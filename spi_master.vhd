@@ -9,7 +9,7 @@ entity SPI_Master is
         cyc_i   : in  STD_LOGIC;
         stb_i   : in  STD_LOGIC;
         we_i    : in  STD_LOGIC;
-        --adr_i   : in  STD_LOGIC_VECTOR(7 downto 0);
+        adr_i   : in  STD_LOGIC_VECTOR(7 downto 0);
         dat_i   : in  STD_LOGIC_VECTOR(31 downto 0);
         dat_o   : out STD_LOGIC_VECTOR(31 downto 0);
         ack_o   : out STD_LOGIC;
@@ -21,7 +21,7 @@ entity SPI_Master is
     );
 end SPI_Master;
 
-architecture SPI_Master_STRUCTURAL of SPI_Master is
+architecture SPI_Master_BEHAVIORAL of SPI_Master is
     constant CPOL : std_logic := '0'; 
     constant CPHA : std_logic := '0'; 
 
@@ -55,6 +55,7 @@ begin
                 data_o_s <= (others => '0');
                 curr_state <= S_IDLE;
             else
+                ack_o <= '0';
                 curr_state <= next_state;
                 
                 if prescaler_cki = 15 then
@@ -89,9 +90,8 @@ begin
                         end if;
                     end if;
                     if we_i = '0' then
-                        ack_o <= '1';
                     end if;
-                    
+                    ack_o <= '1';
 
                 end if;
             end if;
@@ -133,4 +133,4 @@ begin
         end case;
     end process comb_process_sck;
 
-end SPI_Master_STRUCTURAL;
+end SPI_Master_BEHAVIORAL;

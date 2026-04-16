@@ -1,7 +1,13 @@
 v 4
-file . "tb_spi_master.vhd" "5ab740cf23b89d0da707a55673a4fd4ccd5b864c" "20260415211303.812":
-  entity testbench at 1( 0) + 0 on 61;
-  architecture tbarch of testbench at 8( 113) + 0 on 62;
-file . "spi_master.vhd" "f8ec00cbba313666f4a37c2fa185086d81f824a2" "20260415211303.751":
-  entity spi_master at 1( 0) + 0 on 59;
-  architecture spi_master_structural of spi_master at 27( 659) + 0 on 60;
+file . "tb_pwm_generic_master.vhd" "f1d84ad501080ccda7906278f1f4dd6940ac9d92" "20260416231029.664":
+  entity testbench at 1( 0) + 0 on 93;
+  architecture tbarch of testbench at 8( 113) + 0 on 94;
+file . "spi_master.vhd" "91c3ea176569fb4f5a1f14fe0e32b2ce2647cb70" "20260416223246.169":
+  entity spi_master at 1( 0) + 0 on 63;
+  architecture spi_master_behavioral of spi_master at 24( 602) + 0 on 64;
+file . "pwm_10_master.vhd" "e5f649ea78f039510516561f7c54f9b08b5494df" "20260416230214.870":
+  entity pwm_10 at 1( 0) + 0 on 79;
+  architecture pwm_10_behavioral of pwm_10 at 21( 527) + 0 on 80;
+file . "pwm_generic_master.vhd" "99007a8e375637676ced09de0e0c7f594dd67df9" "20260416231029.596":
+  entity pwm_generic at 1( 0) + 0 on 91;
+  architecture pwm_generic_behavioral of pwm_generic at 24( 590) + 0 on 92;

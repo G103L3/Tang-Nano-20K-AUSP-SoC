@@ -11,6 +11,8 @@ entity top_system is
         miso_p   : in  std_logic;
         sck_p    : out std_logic;
         cs_p     : out std_logic;
+        pwm_10_o : out std_logic;
+        pwm_4_o  : out std_logic;
         jtag_tdi : in  std_logic;
         jtag_tdo : out std_logic;
         jtag_tck : in  std_logic;
@@ -44,38 +46,35 @@ architecture behavioral of top_system is
 
     component wb_interconnect
         port (
-            m0_adr_i : in std_logic_vector(31 downto 0);
-            m0_dat_i : in std_logic_vector(31 downto 0);
-            m0_dat_o : out std_logic_vector(31 downto 0);
-            m0_we_i  : in std_logic;
-            m0_sel_i : in std_logic_vector(3 downto 0);
-            m0_stb_i : in std_logic;
-            m0_cyc_i : in std_logic;
-            m0_ack_o : out std_logic;
-            m1_adr_i : in std_logic_vector(31 downto 0);
-            m1_dat_i : in std_logic_vector(31 downto 0);
-            m1_dat_o : out std_logic_vector(31 downto 0);
-            m1_we_i  : in std_logic;
-            m1_sel_i : in std_logic_vector(3 downto 0);
-            m1_stb_i : in std_logic;
-            m1_cyc_i : in std_logic;
-            m1_ack_o : out std_logic;
-            s0_adr_o : out std_logic_vector(31 downto 0);
-            s0_dat_o : out std_logic_vector(31 downto 0);
-            s0_dat_i : in std_logic_vector(31 downto 0);
-            s0_we_o  : out std_logic;
-            s0_sel_o : out std_logic_vector(3 downto 0);
-            s0_stb_o : out std_logic;
-            s0_cyc_o : out std_logic;
-            s0_ack_i : in std_logic;
-            s1_adr_o : out std_logic_vector(31 downto 0);
-            s1_dat_o : out std_logic_vector(31 downto 0);
-            s1_dat_i : in std_logic_vector(31 downto 0);
-            s1_we_o  : out std_logic;
-            s1_sel_o : out std_logic_vector(3 downto 0);
-            s1_stb_o : out std_logic;
-            s1_cyc_o : out std_logic;
-            s1_ack_i : in std_logic
+            m0_adr_i : in std_logic_vector(31 downto 0); m0_dat_i : in std_logic_vector(31 downto 0); m0_dat_o : out std_logic_vector(31 downto 0);
+            m0_we_i  : in std_logic; m0_sel_i : in std_logic_vector(3 downto 0); m0_stb_i : in std_logic; m0_cyc_i : in std_logic; m0_ack_o : out std_logic;
+            
+            m1_adr_i : in std_logic_vector(31 downto 0); m1_dat_i : in std_logic_vector(31 downto 0); m1_dat_o : out std_logic_vector(31 downto 0);
+            m1_we_i  : in std_logic; m1_sel_i : in std_logic_vector(3 downto 0); m1_stb_i : in std_logic; m1_cyc_i : in std_logic; m1_ack_o : out std_logic;
+
+            s0_adr_o : out std_logic_vector(31 downto 0); s0_dat_o : out std_logic_vector(31 downto 0); s0_dat_i : in std_logic_vector(31 downto 0);
+            s0_we_o  : out std_logic; s0_sel_o : out std_logic_vector(3 downto 0); s0_stb_o : out std_logic; s0_cyc_o : out std_logic; s0_ack_i : in std_logic;
+            
+            s1_adr_o : out std_logic_vector(31 downto 0); s1_dat_o : out std_logic_vector(31 downto 0); s1_dat_i : in std_logic_vector(31 downto 0);
+            s1_we_o  : out std_logic; s1_sel_o : out std_logic_vector(3 downto 0); s1_stb_o : out std_logic; s1_cyc_o : out std_logic; s1_ack_i : in std_logic;
+
+            s2_adr_o : out std_logic_vector(31 downto 0); s2_dat_o : out std_logic_vector(31 downto 0); s2_dat_i : in std_logic_vector(31 downto 0);
+            s2_we_o  : out std_logic; s2_sel_o : out std_logic_vector(3 downto 0); s2_stb_o : out std_logic; s2_cyc_o : out std_logic; s2_ack_i : in std_logic;
+
+            s3_adr_o : out std_logic_vector(31 downto 0); s3_dat_o : out std_logic_vector(31 downto 0); s3_dat_i : in std_logic_vector(31 downto 0);
+            s3_we_o  : out std_logic; s3_sel_o : out std_logic_vector(3 downto 0); s3_stb_o : out std_logic; s3_cyc_o : out std_logic; s3_ack_i : in std_logic;
+
+            s4_adr_o : out std_logic_vector(31 downto 0); s4_dat_o : out std_logic_vector(31 downto 0); s4_dat_i : in std_logic_vector(31 downto 0);
+            s4_we_o  : out std_logic; s4_sel_o : out std_logic_vector(3 downto 0); s4_stb_o : out std_logic; s4_cyc_o : out std_logic; s4_ack_i : in std_logic;
+
+            s5_adr_o : out std_logic_vector(31 downto 0); s5_dat_o : out std_logic_vector(31 downto 0); s5_dat_i : in std_logic_vector(31 downto 0);
+            s5_we_o  : out std_logic; s5_sel_o : out std_logic_vector(3 downto 0); s5_stb_o : out std_logic; s5_cyc_o : out std_logic; s5_ack_i : in std_logic;
+
+            s6_adr_o : out std_logic_vector(31 downto 0); s6_dat_o : out std_logic_vector(31 downto 0); s6_dat_i : in std_logic_vector(31 downto 0);
+            s6_we_o  : out std_logic; s6_sel_o : out std_logic_vector(3 downto 0); s6_stb_o : out std_logic; s6_cyc_o : out std_logic; s6_ack_i : in std_logic;
+
+            s7_adr_o : out std_logic_vector(31 downto 0); s7_dat_o : out std_logic_vector(31 downto 0); s7_dat_i : in std_logic_vector(31 downto 0);
+            s7_we_o  : out std_logic; s7_sel_o : out std_logic_vector(3 downto 0); s7_stb_o : out std_logic; s7_cyc_o : out std_logic; s7_ack_i : in std_logic
         );
     end component;
 
@@ -86,6 +85,7 @@ architecture behavioral of top_system is
             cyc_i : in  std_logic;
             stb_i : in  std_logic;
             we_i  : in  std_logic;
+            adr_i : in  std_logic_vector(7 downto 0);
             dat_i : in  std_logic_vector(31 downto 0);
             dat_o : out std_logic_vector(31 downto 0);
             ack_o : out std_logic;
@@ -93,6 +93,24 @@ architecture behavioral of top_system is
             miso  : in  std_logic;
             sck   : out std_logic;
             cs    : out std_logic
+        );
+    end component;
+
+    component pwm_generic
+        generic (
+            nbit : integer := 10
+        );
+        port (
+            clk_i : in  std_logic;
+            rst_i : in  std_logic;
+            cyc_i : in  std_logic;
+            stb_i : in  std_logic;
+            we_i  : in  std_logic;
+            adr_i : in  std_logic_vector(7 downto 0);
+            dat_i : in  std_logic_vector(31 downto 0);
+            dat_o : out std_logic_vector(31 downto 0);
+            ack_o : out std_logic;
+            pwm_o : out std_logic
         );
     end component;
 
@@ -104,13 +122,20 @@ architecture behavioral of top_system is
     signal s1_stb, s1_we, s1_cyc, s1_ack : std_logic;
     signal s1_sel : std_logic_vector(3 downto 0);
 
-    signal dummy_m1_adr, dummy_m1_dat_i, dummy_m1_dat_o : std_logic_vector(31 downto 0) := (others => '0');
-    signal dummy_m1_stb, dummy_m1_we, dummy_m1_cyc, dummy_m1_ack : std_logic := '0';
+    signal s2_adr, s2_wdata, s2_rdata : std_logic_vector(31 downto 0);
+    signal s2_stb, s2_we, s2_cyc, s2_ack : std_logic;
+    signal s2_sel : std_logic_vector(3 downto 0);
+
+    signal s3_adr, s3_wdata, s3_rdata : std_logic_vector(31 downto 0);
+    signal s3_stb, s3_we, s3_cyc, s3_ack : std_logic;
+    signal s3_sel : std_logic_vector(3 downto 0);
+
+    signal dummy_m1_adr, dummy_m1_dat_i : std_logic_vector(31 downto 0) := (others => '0');
+    signal dummy_m1_stb, dummy_m1_we, dummy_m1_cyc : std_logic := '0';
     signal dummy_m1_sel : std_logic_vector(3 downto 0) := (others => '0');
 
-    signal dummy_s0_adr, dummy_s0_dat_o, dummy_s0_dat_i : std_logic_vector(31 downto 0) := (others => '0');
-    signal dummy_s0_stb, dummy_s0_we, dummy_s0_cyc, dummy_s0_ack : std_logic := '0';
-    signal dummy_s0_sel : std_logic_vector(3 downto 0) := (others => '0');
+    signal dummy_s_dat_i : std_logic_vector(31 downto 0) := (others => '0');
+    signal dummy_s_ack_i : std_logic := '0';
 
     signal irq_dummy : std_logic_vector(31 downto 20) := (others => '0');
 
@@ -139,41 +164,19 @@ begin
 
     u_bus: wb_interconnect
     port map (
-        m0_adr_i => cpu_adr,
-        m0_dat_i => cpu_wdata,
-        m0_dat_o => cpu_rdata,
-        m0_we_i  => cpu_we,
-        m0_sel_i => cpu_sel,
-        m0_stb_i => cpu_stb,
-        m0_cyc_i => cpu_cyc,
-        m0_ack_o => cpu_ack,
-        
-        m1_adr_i => dummy_m1_adr,
-        m1_dat_i => dummy_m1_dat_i,
-        m1_dat_o => dummy_m1_dat_o,
-        m1_we_i  => dummy_m1_we,
-        m1_sel_i => dummy_m1_sel,
-        m1_stb_i => dummy_m1_stb,
-        m1_cyc_i => dummy_m1_cyc,
-        m1_ack_o => dummy_m1_ack,
+        m0_adr_i => cpu_adr, m0_dat_i => cpu_wdata, m0_dat_o => cpu_rdata, m0_we_i => cpu_we, m0_sel_i => cpu_sel, m0_stb_i => cpu_stb, m0_cyc_i => cpu_cyc, m0_ack_o => cpu_ack,
+        m1_adr_i => dummy_m1_adr, m1_dat_i => dummy_m1_dat_i, m1_dat_o => open, m1_we_i => dummy_m1_we, m1_sel_i => dummy_m1_sel, m1_stb_i => dummy_m1_stb, m1_cyc_i => dummy_m1_cyc, m1_ack_o => open,
 
-        s0_adr_o => dummy_s0_adr,
-        s0_dat_o => dummy_s0_dat_o,
-        s0_dat_i => dummy_s0_dat_i,
-        s0_we_o  => dummy_s0_we,
-        s0_sel_o => dummy_s0_sel,
-        s0_stb_o => dummy_s0_stb,
-        s0_cyc_o => dummy_s0_cyc,
-        s0_ack_i => dummy_s0_ack,
+        s0_adr_o => open, s0_dat_o => open, s0_dat_i => dummy_s_dat_i, s0_we_o => open, s0_sel_o => open, s0_stb_o => open, s0_cyc_o => open, s0_ack_i => dummy_s_ack_i,
         
-        s1_adr_o => s1_adr,
-        s1_dat_o => s1_wdata,
-        s1_dat_i => s1_rdata,
-        s1_we_o  => s1_we,
-        s1_sel_o => s1_sel,
-        s1_stb_o => s1_stb,
-        s1_cyc_o => s1_cyc,
-        s1_ack_i => s1_ack
+        s1_adr_o => s1_adr, s1_dat_o => s1_wdata, s1_dat_i => s1_rdata, s1_we_o => s1_we, s1_sel_o => s1_sel, s1_stb_o => s1_stb, s1_cyc_o => s1_cyc, s1_ack_i => s1_ack,
+        s2_adr_o => s2_adr, s2_dat_o => s2_wdata, s2_dat_i => s2_rdata, s2_we_o => s2_we, s2_sel_o => s2_sel, s2_stb_o => s2_stb, s2_cyc_o => s2_cyc, s2_ack_i => s2_ack,
+        s3_adr_o => s3_adr, s3_dat_o => s3_wdata, s3_dat_i => s3_rdata, s3_we_o => s3_we, s3_sel_o => s3_sel, s3_stb_o => s3_stb, s3_cyc_o => s3_cyc, s3_ack_i => s3_ack,
+        
+        s4_adr_o => open, s4_dat_o => open, s4_dat_i => dummy_s_dat_i, s4_we_o => open, s4_sel_o => open, s4_stb_o => open, s4_cyc_o => open, s4_ack_i => dummy_s_ack_i,
+        s5_adr_o => open, s5_dat_o => open, s5_dat_i => dummy_s_dat_i, s5_we_o => open, s5_sel_o => open, s5_stb_o => open, s5_cyc_o => open, s5_ack_i => dummy_s_ack_i,
+        s6_adr_o => open, s6_dat_o => open, s6_dat_i => dummy_s_dat_i, s6_we_o => open, s6_sel_o => open, s6_stb_o => open, s6_cyc_o => open, s6_ack_i => dummy_s_ack_i,
+        s7_adr_o => open, s7_dat_o => open, s7_dat_i => dummy_s_dat_i, s7_we_o => open, s7_sel_o => open, s7_stb_o => open, s7_cyc_o => open, s7_ack_i => dummy_s_ack_i
     );
 
     u_spi: spi_master
@@ -183,6 +186,7 @@ begin
         cyc_i => s1_cyc,
         stb_i => s1_stb,
         we_i  => s1_we,
+        adr_i => s1_adr(7 downto 0),
         dat_i => s1_wdata,
         dat_o => s1_rdata,
         ack_o => s1_ack,
@@ -190,6 +194,40 @@ begin
         miso  => miso_p,
         sck   => sck_p,
         cs    => cs_p
+    );
+
+    u_pwm10: pwm_generic
+    generic map (
+        nbit => 10
+    )
+    port map (
+        clk_i => clk_i,
+        rst_i => rst_i,
+        cyc_i => s2_cyc,
+        stb_i => s2_stb,
+        we_i  => s2_we,
+        adr_i => s2_adr(7 downto 0),
+        dat_i => s2_wdata,
+        dat_o => s2_rdata,
+        ack_o => s2_ack,
+        pwm_o => pwm_10_o
+    );
+
+    u_pwm4: pwm_generic
+    generic map (
+        nbit => 4
+    )
+    port map (
+        clk_i => clk_i,
+        rst_i => rst_i,
+        cyc_i => s3_cyc,
+        stb_i => s3_stb,
+        we_i  => s3_we,
+        adr_i => s3_adr(7 downto 0),
+        dat_i => s3_wdata,
+        dat_o => s3_rdata,
+        ack_o => s3_ack,
+        pwm_o => pwm_4_o
     );
 
 end behavioral;
