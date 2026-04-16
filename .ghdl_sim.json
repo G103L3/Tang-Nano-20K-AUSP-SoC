@@ -1,0 +1,8 @@
+{
+    "extra_files":  [
+
+                    ],
+    "tb_entity":  "TestBench",
+    "main_file":  "spi_master",
+    "tb_file":  "tb_spi_master"
+}

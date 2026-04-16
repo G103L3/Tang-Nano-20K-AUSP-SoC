@@ -1,0 +1,7 @@
+v 4
+file . "tb_spi_master.vhd" "5ab740cf23b89d0da707a55673a4fd4ccd5b864c" "20260415211303.812":
+  entity testbench at 1( 0) + 0 on 61;
+  architecture tbarch of testbench at 8( 113) + 0 on 62;
+file . "spi_master.vhd" "f8ec00cbba313666f4a37c2fa185086d81f824a2" "20260415211303.751":
+  entity spi_master at 1( 0) + 0 on 59;
+  architecture spi_master_structural of spi_master at 27( 659) + 0 on 60;
