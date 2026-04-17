@@ -2,12 +2,12 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity TestBench is
-end TestBench;
+entity testbench is
+end testbench;
 
-architecture tbarch of TestBench is
-component PWM_GENERIC is
-    Generic(
+architecture tbarch of testbench is
+    component PWM_GENERIC is
+    Generic (
         NBIT : integer := 10
     );
     Port (
@@ -20,10 +20,9 @@ component PWM_GENERIC is
         dat_i   : in  STD_LOGIC_VECTOR(31 downto 0);
         dat_o   : out STD_LOGIC_VECTOR(31 downto 0);
         ack_o   : out STD_LOGIC;
-
         PWM_o   : OUT STD_LOGIC
     );
-end component;
+    end component;
 
     signal clk_i : std_logic := '0';
     signal rst_i : std_logic := '0';
@@ -34,12 +33,12 @@ end component;
     signal dat_i : std_logic_vector(31 downto 0) := x"00000000";
     signal dat_o : std_logic_vector(31 downto 0);
     signal ack_o : std_logic;
-    signal pwm_o : std_logic;
+    signal PWM_o : std_logic;
 
 begin
 
     uut: PWM_GENERIC
-    generic map (10) 
+    generic map ( NBIT => 10 )
     port map (
         clk_i => clk_i,
         rst_i => rst_i,
@@ -50,7 +49,7 @@ begin
         dat_i => dat_i,
         dat_o => dat_o,
         ack_o => ack_o,
-        pwm_o => pwm_o
+        PWM_o => PWM_o
     );
 
     clk_i <= not clk_i after 5 ns;
@@ -67,7 +66,9 @@ begin
         stb_i <= '1';
         we_i  <= '1';
         adr_i <= x"00";
-        dat_i <= x"00000005";
+        -- impacchettamento: duty=5 (bit 19-10) e periodo=10 (bit 9-0)
+        -- hex: 0000140A
+        dat_i <= x"0000140A"; 
         wait until rising_edge(clk_i);
         cyc_i <= '0';
         stb_i <= '0';
@@ -79,30 +80,14 @@ begin
         cyc_i <= '1';
         stb_i <= '1';
         we_i  <= '1';
-        adr_i <= x"00";
-        dat_i <= x"80000000";
+        adr_i <= x"04"; -- stop
         wait until rising_edge(clk_i);
         cyc_i <= '0';
         stb_i <= '0';
-        we_i  <= '0';
 
-        wait for 200 ns;
+        wait for 100 ns;
 
-        wait until rising_edge(clk_i);
-        cyc_i <= '1';
-        stb_i <= '1';
-        we_i  <= '1';
-        adr_i <= x"00";
-        dat_i <= x"00000002";
-        wait until rising_edge(clk_i);
-        cyc_i <= '0';
-        stb_i <= '0';
-        we_i  <= '0';
-
-        wait for 500 ns;
-
-        wait until rising_edge(clk_i);
-        assert false report "=== SIMULAZIONE COMPLETATA CON SUCCESSO ===" severity failure;
+        assert false report "=== TEST COMPLETATO CON PACKING PERIOD/DUTY ===" severity failure;
         wait;
     end process;
 

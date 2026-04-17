@@ -22,7 +22,7 @@ entity PWM_GENERIC is
 end PWM_GENERIC;
 
 architecture PWM_GENERIC_BEHAVIORAL of PWM_GENERIC is
-signal resolution, counter : unsigned(NBIT-1 downto 0) := (others => '0');
+signal period, counter, duty_cycle : unsigned(NBIT-1 downto 0) := (others => '0');
 
 signal start : std_logic;
 signal stb_old : std_logic;
@@ -44,16 +44,15 @@ begin
                 stb_old <= stb_i;
                 if cyc_i = '1' AND stb_i = '1' AND stb_old = '0' then 
                     if we_i = '1' then
-                        if dat_i(31) = '1' then -- The dat_i = 10000000000000000000000000000000 means stop sending (silent)
-                            start <= '0';
-                            ack_o <= '0';
-                            PWM_o <= '0';
-                        else
+                        if adr_i = x"00" then
                             if start = '0' then
-                                resolution <= unsigned(dat_i(NBIT-1 downto 0));
+                                period <= unsigned(dat_i(NBIT-1 downto 0));
+                                duty_cycle <= unsigned(dat_i((NBIT*2)-1 downto NBIT));
                                 counter <= (others => '0');
                                 start <= '1';
                             end if;
+                        elsif adr_i = x"04" then
+                            start <= '0';
                         end if;
                     end if;
                     if we_i = '0' then
@@ -61,13 +60,16 @@ begin
                     ack_o <= '1';
                 end if;
                 if start = '1' then
-                    if counter = resolution-1 then
-                        counter <= (others => '0');
+                    if counter < duty_cycle then
                         PWM_o <= '1';
                     else
-                        counter <= counter + 1;
                         PWM_o <= '0';
+                    end if;
 
+                    if counter = period-1 then
+                        counter <= (others => '0');
+                    else
+                        counter <= counter + 1;
                     end if;
                 end if;
 
