@@ -3,6 +3,6 @@
 
                     ],
     "tb_entity":  "TestBench",
-    "main_file":  "pwm_generic_master",
-    "tb_file":  "tb_pwm_generic_master"
+    "main_file":  "gpio_generic",
+    "tb_file":  "tb_gpio_generic"
 }
