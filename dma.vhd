@@ -16,7 +16,7 @@ entity dma is
         clk_i    : in  std_logic;
         rst_i    : in  std_logic;  -- active low
 
-        -- Wishbone Slave – CPU configures the DMA
+        -- Wishbone Slave: CPU configures the DMA
         s_cyc_i  : in  std_logic;
         s_stb_i  : in  std_logic;
         s_we_i   : in  std_logic;
@@ -25,7 +25,7 @@ entity dma is
         s_dat_o  : out std_logic_vector(31 downto 0);
         s_ack_o  : out std_logic;
 
-        -- Wishbone Master – DMA accesses SDRAM via memory_arbiter M1
+        -- Wishbone Master: DMA accesses SDRAM via memory_arbiter M1
         m_cyc_o  : out std_logic;
         m_stb_o  : out std_logic;
         m_we_o   : out std_logic;
@@ -50,9 +50,7 @@ architecture behavioral of dma is
 
 begin
 
-    -- -------------------------------------------------------------------------
-    -- Wishbone Slave: register read/write
-    -- -------------------------------------------------------------------------
+
     seq_clk: process(clk_i)
         variable reg_sel : std_logic_vector(3 downto 0);
     begin
@@ -62,15 +60,23 @@ begin
             start_req <= '0';
 
             if rst_i = '0' then
-
+                s_ack_o <= '0';
+                s_dat_o <= (others => '0');
+                m_adr_o <= (others => '0');
+                m_dat_o <= (others => '0');
             elsif s_cyc_i = '1' and s_stb_i = '1' then
                 s_ack_o <= '1';
-                reg_sel := s_adr_i(4 downto 2); 
 
                 if s_we_i = '1' then
                     -- Write
                     case reg_sel is
-                    
+                        if s_adr_i = x"00000003" then
+                            base_address <= s_dat_i;
+                        elsif s_adr_i = x"00000001" then
+                            start <= '1';
+                        elsif s_adr_i = x"00000002" then
+                            start <= '0';
+                        end if;
                     end case;
                 else
                     -- Read
@@ -161,9 +167,13 @@ begin
             when S_SCALER => 
                 scaler_counter <= scaler_counter + 1;
                 if scaler_counter = 31 then
-
-
-                
+                    next_state <= S_READ_1;
+                else
+                    next_state <= S_SCALER;
+                end if;
+            when others => 
+                next_state <= S_IDLE;
+            end case;
     end process comb_proc;
 
 end behavioral;
