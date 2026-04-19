@@ -41,7 +41,7 @@ begin
     SCK   <= SCK_s;
     CS    <= CS_s;
     MOSI  <= '0';
-
+d
     seq_process_cki: process(clk_i)
     begin
         if rising_edge(clk_i) then
