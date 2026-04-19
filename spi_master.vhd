@@ -23,8 +23,8 @@ end SPI_Master;
 
 architecture SPI_Master_BEHAVIORAL of SPI_Master is
 
-    type state_type is (S_IDLE, S_START, S_READING, S_CLOSE);
-    signal curr_state, next_state : state_type;
+    type state_type is (S_IDLE, S_READING, S_CLOSE);
+    signal curr_state : state_type;
 
     signal prescaler_cki : natural range 0 to 31 := 0;
     signal shift_reg     : std_logic_vector(31 downto 0) := (others => '0');
@@ -42,7 +42,7 @@ begin
     CS    <= CS_s;
     MOSI  <= '0';
     
-    seq_process_cki: process(clk_i)
+    seq_clk: process(clk_i)
     begin
         if rising_edge(clk_i) then
             if rst_i = '0' then
@@ -56,32 +56,6 @@ begin
                 data_ready    <= '0';
                 curr_state    <= S_IDLE;
             else
-                ack_o      <= '0';
-                curr_state <= next_state;
-
-                if prescaler_cki = 15 then
-                    SCK_s         <= '1';
-                    prescaler_cki <= prescaler_cki + 1;
-
-                    if curr_state = S_READING then
-                        if MISO_counter = 31 then
-                            data_o_s     <= shift_reg(30 downto 0) & MISO;
-                            data_ready   <= '1';
-                            shift_reg    <= (others => '0');
-                            MISO_counter <= 0;
-                        else
-                            shift_reg    <= shift_reg(30 downto 0) & MISO;
-                            MISO_counter <= MISO_counter + 1;
-                        end if;
-                    end if;
-
-                elsif prescaler_cki = 31 then
-                    SCK_s         <= '0';
-                    prescaler_cki <= 0;
-                else
-                    prescaler_cki <= prescaler_cki + 1;
-                end if;
-
                 if cyc_i = '1' and stb_i = '1' then
                     if we_i = '1' then
                         if adr_i = x"01" then
@@ -110,39 +84,53 @@ begin
                     end if;
                 end if;
 
+                ack_o      <= '0';
+                CS_s       <= '0';
+
+                case curr_state is
+                    when S_IDLE =>
+                        CS_s <= '1';
+                        if start = '1' then
+                            curr_state <= S_START;
+                        else 
+                            curr_state <= S_IDLE;
+                        end if;
+                    when S_READING =>
+                        if prescaler_cki = 15 then
+                            SCK_s         <= '1';
+                            prescaler_cki <= prescaler_cki + 1;
+                            if MISO_counter = 31 then
+                                data_o_s     <= shift_reg(30 downto 0) & MISO;
+                                data_ready   <= '1';
+                                shift_reg    <= (others => '0');
+                                MISO_counter <= 0;
+                            else
+                                shift_reg    <= shift_reg(30 downto 0) & MISO;
+                                MISO_counter <= MISO_counter + 1;
+                            end if;
+                        elsif prescaler_cki = 31 then
+                            SCK_s         <= '0';
+                            prescaler_cki <= 0;
+                        else
+                            prescaler_cki <= prescaler_cki + 1;
+                        end if;
+                        if start = '1' then
+                            curr_state <= S_READING;
+                        else
+                            curr_state <= S_CLOSE;
+                        end if;
+
+                    when S_CLOSE =>
+                        CS_s       <= '1';
+                        curr_state <= S_IDLE;
+
+                    when others =>
+                        CS_s       <= '1';
+                        curr_state <= S_IDLE;
+                end case;
             end if;
         end if;
     end process seq_process_cki;
 
-    comb_process_sck: process(curr_state, start)
-    begin
-        next_state <= curr_state;
-        CS_s       <= '0';
-
-        case curr_state is
-            when S_IDLE =>
-                CS_s <= '1';
-                if start = '1' then
-                    next_state <= S_START;
-                end if;
-
-            when S_START =>
-                next_state <= S_READING;
-
-            when S_READING =>
-                if start = '0' then
-                    next_state <= S_CLOSE;
-                end if;
-
-            when S_CLOSE =>
-                CS_s       <= '1';
-                next_state <= S_IDLE;
-
-            when others =>
-                CS_s       <= '1';
-                next_state <= S_IDLE;
-
-        end case;
-    end process comb_process_sck;
 
 end SPI_Master_BEHAVIORAL;
