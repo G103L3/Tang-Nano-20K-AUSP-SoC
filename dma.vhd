@@ -48,7 +48,11 @@ architecture behavioral of dma is
     signal address_local : unsigned(20 downto 0) := (others => '0');
     signal base_address  : unsigned(20 downto 0) := (others => '0');
     signal start         : std_logic := '0';
+    constant lost_cycles        : natural := 0; 
+    constant prescaler_cycles   : natural := 32;
+    constant total_cycles       : natural := prescaler_cycles * 32;
 
+    
 begin
 
     seq_clk: process(clk_i)
@@ -104,7 +108,7 @@ begin
                         end if;
 
                     when S_SCALER =>
-                        if scaler_counter = 1023 then --Ci sono 32 * 32 = 2^5 * 2^5 = 2^10 = 1024 inputs prima dell'spi output
+                        if scaler_counter = total_cycles-1 then --Ci sono 32 * 32 = 2^5 * 2^5 = 2^10 = 1024 inputs prima dell'spi output
                             scaler_counter <= 0;
                             curr_state     <= S_READ_1;
                         else
@@ -120,11 +124,8 @@ begin
                             data    <= m_dat_i;
                             m_cyc_o <= '0';
                             m_stb_o <= '0';
-                            curr_state <= S_READ_2;
+                            curr_state <= S_R_DEV;
                         end if;
-
-                    when S_READ_2 =>
-                        curr_state <= S_R_DEV;
 
                     when S_R_DEV =>
                         m_cyc_o <= '1';
@@ -164,7 +165,7 @@ begin
                             if to_integer(address_local + 1 - base_address) mod 512 = 0 then
                                 curr_state <= S_IRQ;
                             else
-                                scaler_counter <= 0;
+                                scaler_counter <= 12; --lo imposta a 12 perché è il numero di cicli persi rispetto al SPI in questo punto
                                 curr_state     <= S_SCALER;
                             end if;
                         end if;
@@ -174,14 +175,14 @@ begin
                         if to_integer(address_local - base_address) = 1024 then
                             curr_state <= S_C_BASE;
                         else
-                            scaler_counter <= 0;
+                            scaler_counter <= 13; --lo imposta a 13 perché è il numero di cicli persi rispetto al SPI in questo punto
                             curr_state     <= S_SCALER;
                         end if;
 
                     when S_C_BASE =>
                         irq_o         <= '1';
                         address_local <= base_address;
-                        scaler_counter <= 0;
+                        scaler_counter <= 14; --lo imposta a 14 perché è il numero di cicli persi rispetto al SPI in questo punto
                         curr_state    <= S_SCALER;
 
                     when S_CLOSE =>

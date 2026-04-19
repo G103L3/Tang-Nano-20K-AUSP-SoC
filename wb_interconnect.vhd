@@ -130,7 +130,7 @@ architecture behavioral of wb_interconnect is
 
 begin
 
-    -- Priority mux: M1 wins when both have cyc+stb active
+    -- Il Mux M1 (DMA) vince su M0 (CPU)
     sel_m1  <= '1' when (m1_cyc_i = '1' and m1_stb_i = '1') else '0';
     sel_adr <= m1_adr_i when sel_m1 = '1' else m0_adr_i;
     sel_dat <= m1_dat_i when sel_m1 = '1' else m0_dat_i;
@@ -139,7 +139,6 @@ begin
     sel_stb <= m1_stb_i when sel_m1 = '1' else m0_stb_i;
     sel_cyc <= m1_cyc_i when sel_m1 = '1' else m0_cyc_i;
 
-    -- Address decode: bits [31:28]
     process(sel_adr)
     begin
         case sel_adr(31 downto 28) is

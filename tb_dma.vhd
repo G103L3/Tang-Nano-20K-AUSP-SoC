@@ -221,7 +221,7 @@ begin
         wait until rising_edge(clk_i);
         s_cyc_i <= '0'; s_stb_i <= '0'; s_we_i <= '0';
 
-        wait for 35 us;
+        wait for 6000 us;
 
         wait until rising_edge(clk_i);
         s_cyc_i <= '1'; s_stb_i <= '1'; s_we_i <= '1';
