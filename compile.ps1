@@ -3,29 +3,67 @@
 # ==========================================
 Write-Host "=== Setup simulazione GHDL ===" -ForegroundColor Cyan
 
-$ConfigFile = ".ghdl_sim.json"
+$ProfilesFile = ".ghdl_profiles.json"
+$OldConfigFile = ".ghdl_sim.json"
 
 # ===============================
-# Caricamento configurazione
+# Migrazione da vecchio formato
 # ===============================
-if (Test-Path $ConfigFile) {
-    $use_old = Read-Host "Configurazione precedente trovata. Usarla? (y/n)"
-    if ($use_old -eq "y") {
-        $config = Get-Content $ConfigFile | ConvertFrom-Json
-        $main_file = $config.main_file
-        $tb_file = $config.tb_file
-        $tb_entity = $config.tb_entity
-        $extra_files = $config.extra_files
-        Write-Host "Configurazione caricata." -ForegroundColor Green
-    } else {
-        Remove-Item $ConfigFile -Force
+if ((Test-Path $OldConfigFile) -and -not (Test-Path $ProfilesFile)) {
+    Write-Host "Migrazione configurazione precedente..." -ForegroundColor Yellow
+    $oldConfig = Get-Content $OldConfigFile | ConvertFrom-Json
+    $oldConfig | Add-Member -NotePropertyName "name" -NotePropertyValue "Profilo default" -Force
+    $oldConfig | Add-Member -NotePropertyName "vaporview_config" -NotePropertyValue $null -Force
+    @($oldConfig) | ConvertTo-Json -Depth 20 | Set-Content $ProfilesFile
+    Write-Host "Profilo esistente migrato come 'Profilo default'." -ForegroundColor Green
+}
+
+# ===============================
+# Caricamento profili
+# ===============================
+$profiles = @()
+if (Test-Path $ProfilesFile) {
+    $loaded = Get-Content $ProfilesFile | ConvertFrom-Json
+    if ($loaded -is [array]) { $profiles = $loaded } else { $profiles = @($loaded) }
+}
+
+$profileIndex = -1
+$main_file = $null
+$tb_file = $null
+$tb_entity = $null
+$extra_files = @()
+
+if ($profiles.Count -gt 0) {
+    Write-Host "`nProfili disponibili:" -ForegroundColor Yellow
+    for ($i = 0; $i -lt $profiles.Count; $i++) {
+        Write-Host "  $($i + 1). $($profiles[$i].name)  [main: $($profiles[$i].main_file), tb: $($profiles[$i].tb_entity)]"
+    }
+    Write-Host "  $($profiles.Count + 1). Crea nuovo profilo" -ForegroundColor Cyan
+
+    do {
+        $choice = Read-Host "Seleziona un profilo (1-$($profiles.Count + 1))"
+        $choiceNum = 0
+        $valid = [int]::TryParse($choice, [ref]$choiceNum) -and $choiceNum -ge 1 -and $choiceNum -le ($profiles.Count + 1)
+        if (-not $valid) { Write-Host "Scelta non valida, riprova." -ForegroundColor Red }
+    } while (-not $valid)
+
+    if ($choiceNum -le $profiles.Count) {
+        $profileIndex = $choiceNum - 1
+        $main_file   = $profiles[$profileIndex].main_file
+        $tb_file     = $profiles[$profileIndex].tb_file
+        $tb_entity   = $profiles[$profileIndex].tb_entity
+        $extra_files = if ($profiles[$profileIndex].extra_files) { @($profiles[$profileIndex].extra_files) } else { @() }
+        Write-Host "Profilo '$($profiles[$profileIndex].name)' caricato." -ForegroundColor Green
     }
 }
 
 # ===============================
-# Input dati (solo se non caricati)
+# Input dati nuovo profilo
 # ===============================
-if (-not $main_file) {
+if ($profileIndex -eq -1) {
+    $profileName = Read-Host "Nome profilo"
+    if (-not $profileName) { Write-Host "Errore: nome profilo non valido." -ForegroundColor Red; exit 1 }
+
     $main_file = Read-Host "Nome file principale da analizzare (senza .vhd, es. spi_master)"
     if (-not $main_file) { Write-Host "Errore: nome file non valido." -ForegroundColor Red; exit 1 }
 
@@ -37,34 +75,42 @@ if (-not $main_file) {
 
     $extra_files = @()
     $use_extra = Read-Host "Si usano altri file da compilare? (y/n)"
-    
     if ($use_extra -eq "y") {
         Write-Host "Inserisci i file supplementari (senza .vhd)."
-        Write-Host "Puoi usare anche i percorsi se sono in sottocartelle (es. gowin_picorv32/gowin_picorv32)."
+        Write-Host "Puoi usare anche percorsi per sottocartelle (es. gowin_picorv32/gowin_picorv32)."
         Write-Host "Scrivi '.' per terminare." -ForegroundColor Yellow
-
         while ($true) {
             $extra = Read-Host ">"
-            if ($extra -eq ".") {
-                break
-            } elseif (-not [string]::IsNullOrWhiteSpace($extra)) {
-                $extra_files += $extra
-            }
+            if ($extra -eq ".") { break }
+            elseif (-not [string]::IsNullOrWhiteSpace($extra)) { $extra_files += $extra }
         }
     }
 
-    # ===============================
-    # Salvataggio configurazione
-    # ===============================
-    $configData = @{
-        main_file = $main_file
-        tb_file = $tb_file
-        tb_entity = $tb_entity
-        extra_files = $extra_files
+    $newProfile = [PSCustomObject]@{
+        name             = $profileName
+        main_file        = $main_file
+        tb_file          = $tb_file
+        tb_entity        = $tb_entity
+        extra_files      = $extra_files
+        vaporview_config = $null
     }
-    $configData | ConvertTo-Json | Set-Content $ConfigFile
-    Write-Host "Configurazione salvata in $ConfigFile" -ForegroundColor Green
+    $profiles += $newProfile
+    $profileIndex = $profiles.Count - 1
 }
+
+# ===============================
+# Salva config VaporView prima di cancellare output
+# ===============================
+$vaporviewFile = "output/tb_output_${main_file}.json"
+if (Test-Path $vaporviewFile) {
+    $vvConfig = Get-Content $vaporviewFile -Raw | ConvertFrom-Json
+    $profiles[$profileIndex] | Add-Member -NotePropertyName "vaporview_config" -NotePropertyValue $vvConfig -Force
+    Write-Host "Configurazione VaporView salvata nel profilo." -ForegroundColor Green
+}
+
+# Salva profili (include eventuale nuovo profilo o vaporview aggiornato)
+$profiles | ConvertTo-Json -Depth 20 | Set-Content $ProfilesFile
+Write-Host "Profilo salvato in $ProfilesFile" -ForegroundColor Green
 
 # ===============================
 # Preparazione output
@@ -101,17 +147,29 @@ Write-Host "Esecuzione simulazione..." -ForegroundColor Cyan
 & "C:\GHDL\bin\ghdl.exe" -r --std=08 "$tb_entity" --wave="output/tb_output_${main_file}.ghw"
 
 # ===============================
-# Pulizia
+# Ripristino configurazione VaporView
+# ===============================
+$savedVV = $profiles[$profileIndex].vaporview_config
+if ($savedVV) {
+    $ghwAbsPath = "$PWD\output\tb_output_${main_file}.ghw"
+    $savedVV | Add-Member -NotePropertyName "fileName" -NotePropertyValue $ghwAbsPath -Force
+    $savedVV | ConvertTo-Json -Depth 20 | Set-Content "output/tb_output_${main_file}.json"
+    Write-Host "Configurazione VaporView ripristinata." -ForegroundColor Green
+    & code "$PWD/output/tb_output_${main_file}.json"
+} else {
+    & code "$PWD/output/tb_output_${main_file}.ghw"
+}
+
+# ===============================
+# Pulizia file temporanei
 # ===============================
 Write-Host "Pulizia file temporanei..." -ForegroundColor Cyan
 
-# Su Windows GHDL crea file .exe al momento dell'elaborazione dell'entità
 if (Test-Path "$tb_entity.exe") { Remove-Item "$tb_entity.exe" -ErrorAction SilentlyContinue }
-if (Test-Path "$main_file.o") { Remove-Item "$main_file.o" -ErrorAction SilentlyContinue }
-if (Test-Path "$tb_file.o") { Remove-Item "$tb_file.o" -ErrorAction SilentlyContinue }
+if (Test-Path "$main_file.o")   { Remove-Item "$main_file.o"   -ErrorAction SilentlyContinue }
+if (Test-Path "$tb_file.o")     { Remove-Item "$tb_file.o"     -ErrorAction SilentlyContinue }
 
 foreach ($f in $extra_files) {
-    # Estrae solo il nome del file se c'è un percorso di mezzo per la pulizia dei .o
     $objName = Split-Path $f -Leaf
     if (Test-Path "$objName.o") { Remove-Item "$objName.o" -ErrorAction SilentlyContinue }
 }

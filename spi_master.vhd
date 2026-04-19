@@ -56,24 +56,22 @@ begin
                 data_ready    <= '0';
                 curr_state    <= S_IDLE;
             else
+                ack_o <= '0';
+                CS_s  <= '0';
+
                 if cyc_i = '1' and stb_i = '1' then
                     if we_i = '1' then
                         if adr_i = x"01" then
                             start         <= '1';
-                            prescaler_cki <= 0;
-                            SCK_s         <= '0';
-                            MISO_counter  <= 0;
-                            shift_reg     <= (others => '0');
-                            data_ready    <= '0';
                         elsif adr_i = x"02" then
                             start <= '0';
                         end if;
                         ack_o <= '1';
                     else
-                        --LETTURA 
+                        --LETTURA
                         if adr_i = x"00" then
                             if data_ready = '1' then
-                                ack_o      <= '1';
+                                ack_o <= '1';
                             end if;
                         end if;
                         --RESET FLAG
@@ -83,15 +81,12 @@ begin
                         end if;
                     end if;
                 end if;
-
-                ack_o      <= '0';
-                CS_s       <= '0';
-
                 case curr_state is
                     when S_IDLE =>
                         CS_s <= '1';
                         if start = '1' then
-                            curr_state <= S_START;
+                            curr_state <= S_READING;
+                            ack_o   <= '1';
                         else 
                             curr_state <= S_IDLE;
                         end if;
@@ -130,7 +125,7 @@ begin
                 end case;
             end if;
         end if;
-    end process seq_process_cki;
+    end process seq_clk;
 
 
 end SPI_Master_BEHAVIORAL;

@@ -2,10 +2,10 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity tb_dma is
-end tb_dma;
+entity TestBench is
+end TestBench;
 
-architecture tbarch of tb_dma is
+architecture TBarch of TestBench is
 
     component dma is
         port (
@@ -236,4 +236,4 @@ begin
         wait;
     end process;
 
-end tbarch;
+end TBarch;
