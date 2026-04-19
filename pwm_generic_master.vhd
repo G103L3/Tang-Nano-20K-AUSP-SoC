@@ -44,14 +44,14 @@ begin
                 stb_old <= stb_i;
                 if cyc_i = '1' AND stb_i = '1' AND stb_old = '0' then 
                     if we_i = '1' then
-                        if adr_i = x"00" then
+                        if adr_i = x"01" then
                             if start = '0' then
                                 period <= unsigned(dat_i(NBIT-1 downto 0));
                                 duty_cycle <= unsigned(dat_i((NBIT*2)-1 downto NBIT));
                                 counter <= (others => '0');
                                 start <= '1';
                             end if;
-                        elsif adr_i = x"04" then
+                        elsif adr_i = x"02" then
                             start <= '0';
                         end if;
                     end if;

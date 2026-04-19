@@ -5,8 +5,10 @@
 //Part Number: GW2AR-LV18QN88C8/I7
 //Device: GW2AR-18
 //Device Version: C
-//Created Time: Fri 04 17 01:38:59 2026
+//Created Time: Fri 04 17 02:46:48 2026
 
+IO_LOC "gpio_1_o" 80;
+IO_PORT "gpio_1_o" IO_TYPE=LVCMOS18 PULL_MODE=UP DRIVE=8 BANK_VCCIO=1.8;
 IO_LOC "pwm_4_o" 77;
 IO_PORT "pwm_4_o" IO_TYPE=LVCMOS18 PULL_MODE=UP DRIVE=8 BANK_VCCIO=1.8;
 IO_LOC "pwm_10_o" 76;

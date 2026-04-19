@@ -6,6 +6,7 @@ entity TestBench is
 end TestBench;
 
 architecture TBarch of TestBench is
+
     component SPI_Master is
     Port (
         clk_i   : in  STD_LOGIC;
@@ -17,11 +18,10 @@ architecture TBarch of TestBench is
         dat_i   : in  STD_LOGIC_VECTOR(31 downto 0);
         dat_o   : out STD_LOGIC_VECTOR(31 downto 0);
         ack_o   : out STD_LOGIC;
-
-        MOSI : out STD_LOGIC;
-        MISO : in  STD_LOGIC;
-        SCK  : out STD_LOGIC;
-        CS   : out STD_LOGIC
+        MOSI    : out STD_LOGIC;
+        MISO    : in  STD_LOGIC;
+        SCK     : out STD_LOGIC;
+        CS      : out STD_LOGIC
     );
     end component;
 
@@ -30,7 +30,7 @@ architecture TBarch of TestBench is
     signal cyc_i : std_logic := '0';
     signal stb_i : std_logic := '0';
     signal we_i  : std_logic := '0';
-    signal adr_i : std_logic_vector(7 downto 0) := x"00";
+    signal adr_i : std_logic_vector(7 downto 0)  := x"00";
     signal dat_i : std_logic_vector(31 downto 0) := x"00000000";
     signal dat_o : std_logic_vector(31 downto 0);
     signal ack_o : std_logic;
@@ -70,72 +70,46 @@ begin
     process
     begin
         rst_i <= '0';
-        wait for 15 ns;
+        wait for 20 ns;
         rst_i <= '1';
-        wait for 25 ns;
-
-        wait until rising_edge(clk_i);
-        cyc_i <= '1';
-        stb_i <= '1';
-        we_i  <= '1';
-        adr_i <= x"04";
-        dat_i <= x"CAFEBABE";
-        wait until rising_edge(clk_i);
-        cyc_i <= '0';
-        stb_i <= '0';
-        we_i  <= '0';
-
         wait for 20 ns;
 
         wait until rising_edge(clk_i);
-        cyc_i <= '1';
-        stb_i <= '1';
-        we_i  <= '1';
-        adr_i <= x"00";
-        dat_i <= x"00000001";
+        cyc_i <= '1'; stb_i <= '1'; we_i <= '1'; adr_i <= x"01";
         wait until rising_edge(clk_i);
-        cyc_i <= '0';
-        stb_i <= '0';
-        we_i  <= '0';
+        cyc_i <= '0'; stb_i <= '0'; we_i <= '0';
 
-        wait for 20 us;
+        -- 32 bit * 32 clk/bit * 10 ns = 10.24 us
+        wait for 12 us;
 
-        wait until rising_edge(clk_i);
-        cyc_i <= '1';
-        stb_i <= '1';
-        we_i  <= '0';
-        adr_i <= x"08";
-        wait until rising_edge(clk_i);
-        cyc_i <= '0';
-        stb_i <= '0';
+        poll_loop: loop
+            wait until rising_edge(clk_i);
+            cyc_i <= '1'; stb_i <= '1'; we_i <= '0'; adr_i <= x"00";
+            wait until rising_edge(clk_i);
+            adr_i <= x"03";
+            wait on ack_o for 15 ns;
+            if ack_o = '1' then
+                wait until rising_edge(clk_i);
+                cyc_i <= '0'; stb_i <= '0';
+                exit poll_loop;
+            end if;
 
-        wait for 30 ns;
+            wait until rising_edge(clk_i);
+            cyc_i <= '0'; stb_i <= '0';
+        end loop;
+        wait for 24 us;
+            wait until rising_edge(clk_i);
+            cyc_i <= '1'; stb_i <= '1'; we_i <= '0'; adr_i <= x"00";
+            wait until rising_edge(clk_i);
+            adr_i <= x"03";
+        wait until rising_edge(clk_i);
+        cyc_i <= '1'; stb_i <= '1'; we_i <= '1'; adr_i <= x"02";
+        wait until rising_edge(clk_i);
+        cyc_i <= '0'; stb_i <= '0'; we_i <= '0';
 
-        wait until rising_edge(clk_i);
-        cyc_i <= '1';
-        stb_i <= '0';
-        we_i  <= '1';
-        adr_i <= x"04";
-        dat_i <= x"DEADBEEF";
-        wait until rising_edge(clk_i);
-        cyc_i <= '0';
-        we_i  <= '0';
+        wait for 50 ns;
 
-        wait for 30 ns;
-
-        wait until rising_edge(clk_i);
-        cyc_i <= '1';
-        stb_i <= '1';
-        we_i  <= '0';
-        adr_i <= x"00";
-        dat_i <= x"00000000";
-        wait until rising_edge(clk_i);
-        cyc_i <= '0';
-        stb_i <= '0';
-        we_i  <= '0';
-
-        wait until rising_edge(clk_i);
-        assert false report "=== SIMULAZIONE COMPLETATA CON SUCCESSO ===" severity failure;
+        assert false report "=== SIMULAZIONE COMPLETATA ===" severity failure;
         wait;
     end process;
 

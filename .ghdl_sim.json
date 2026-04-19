@@ -3,6 +3,6 @@
 
                     ],
     "tb_entity":  "TestBench",
-    "main_file":  "gpio_generic",
-    "tb_file":  "tb_gpio_generic"
+    "main_file":  "spi_master",
+    "tb_file":  "tb_spi_master"
 }
