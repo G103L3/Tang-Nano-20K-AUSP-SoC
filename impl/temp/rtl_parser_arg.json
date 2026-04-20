@@ -3,6 +3,11 @@
  "Files" : [
   {
    "Library" : "work",
+   "Path" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/fft/fft.vhd",
+   "Type" : "vhdl"
+  },
+  {
+   "Library" : "work",
    "Path" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/gowin_picorv32/gowin_picorv32.vhd",
    "Type" : "vhdl"
   },
