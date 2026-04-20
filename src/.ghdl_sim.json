@@ -1,0 +1,9 @@
+{
+    "extra_files":  [
+                        "spi_master",
+                        "wb_interconnect"
+                    ],
+    "tb_entity":  "TestBench",
+    "main_file":  "dma",
+    "tb_file":  "tb_dma"
+}

@@ -1,0 +1,78 @@
+[
+ {
+  "InstFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/top.vhd",
+  "InstLine" : 4,
+  "InstName" : "top_system",
+  "ModuleFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/top.vhd",
+  "ModuleLine" : 4,
+  "ModuleName" : "top_system",
+  "SubInsts" : [
+   {
+    "InstFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/top.vhd",
+    "InstLine" : 178,
+    "InstName" : "u_cpu",
+    "ModuleFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/gowin_picorv32/gowin_picorv32.vhd",
+    "ModuleLine" : 21,
+    "ModuleName" : "Gowin_PicoRV32_Top"
+   },
+   {
+    "InstFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/top.vhd",
+    "InstLine" : 199,
+    "InstName" : "u_bus",
+    "ModuleFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/wb_interconnect.vhd",
+    "ModuleLine" : 18,
+    "ModuleName" : "wb_interconnect"
+   },
+   {
+    "InstFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/top.vhd",
+    "InstLine" : 235,
+    "InstName" : "u_sdram",
+    "ModuleFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/memory_arbiter.vhd",
+    "ModuleLine" : 9,
+    "ModuleName" : "memory_arbiter",
+    "SubInsts" : [
+     {
+      "InstFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/memory_arbiter.vhd",
+      "InstLine" : 164,
+      "InstName" : "u_sdram",
+      "ModuleFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/sdram_controller_hs/sdram_controller_hs.vhd",
+      "ModuleLine" : 9,
+      "ModuleName" : "SDRAM_Controller_HS_Top"
+     }
+    ]
+   },
+   {
+    "InstFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/top.vhd",
+    "InstLine" : 255,
+    "InstName" : "u_spi",
+    "ModuleFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/spi_master.vhd",
+    "ModuleLine" : 5,
+    "ModuleName" : "SPI_Master"
+   },
+   {
+    "InstFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/top.vhd",
+    "InstLine" : 263,
+    "InstName" : "u_pwm10",
+    "ModuleFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/pwm_generic_master.vhd",
+    "ModuleLine" : 5,
+    "ModuleName" : "PWM_GENERIC"
+   },
+   {
+    "InstFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/top.vhd",
+    "InstLine" : 272,
+    "InstName" : "u_pwm4",
+    "ModuleFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/pwm_generic_master.vhd",
+    "ModuleLine" : 5,
+    "ModuleName" : "PWM_GENERIC"
+   },
+   {
+    "InstFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/top.vhd",
+    "InstLine" : 281,
+    "InstName" : "u_gpio1",
+    "ModuleFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/gpio_generic.vhd",
+    "ModuleLine" : 5,
+    "ModuleName" : "GPIO_GENERIC"
+   }
+  ]
+ }
+]
