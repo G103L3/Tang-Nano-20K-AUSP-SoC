@@ -6,6 +6,7 @@ use ieee.std_logic_1164.all;
 --
 -- Address map (bits [31:28] of address):
 --   0x1xxxxxxx  S0  SDRAM (via memory_arbiter M0)   [C: 0x10000000]
+--   0x2xxxxxxx  S6  UART_GENERIC                     [C: 0x20000000]
 --   0x3xxxxxxx  S5  DMA control registers            [C: 0x30000000]
 --   0x4xxxxxxx  S1  SPI Master                       [C: 0x40000000]
 --   0x5xxxxxxx  S2  PWM 10-bit                       [C: 0x50000000]
@@ -146,12 +147,13 @@ begin
     begin
         case sel_adr(31 downto 28) is
             when "0001" => slv_idx <= 0;  -- 0x1xxxxxxx  SDRAM
+            when "0010" => slv_idx <= 6;  -- 0x2xxxxxxx  UART_GENERIC
             when "0011" => slv_idx <= 5;  -- 0x3xxxxxxx  DMA
             when "0100" => slv_idx <= 1;  -- 0x4xxxxxxx  SPI
             when "0101" => slv_idx <= 2;  -- 0x5xxxxxxx  PWM10
             when "0110" => slv_idx <= 3;  -- 0x6xxxxxxx  PWM4
             when "0111" => slv_idx <= 4;  -- 0x7xxxxxxx  GPIO
-            when others => slv_idx <= 6;  -- unmapped
+            when others => slv_idx <= 7;  -- unmapped
         end case;
     end process;
 
@@ -189,7 +191,7 @@ begin
     slv_dat_arr(3) <= s3_dat_i; slv_ack_arr(3) <= s3_ack_i;
     slv_dat_arr(4) <= s4_dat_i; slv_ack_arr(4) <= s4_ack_i;
     slv_dat_arr(5) <= s5_dat_i; slv_ack_arr(5) <= s5_ack_i;
-    slv_dat_arr(6) <= (others => '0'); slv_ack_arr(6) <= '0';
+    slv_dat_arr(6) <= s6_dat_i; slv_ack_arr(6) <= s6_ack_i;
     slv_dat_arr(7) <= (others => '0'); slv_ack_arr(7) <= '0';
 
     slv_dat <= slv_dat_arr(slv_idx);

@@ -13,7 +13,9 @@ entity top_system is
         cs_p     : out std_logic;
         pwm_10_o : out std_logic;
         pwm_4_o  : out std_logic;
-        gpio_1_o : out std_logic;
+        gpio_1_o       : out std_logic;
+        uart_ext_tx    : out std_logic;
+        uart_ext_rx    : in  std_logic;
         jtag_tdi : in  std_logic;
         jtag_tdo : out std_logic;
         jtag_tck : in  std_logic;
@@ -121,6 +123,15 @@ architecture behavioral of top_system is
         );
     end component;
 
+    component uart_generic
+        port (
+            clk_i : in std_logic; rst_i : in std_logic; cyc_i : in std_logic; stb_i : in std_logic;
+            we_i  : in std_logic; adr_i : in std_logic_vector(7 downto 0); dat_i : in std_logic_vector(31 downto 0);
+            dat_o : out std_logic_vector(31 downto 0); ack_o : out std_logic;
+            tx_o  : out std_logic; rx_i : in std_logic
+        );
+    end component;
+
     -- CPU <-> bus
     signal cpu_adr, cpu_wdata, cpu_rdata : std_logic_vector(31 downto 0);
     signal cpu_stb, cpu_we, cpu_cyc, cpu_ack : std_logic;
@@ -146,6 +157,10 @@ architecture behavioral of top_system is
     signal s4_adr, s4_wdata, s4_rdata : std_logic_vector(31 downto 0);
     signal s4_stb, s4_we, s4_cyc, s4_ack : std_logic;
     signal s4_sel : std_logic_vector(3 downto 0);
+
+    signal s6_adr, s6_wdata, s6_rdata : std_logic_vector(31 downto 0);
+    signal s6_stb, s6_we, s6_cyc, s6_ack : std_logic;
+    signal s6_sel : std_logic_vector(3 downto 0);
 
     -- WB bus M1 placeholder (future DMA for peripherals)
     signal dummy_m1_adr, dummy_m1_dat_i : std_logic_vector(31 downto 0) := (others => '0');
@@ -222,9 +237,9 @@ begin
         s5_adr_o => open, s5_dat_o => open, s5_dat_i => dummy_s_dat_i,
         s5_we_o  => open, s5_sel_o => open, s5_stb_o => open,
         s5_cyc_o => open, s5_ack_i => dummy_s_ack_i,
-        s6_adr_o => open, s6_dat_o => open, s6_dat_i => dummy_s_dat_i,
-        s6_we_o  => open, s6_sel_o => open, s6_stb_o => open,
-        s6_cyc_o => open, s6_ack_i => dummy_s_ack_i,
+        s6_adr_o => s6_adr, s6_dat_o => s6_wdata, s6_dat_i => s6_rdata,
+        s6_we_o  => s6_we,  s6_sel_o => s6_sel,   s6_stb_o => s6_stb,
+        s6_cyc_o => s6_cyc, s6_ack_i => s6_ack,
         s7_adr_o => open, s7_dat_o => open, s7_dat_i => dummy_s_dat_i,
         s7_we_o  => open, s7_sel_o => open, s7_stb_o => open,
         s7_cyc_o => open, s7_ack_i => dummy_s_ack_i
@@ -285,6 +300,14 @@ begin
         cyc_i => s4_cyc, stb_i => s4_stb, we_i => s4_we,
         adr_i => s4_adr(7 downto 0), dat_i => s4_wdata, dat_o => s4_rdata, ack_o => s4_ack,
         gpio_i => gpio_in_v, gpio_o => gpio_out_v
+    );
+
+    u_uart: uart_generic
+    port map (
+        clk_i => clk_i, rst_i => rst_i,
+        cyc_i => s6_cyc, stb_i => s6_stb, we_i => s6_we,
+        adr_i => s6_adr(7 downto 0), dat_i => s6_wdata, dat_o => s6_rdata, ack_o => s6_ack,
+        tx_o  => uart_ext_tx, rx_i => uart_ext_rx
     );
 
 end behavioral;

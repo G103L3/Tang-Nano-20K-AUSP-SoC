@@ -56,6 +56,9 @@ UART TX/RX ────────►│       │        └──────
                     │                                              │
                     │  S3 0x6xxxxxxx  S4 0x7xxxxxxx  S5 0x3xxxxxxx│
                     │  PWM 4-bit      GPIO 1-bit      DMA control  │
+                    │                                              │
+                    │  S6 0x2xxxxxxx                               │
+                    │  UART_GENERIC                                 │
                     └──┬──────────────────────────────────────────┘
                        │
               ┌────────▼──────────┐
@@ -77,9 +80,8 @@ UART TX/RX ────────►│       │        └──────
 |-----------|---------|-------------|
 | `0x01000000` | DTCM | Data RAM — variabili globali, stack |
 | `0x02000000` | ITCM | Instruction RAM — codice firmware |
-| `0x04000004` | UART\_DIV | Divisore baud rate (simpleuart interno) |
-| `0x04000008` | UART\_DATA | TX write / RX read (bit[8]=valid) |
 | `0x10000000` | SDRAM | Via WB S0 → memory\_arbiter M0 |
+| `0x20000000` | UART\_EXT | UART\_GENERIC esterno (S6) |
 | `0x30000000` | DMA | Registri di controllo DMA |
 | `0x40000000` | SPI | SPI Master (solo RX, 32-bit) |
 | `0x50000000` | PWM10 | PWM 10-bit (period + duty) |
@@ -93,13 +95,6 @@ UART TX/RX ────────►│       │        └──────
 ---
 
 ## Registri Periferiche
-
-### UART (simpleuart, interno al GowinPicoSoC)
-| Indirizzo | Accesso | Descrizione |
-|-----------|---------|-------------|
-| `0x04000004` | R/W | Divisore: `div = clk_hz / baud` |
-| `0x04000008` | W | Trasmetti byte (attende TX libero) |
-| `0x04000008` | R | Bit[8]=0: dato valido in Bit[7:0] |
 
 ### SPI Master (`spi_master.vhd`)
 | Offset | Accesso | Descrizione |
@@ -126,6 +121,19 @@ UART TX/RX ────────►│       │        └──────
 |--------|---------|-------------|
 | qualsiasi | W | `dat[0]` = `gpio_1_o` |
 | qualsiasi | R | `dat[0]` = `gpio_in` (attualmente fisso a 0) |
+
+### UART\_GENERIC (`uart_generic.vhd`) — base `0x20000000`
+| Offset | Accesso | Descrizione |
+|--------|---------|-------------|
+| `+0x00` | W | Trasmetti byte `dat[7:0]` (ignorato se `tx_busy=1` o `enabled=0`) |
+| `+0x00` | R | `dat[8]=rx_valid`, `dat[7:0]=RX byte` (lettura azzera `rx_valid`) |
+| `+0x01` | W | Abilita UART (start) |
+| `+0x02` | W | Disabilita UART (stop) |
+| `+0x03` | W | `dat[15:0]` = divisore baud: `baud_div = clk_hz / baud_rate` (default 234 = 27 MHz / 115200) |
+| `+0x04` | W | Configurazione: `dat[1:0]`=parità (00=none, 01=even, 10=odd), `dat[2]`=stop bits (0=1, 1=2), `dat[6:3]`=data bits − 5 (0=5 bit, 3=8 bit, 4=9 bit) |
+| `+0x05` | R | Status: `dat[1]=rx_valid`, `dat[0]=tx_busy` |
+
+Port top-level: `uart_ext_tx` (out), `uart_ext_rx` (in)
 
 ### DMA (`dma.vhd`)
 | Offset | Accesso | Descrizione |

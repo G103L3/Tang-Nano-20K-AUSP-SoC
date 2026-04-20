@@ -42,6 +42,28 @@ end dma;
 
 architecture behavioral of dma is
 
+    component FFT_Top is
+        port (
+            idx: out std_logic_vector(8 downto 0);
+            xk_re: out std_logic_vector(15 downto 0);
+            xk_im: out std_logic_vector(15 downto 0);
+            sod: out std_logic;
+            ipd: out std_logic;
+            eod: out std_logic;
+            busy: out std_logic;
+            soud: out std_logic;
+            opd: out std_logic;
+            eoud: out std_logic;
+            xn_re: in std_logic_vector(15 downto 0);
+            xn_im: in std_logic_vector(15 downto 0);
+            start: in std_logic;
+            clk: in std_logic;
+            rst: in std_logic
+        );
+    end component;
+
+    
+
     type state_type is (S_IDLE, S_OPEN, S_CLOSE, S_READ_1, S_READ_2, S_R_DEV, S_WRITE_1, S_WRITE_2, S_SCALER, S_IRQ, S_C_BASE);
     signal curr_state    : state_type;
     signal data          : std_logic_vector(31 downto 0) := (others => '0');
@@ -52,6 +74,7 @@ architecture behavioral of dma is
     constant prescaler_cycles   : natural := 36;
     constant total_cycles       : natural := prescaler_cycles * 32;
     signal scaler_counter: natural range 0 to (prescaler_cycles * 32)-1 := 0;
+
 
 
     
@@ -140,6 +163,11 @@ begin
                             m_stb_o    <= '0';
                             curr_state <= S_WRITE_1;
                         end if;
+                    
+                    when S_FFT =>
+                        --Si esegue l'FFT in live e poi si scrive l'output in memoria
+                        -- I campioni dell'SPI (ADC) sono tutti reali quindi la parte immazinaria
+                        -- si lascia a 0
 
                     when S_WRITE_1 =>
                         m_cyc_o <= '1';

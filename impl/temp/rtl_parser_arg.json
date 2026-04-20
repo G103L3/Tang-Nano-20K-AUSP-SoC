@@ -45,6 +45,11 @@
    "Library" : "work",
    "Path" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/wb_interconnect.vhd",
    "Type" : "vhdl"
+  },
+  {
+   "Library" : "work",
+   "Path" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/uart_generic.vhd",
+   "Type" : "vhdl"
   }
  ],
  "IncludePath" : [
