@@ -1,13 +1,13 @@
 v 4
-file . "tb_dma.vhd" "a6859c089f938292214b0fbd664e7028e77e8f0e" "20260420113759.022":
-  entity testbench at 1( 0) + 0 on 337;
-  architecture tbarch of testbench at 8( 106) + 0 on 338;
-file . "wb_interconnect.vhd" "f74f4f1bff1940940e4598e55071e17c7d34bc6b" "20260420113758.900":
-  entity wb_interconnect at 1( 0) + 0 on 333;
-  architecture behavioral of wb_interconnect at 110( 4427) + 0 on 334;
-file . "spi_master.vhd" "48e5a8b90d58647215e7f4ba01d1a421e828e757" "20260420113758.844":
-  entity spi_master at 1( 0) + 0 on 331;
-  architecture spi_master_behavioral of spi_master at 24( 602) + 0 on 332;
+file . "tb_dma.vhd" "19a3a2dce23357fedeb89299e63a02e71830c2da" "20260420161712.353":
+  entity testbench at 1( 0) + 0 on 385;
+  architecture tbarch of testbench at 8( 106) + 0 on 386;
+file . "wb_interconnect.vhd" "e8930bf75130d0889b15ac04ac06d5627e925d86" "20260420161712.210":
+  entity wb_interconnect at 1( 0) + 0 on 381;
+  architecture behavioral of wb_interconnect at 113( 4795) + 0 on 382;
+file . "spi_master.vhd" "902d51d14710323d9c2fd96c95a330914e0e28be" "20260420161712.150":
+  entity spi_master at 1( 0) + 0 on 379;
+  architecture spi_master_behavioral of spi_master at 24( 602) + 0 on 380;
 file . "pwm_10_master.vhd" "e5f649ea78f039510516561f7c54f9b08b5494df" "20260416230214.870":
   entity pwm_10 at 1( 0) + 0 on 79;
   architecture pwm_10_behavioral of pwm_10 at 21( 527) + 0 on 80;
@@ -17,6 +17,6 @@ file . "pwm_generic_master.vhd" "a3721383052b72bf0ceb70a8cc02ab46a6e4f6e1" "2026
 file . "gpio_generic.vhd" "530a70152f716052b2ca5c086e50523c41a303b2" "20260417003045.166":
   entity gpio_generic at 1( 0) + 0 on 119;
   architecture gpio_generic_behavioral of gpio_generic at 25( 673) + 0 on 120;
-file . "dma.vhd" "2b6fc2d9845dd28fa54e97c8368253d5a972b53c" "20260420113758.955":
-  entity dma at 1( 0) + 0 on 335;
-  architecture behavioral of dma at 42( 1352) + 0 on 336;
+file . "dma.vhd" "d6c3f618b8d55f794d3a3a5db17bf9f69e76ac0b" "20260420161712.271":
+  entity dma at 1( 0) + 0 on 383;
+  architecture behavioral of dma at 43( 1407) + 0 on 384;

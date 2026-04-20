@@ -7,9 +7,7 @@
     "main_file":  "dma",
     "tb_file":  "tb_dma",
     "name":  "Profilo default",
-    "vaporview_config":  null
-}
-REMOVE_REST
+    "vaporview_config":  {
                              "extensionVersion":  "1.5.2",
                              "markerTime":  4994085000000,
                              "altMarkerTime":  null,

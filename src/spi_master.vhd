@@ -26,7 +26,6 @@ architecture SPI_Master_BEHAVIORAL of SPI_Master is
     type state_type is (S_IDLE, S_READING, S_CLOSE);
     signal curr_state : state_type;
 
-    signal prescaler_cki : natural range 0 to 31 := 0;
     signal shift_reg     : std_logic_vector(31 downto 0) := (others => '0');
     signal data_o_s      : std_logic_vector(31 downto 0) := (others => '0');
     signal data_ready    : std_logic := '0';
@@ -34,6 +33,10 @@ architecture SPI_Master_BEHAVIORAL of SPI_Master is
 
     signal SCK_s, CS_s   : std_logic;
     signal MISO_counter  : natural range 0 to 31 := 0;
+
+    constant prescaler_cycles   : natural := 36;
+    signal prescaler_cki : natural range 0 to prescaler_cycles - 1 := 0;
+
 
 begin
 
@@ -91,7 +94,7 @@ begin
                             curr_state <= S_IDLE;
                         end if;
                     when S_READING =>
-                        if prescaler_cki = 15 then
+                        if prescaler_cki = (prescaler_cycles/2)-1 then
                             SCK_s         <= '1';
                             prescaler_cki <= prescaler_cki + 1;
                             if MISO_counter = 31 then
@@ -103,7 +106,7 @@ begin
                                 shift_reg    <= shift_reg(30 downto 0) & MISO;
                                 MISO_counter <= MISO_counter + 1;
                             end if;
-                        elsif prescaler_cki = 31 then
+                        elsif prescaler_cki = prescaler_cycles-1 then
                             SCK_s         <= '0';
                             prescaler_cki <= 0;
                         else

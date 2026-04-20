@@ -92,6 +92,9 @@ architecture TBarch of TestBench is
     signal m_ack_i : std_logic;
     signal irq_o   : std_logic;
 
+    signal m1_ack_bus  : std_logic := '0'; -- ack dall'interconnect (SPI)
+    signal m_ack_sdram : std_logic := '0'; -- ack BFM diretto per SDRAM
+
     signal s0_adr_s  : std_logic_vector(31 downto 0);
     signal s0_dat_ws : std_logic_vector(31 downto 0);
     signal s0_dat_rs : std_logic_vector(31 downto 0) := (others => '0');
@@ -145,7 +148,7 @@ begin
         m0_adr_i => (others => '0'), m0_dat_i => (others => '0'), m0_dat_o => open,
         m0_we_i  => '0',             m0_sel_i => "0000",           m0_stb_i => '0', m0_cyc_i => '0', m0_ack_o => open,
         m1_adr_i => m_adr_o,         m1_dat_i => m_dat_o,          m1_dat_o => m_dat_i,
-        m1_we_i  => m_we_o,          m1_sel_i => "1111",            m1_stb_i => m_stb_o, m1_cyc_i => m_cyc_o, m1_ack_o => m_ack_i,
+        m1_we_i  => m_we_o,          m1_sel_i => "1111",            m1_stb_i => m_stb_o, m1_cyc_i => m_cyc_o, m1_ack_o => m1_ack_bus,
         s0_adr_o => s0_adr_s,  s0_dat_o => s0_dat_ws, s0_dat_i => s0_dat_rs,
         s0_we_o  => s0_we_s,   s0_sel_o => s0_sel_s,  s0_stb_o => s0_stb_s, s0_cyc_o => s0_cyc_s, s0_ack_i => s0_ack_s,
         s1_adr_o => s1_adr_s,  s1_dat_o => s1_dat_ws, s1_dat_i => s1_dat_rs,
@@ -190,6 +193,20 @@ begin
             end if;
         end if;
     end process;
+
+    -- BFM diretto: ack al DMA per accessi SDRAM (indirizzi non-SPI, bit[31:28] /= 0x4)
+    sdram_direct_bfm: process(clk_i)
+    begin
+        if rising_edge(clk_i) then
+            m_ack_sdram <= '0';
+            if m_cyc_o = '1' and m_stb_o = '1' and m_adr_o(31 downto 28) /= "0100" then
+                m_ack_sdram <= '1';
+            end if;
+        end if;
+    end process;
+
+    -- m_ack_i: OR tra ack SPI (dall'interconnect) e ack SDRAM diretto
+    m_ack_i <= m1_ack_bus or m_ack_sdram;
 
     process(SCK)
     begin

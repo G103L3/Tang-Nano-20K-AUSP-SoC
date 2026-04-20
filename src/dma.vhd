@@ -45,13 +45,14 @@ architecture behavioral of dma is
     type state_type is (S_IDLE, S_OPEN, S_CLOSE, S_READ_1, S_READ_2, S_R_DEV, S_WRITE_1, S_WRITE_2, S_SCALER, S_IRQ, S_C_BASE);
     signal curr_state    : state_type;
     signal data          : std_logic_vector(31 downto 0) := (others => '0');
-    signal scaler_counter: natural range 0 to 1023 := 0;
     signal address_local : unsigned(20 downto 0) := (others => '0');
     signal base_address  : unsigned(20 downto 0) := (others => '0');
     signal start         : std_logic := '0';
     constant lost_cycles        : natural := 0; 
-    constant prescaler_cycles   : natural := 32;
+    constant prescaler_cycles   : natural := 36;
     constant total_cycles       : natural := prescaler_cycles * 32;
+    signal scaler_counter: natural range 0 to (prescaler_cycles * 32)-1 := 0;
+
 
     
 begin
@@ -109,7 +110,7 @@ begin
                         end if;
 
                     when S_SCALER =>
-                        if scaler_counter = total_cycles-1 then --Ci sono 32 * 32 = 2^5 * 2^5 = 2^10 = 1024 inputs prima dell'spi output
+                        if scaler_counter = total_cycles-1 then --Ci sono 36 (numero di ripetizioni del prescaler) * 32 = 36 * 2^5 = 2^10 = 1152 inputs prima dell'spi output
                             scaler_counter <= 0;
                             curr_state     <= S_READ_1;
                         else
