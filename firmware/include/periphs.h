@@ -112,12 +112,14 @@ static inline void pwm4_stop(void) { PWM4_STOP_REG = 1; }
 
 static inline void gpio_set(uint32_t val) { GPIO_REG = val & 1u; }
 
-// --- DMA SPI→SDRAM (0x30000000) ---
-// +0x01 WR: start   — avvia acquisizione continua SPI→SDRAM
+// --- DMA SPI→SDRAM + FFT (0x30000000) ---
+// +0x01 WR: start   — avvia acquisizione continua MCP3201 (12-bit, ~46.875 kHz)
 // +0x02 WR: stop    — ferma acquisizione
 // +0x03 WR: base    — imposta indirizzo base SDRAM (bit[20:0] = word address 21-bit)
-// IRQ ogni 512 parole SDRAM scritte (256 letture SPI da 32-bit → 2×16-bit);
-// dopo 1024 parole il DMA torna automaticamente a base.
+// Ogni 512 campioni scatta FFT a 512 punti sul blocco appena scritto.
+// Risultati xk_re scritti in SDRAM da word address 0x1300 (byte 0x10004C00).
+// IRQ bit 20 alzato al termine della FFT; il main legge da FFT_RESULT_BASE.
+// Ping-pong: blocco A = base..base+511, blocco B = base+512..base+1023, poi wrap.
 #define DMA_BASE        0x30000000u
 #define DMA_START       (*(volatile uint32_t*)(DMA_BASE + 0x01))
 #define DMA_STOP        (*(volatile uint32_t*)(DMA_BASE + 0x02))

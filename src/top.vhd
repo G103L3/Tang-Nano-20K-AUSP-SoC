@@ -97,10 +97,11 @@ architecture behavioral of top_system is
 
     component spi_master
         port (
-            clk_i : in std_logic; rst_i : in std_logic; cyc_i : in std_logic; stb_i : in std_logic;
-            we_i  : in std_logic; adr_i : in std_logic_vector(7 downto 0); dat_i : in std_logic_vector(31 downto 0);
-            dat_o : out std_logic_vector(31 downto 0); ack_o : out std_logic; mosi : out std_logic;
-            miso  : in std_logic; sck : out std_logic; cs : out std_logic
+            clk_i        : in  std_logic; rst_i : in std_logic; cyc_i : in std_logic; stb_i : in std_logic;
+            we_i         : in  std_logic; adr_i : in std_logic_vector(7 downto 0); dat_i : in std_logic_vector(31 downto 0);
+            dat_o        : out std_logic_vector(31 downto 0); ack_o : out std_logic;
+            data_ready_o : out std_logic;
+            mosi         : out std_logic; miso : in std_logic; sck : out std_logic; cs : out std_logic
         );
     end component;
 
@@ -129,6 +130,20 @@ architecture behavioral of top_system is
             we_i  : in std_logic; adr_i : in std_logic_vector(7 downto 0); dat_i : in std_logic_vector(31 downto 0);
             dat_o : out std_logic_vector(31 downto 0); ack_o : out std_logic;
             tx_o  : out std_logic; rx_i : in std_logic
+        );
+    end component;
+
+    component dma
+        port (
+            clk_i   : in  std_logic; rst_i   : in  std_logic;
+            s_cyc_i : in  std_logic; s_stb_i : in  std_logic; s_we_i  : in  std_logic;
+            s_adr_i : in  std_logic_vector(31 downto 0); s_dat_i : in  std_logic_vector(31 downto 0);
+            s_dat_o : out std_logic_vector(31 downto 0); s_ack_o : out std_logic;
+            m_cyc_o : out std_logic; m_stb_o : out std_logic; m_we_o  : out std_logic;
+            m_adr_o : out std_logic_vector(31 downto 0); m_dat_o : out std_logic_vector(31 downto 0);
+            m_dat_i : in  std_logic_vector(31 downto 0); m_ack_i : in  std_logic;
+            spi_data_ready_i : in  std_logic;
+            irq_o   : out std_logic
         );
     end component;
 
@@ -162,26 +177,39 @@ architecture behavioral of top_system is
     signal s6_stb, s6_we, s6_cyc, s6_ack : std_logic;
     signal s6_sel : std_logic_vector(3 downto 0);
 
-    -- WB bus M1 placeholder (future DMA for peripherals)
-    signal dummy_m1_adr, dummy_m1_dat_i : std_logic_vector(31 downto 0) := (others => '0');
-    signal dummy_m1_stb, dummy_m1_we, dummy_m1_cyc : std_logic := '0';
-    signal dummy_m1_sel : std_logic_vector(3 downto 0) := (others => '0');
+    -- DMA slave (S5)
+    signal s5_adr, s5_wdata, s5_rdata : std_logic_vector(31 downto 0);
+    signal s5_stb, s5_we, s5_cyc, s5_ack : std_logic;
+    signal s5_sel : std_logic_vector(3 downto 0);
 
-    -- DMA WB interface to memory_arbiter M1 (placeholder until DMA is added)
-    signal dma_cyc, dma_stb, dma_we : std_logic := '0';
-    signal dma_adr, dma_wdata       : std_logic_vector(31 downto 0) := (others => '0');
+    -- DMA master output
+    signal dma_m_adr, dma_m_wdat : std_logic_vector(31 downto 0);
+    signal dma_m_we, dma_m_stb, dma_m_cyc : std_logic;
+    -- DMA master input (muxed: SDRAM quando bit[31:28]="0001", altrimenti WB)
+    signal dma_m_rdat : std_logic_vector(31 downto 0);
+    signal dma_m_ack_s : std_logic;
+    signal dma_to_sdram : std_logic;
+    signal dma_wb_rdat  : std_logic_vector(31 downto 0);
+    signal dma_wb_ack   : std_logic;
+    -- DMA SDRAM M1 (high-prio)
+    signal dma_cyc, dma_stb, dma_we : std_logic;
+    signal dma_adr, dma_wdata       : std_logic_vector(31 downto 0);
     signal dma_rdata                : std_logic_vector(31 downto 0);
     signal dma_ack                  : std_logic;
+    signal dma_irq                  : std_logic;
 
-    -- Dummy slave (S5..S7 non collegati)
+    -- Dummy slave (S7)
     signal dummy_s_dat_i : std_logic_vector(31 downto 0) := (others => '0');
     signal dummy_s_ack_i : std_logic := '0';
 
     -- GPIO
     signal gpio_in_v, gpio_out_v : std_logic_vector(0 downto 0);
 
-    -- IRQ non utilizzati
-    signal irq_dummy : std_logic_vector(31 downto 20) := (others => '0');
+    -- SPI data-ready direct wire to DMA
+    signal spi_data_ready_s : std_logic;
+
+    -- IRQ
+    signal irq_vec : std_logic_vector(31 downto 20) := (others => '0');
 
 
 
@@ -189,6 +217,20 @@ begin
 
     gpio_in_v <= (others => '0');
     gpio_1_o  <= gpio_out_v(0);
+
+    irq_vec       <= (others => '0');
+    irq_vec(20)   <= dma_irq;
+
+    dma_to_sdram  <= '1' when dma_m_adr(31 downto 28) = "0001" else '0';
+    dma_m_ack_s   <= dma_ack  when dma_to_sdram = '1' else dma_wb_ack;
+    -- dma_m_rdat mux handled via dma_rdata / dma_wb_rdat in port maps
+
+    dma_cyc       <= dma_m_cyc and     dma_to_sdram;
+    dma_stb       <= dma_m_stb and     dma_to_sdram;
+    dma_we        <= dma_m_we;
+    dma_adr       <= dma_m_adr;
+    dma_wdata     <= dma_m_wdat;
+    dma_m_rdat    <= dma_rdata when dma_to_sdram = '1' else dma_wb_rdat;
 
     u_cpu: gowin_picorv32_top
     port map (
@@ -202,7 +244,7 @@ begin
         slv_ext_wdata_o => cpu_wdata,
         slv_ext_rdata_i => cpu_rdata,
         slv_ext_sel_o   => cpu_sel,
-        irq_in          => irq_dummy,
+        irq_in          => irq_vec,
         jtag_tdi        => jtag_tdi,
         jtag_tdo        => jtag_tdo,
         jtag_tck        => jtag_tck,
@@ -216,9 +258,9 @@ begin
         m0_adr_i => cpu_adr,       m0_dat_i => cpu_wdata,       m0_dat_o => cpu_rdata,
         m0_we_i  => cpu_we,        m0_sel_i => cpu_sel,         m0_stb_i => cpu_stb,
         m0_cyc_i => cpu_cyc,       m0_ack_o => cpu_ack,
-        m1_adr_i => dummy_m1_adr,  m1_dat_i => dummy_m1_dat_i,  m1_dat_o => open,
-        m1_we_i  => dummy_m1_we,   m1_sel_i => dummy_m1_sel,    m1_stb_i => dummy_m1_stb,
-        m1_cyc_i => dummy_m1_cyc,  m1_ack_o => open,
+        m1_adr_i => dma_m_adr,  m1_dat_i => dma_m_wdat,  m1_dat_o => dma_wb_rdat,
+        m1_we_i  => dma_m_we,   m1_sel_i => "1111",      m1_stb_i => (dma_m_stb and not dma_to_sdram),
+        m1_cyc_i => (dma_m_cyc and not dma_to_sdram),    m1_ack_o => dma_wb_ack,
         s0_adr_o => s0_adr, s0_dat_o => s0_wdata, s0_dat_i => s0_rdata,
         s0_we_o  => s0_we,  s0_sel_o => s0_sel,   s0_stb_o => s0_stb,
         s0_cyc_o => s0_cyc, s0_ack_i => s0_ack,
@@ -234,9 +276,9 @@ begin
         s4_adr_o => s4_adr, s4_dat_o => s4_wdata, s4_dat_i => s4_rdata,
         s4_we_o  => s4_we,  s4_sel_o => s4_sel,   s4_stb_o => s4_stb,
         s4_cyc_o => s4_cyc, s4_ack_i => s4_ack,
-        s5_adr_o => open, s5_dat_o => open, s5_dat_i => dummy_s_dat_i,
-        s5_we_o  => open, s5_sel_o => open, s5_stb_o => open,
-        s5_cyc_o => open, s5_ack_i => dummy_s_ack_i,
+        s5_adr_o => s5_adr, s5_dat_o => s5_wdata, s5_dat_i => s5_rdata,
+        s5_we_o  => s5_we,  s5_sel_o => s5_sel,   s5_stb_o => s5_stb,
+        s5_cyc_o => s5_cyc, s5_ack_i => s5_ack,
         s6_adr_o => s6_adr, s6_dat_o => s6_wdata, s6_dat_i => s6_rdata,
         s6_we_o  => s6_we,  s6_sel_o => s6_sel,   s6_stb_o => s6_stb,
         s6_cyc_o => s6_cyc, s6_ack_i => s6_ack,
@@ -267,11 +309,26 @@ begin
         m1_ack_o  => dma_ack
     );
 
+    u_dma: dma
+    port map (
+        clk_i   => clk_i,    rst_i   => rst_i,
+        s_cyc_i => s5_cyc,   s_stb_i => s5_stb,   s_we_i  => s5_we,
+        s_adr_i => s5_adr,   s_dat_i => s5_wdata,
+        s_dat_o => s5_rdata, s_ack_o => s5_ack,
+        m_cyc_o => dma_m_cyc, m_stb_o => dma_m_stb, m_we_o  => dma_m_we,
+        m_adr_o => dma_m_adr, m_dat_o => dma_m_wdat,
+        m_dat_i          => dma_m_rdat,
+        m_ack_i          => dma_m_ack_s,
+        spi_data_ready_i => spi_data_ready_s,
+        irq_o            => dma_irq
+    );
+
     u_spi: spi_master
     port map (
-        clk_i => clk_i, rst_i => rst_i,
-        cyc_i => s1_cyc, stb_i => s1_stb, we_i => s1_we,
-        adr_i => s1_adr(7 downto 0), dat_i => s1_wdata, dat_o => s1_rdata, ack_o => s1_ack,
+        clk_i        => clk_i, rst_i => rst_i,
+        cyc_i        => s1_cyc, stb_i => s1_stb, we_i => s1_we,
+        adr_i        => s1_adr(7 downto 0), dat_i => s1_wdata, dat_o => s1_rdata, ack_o => s1_ack,
+        data_ready_o => spi_data_ready_s,
         mosi => mosi_p, miso => miso_p, sck => sck_p, cs => cs_p
     );
 

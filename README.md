@@ -76,21 +76,21 @@ UART TX/RX ────────►│       │        └──────
 
 ## Mappa Memoria (visione dal C)
 
-| Indirizzo | Regione | Descrizione |
-|-----------|---------|-------------|
-| `0x01000000` | DTCM | Data RAM — variabili globali, stack |
-| `0x02000000` | ITCM | Instruction RAM — codice firmware |
-| `0x10000000` | SDRAM | Via WB S0 → memory\_arbiter M0 |
-| `0x20000000` | UART\_EXT | UART\_GENERIC esterno (S6) |
-| `0x30000000` | DMA | Registri di controllo DMA |
-| `0x40000000` | SPI | SPI Master (solo RX, 32-bit) |
-| `0x50000000` | PWM10 | PWM 10-bit (period + duty) |
-| `0x60000000` | PWM4 | PWM 4-bit (period + duty) |
-| `0x70000000` | GPIO | GPIO 1-bit output |
+| Indirizzo C | WB Slave | Periferico | Note |
+|-------------|----------|------------|------|
+| `0x01000000` | — | DTCM | Data RAM — variabili globali, stack |
+| `0x02000000` | — | ITCM | Instruction RAM — codice firmware |
+| `0x10000000` | S0 | SDRAM | CPU via memory\_arbiter M0; DMA write via M1 (alta priorità) |
+| `0x20000000` | S6 | UART\_GENERIC | UART esterno configurabile |
+| `0x30000000` | S5 | DMA | Registri di controllo DMA (offset `+0x01/02/03`) |
+| `0x40000000` | S1 | SPI Master | 32-bit RX; usato anche dal DMA internamente |
+| `0x50000000` | S2 | PWM 10-bit | Period + duty cycle |
+| `0x60000000` | S3 | PWM 4-bit | Period + duty cycle |
+| `0x70000000` | S4 | GPIO | 1-bit output |
 
 > **Nota:** Il PicoRV32 instrada al bus WB esterno solo gli indirizzi con
-> `addr[31:28] > 0` e `addr[31] = 0`. Per questo motivo SDRAM è a `0x1xxxxxxx`
-> e DMA a `0x3xxxxxxx` (non `0x0` o `0x8` come sarebbe intuitivo).
+> `addr[31:28] > 0` e `addr[31] = 0` — quindi range valido `0x10000000`–`0x7FFFFFFF`.
+> `0x0xxxxxxx` (DTCM/ITCM) e `0x8xxxxxxx` (bit31=1) non raggiungono il bus esterno.
 
 ---
 

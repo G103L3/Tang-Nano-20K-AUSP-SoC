@@ -2,6 +2,45 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+-- Stub FFT_Top: outputs fissi a 0, nessuna logica interna
+entity FFT_Top is
+    port (
+        idx   : out std_logic_vector(8 downto 0);
+        xk_re : out std_logic_vector(15 downto 0);
+        xk_im : out std_logic_vector(15 downto 0);
+        sod   : out std_logic;
+        ipd   : out std_logic;
+        eod   : out std_logic;
+        busy  : out std_logic;
+        soud  : out std_logic;
+        opd   : out std_logic;
+        eoud  : out std_logic;
+        xn_re : in  std_logic_vector(15 downto 0);
+        xn_im : in  std_logic_vector(15 downto 0);
+        start : in  std_logic;
+        clk   : in  std_logic;
+        rst   : in  std_logic
+    );
+end FFT_Top;
+
+architecture stub of FFT_Top is
+begin
+    idx   <= (others => '0');
+    xk_re <= (others => '0');
+    xk_im <= (others => '0');
+    sod   <= '0';
+    ipd   <= '0';
+    eod   <= '0';
+    busy  <= '0';
+    soud  <= '0';
+    opd   <= '0';
+    eoud  <= '0';
+end stub;
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
 entity TestBench is
 end TestBench;
 
@@ -9,41 +48,43 @@ architecture TBarch of TestBench is
 
     component dma is
         port (
-            clk_i   : in  std_logic;
-            rst_i   : in  std_logic;
-            s_cyc_i : in  std_logic;
-            s_stb_i : in  std_logic;
-            s_we_i  : in  std_logic;
-            s_adr_i : in  std_logic_vector(31 downto 0);
-            s_dat_i : in  std_logic_vector(31 downto 0);
-            s_dat_o : out std_logic_vector(31 downto 0);
-            s_ack_o : out std_logic;
-            m_cyc_o : out std_logic;
-            m_stb_o : out std_logic;
-            m_we_o  : out std_logic;
-            m_adr_o : out std_logic_vector(31 downto 0);
-            m_dat_o : out std_logic_vector(31 downto 0);
-            m_dat_i : in  std_logic_vector(31 downto 0);
-            m_ack_i : in  std_logic;
-            irq_o   : out std_logic
+            clk_i            : in  std_logic;
+            rst_i            : in  std_logic;
+            s_cyc_i          : in  std_logic;
+            s_stb_i          : in  std_logic;
+            s_we_i           : in  std_logic;
+            s_adr_i          : in  std_logic_vector(31 downto 0);
+            s_dat_i          : in  std_logic_vector(31 downto 0);
+            s_dat_o          : out std_logic_vector(31 downto 0);
+            s_ack_o          : out std_logic;
+            m_cyc_o          : out std_logic;
+            m_stb_o          : out std_logic;
+            m_we_o           : out std_logic;
+            m_adr_o          : out std_logic_vector(31 downto 0);
+            m_dat_o          : out std_logic_vector(31 downto 0);
+            m_dat_i          : in  std_logic_vector(31 downto 0);
+            m_ack_i          : in  std_logic;
+            spi_data_ready_i : in  std_logic;
+            irq_o            : out std_logic
         );
     end component;
 
     component SPI_Master is
         port (
-            clk_i : in  std_logic;
-            rst_i : in  std_logic;
-            cyc_i : in  std_logic;
-            stb_i : in  std_logic;
-            we_i  : in  std_logic;
-            adr_i : in  std_logic_vector(7 downto 0);
-            dat_i : in  std_logic_vector(31 downto 0);
-            dat_o : out std_logic_vector(31 downto 0);
-            ack_o : out std_logic;
-            MOSI  : out std_logic;
-            MISO  : in  std_logic;
-            SCK   : out std_logic;
-            CS    : out std_logic
+            clk_i        : in  std_logic;
+            rst_i        : in  std_logic;
+            cyc_i        : in  std_logic;
+            stb_i        : in  std_logic;
+            we_i         : in  std_logic;
+            adr_i        : in  std_logic_vector(7 downto 0);
+            dat_i        : in  std_logic_vector(31 downto 0);
+            dat_o        : out std_logic_vector(31 downto 0);
+            ack_o        : out std_logic;
+            data_ready_o : out std_logic;
+            MOSI         : out std_logic;
+            MISO         : in  std_logic;
+            SCK          : out std_logic;
+            CS           : out std_logic
         );
     end component;
 
@@ -90,7 +131,8 @@ architecture TBarch of TestBench is
     signal m_dat_o : std_logic_vector(31 downto 0);
     signal m_dat_i : std_logic_vector(31 downto 0);
     signal m_ack_i : std_logic;
-    signal irq_o   : std_logic;
+    signal irq_o             : std_logic;
+    signal spi_data_ready_s  : std_logic;
 
     signal m1_ack_bus  : std_logic := '0'; -- ack dall'interconnect (SPI)
     signal m_ack_sdram : std_logic := '0'; -- ack BFM diretto per SDRAM
@@ -138,9 +180,10 @@ begin
         m_we_o  => m_we_o,
         m_adr_o => m_adr_o,
         m_dat_o => m_dat_o,
-        m_dat_i => m_dat_i,
-        m_ack_i => m_ack_i,
-        irq_o   => irq_o
+        m_dat_i          => m_dat_i,
+        m_ack_i          => m_ack_i,
+        spi_data_ready_i => spi_data_ready_s,
+        irq_o            => irq_o
     );
 
     u_bus: wb_interconnect
@@ -176,12 +219,13 @@ begin
         we_i  => s1_we_s,
         adr_i => s1_adr_s(7 downto 0),
         dat_i => s1_dat_ws,
-        dat_o => s1_dat_rs,
-        ack_o => s1_ack_s,
-        MOSI  => MOSI,
-        MISO  => MISO,
-        SCK   => SCK,
-        CS    => CS
+        dat_o        => s1_dat_rs,
+        ack_o        => s1_ack_s,
+        data_ready_o => spi_data_ready_s,
+        MOSI         => MOSI,
+        MISO         => MISO,
+        SCK          => SCK,
+        CS           => CS
     );
 
     sdram_bfm: process(clk_i)
