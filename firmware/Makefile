@@ -17,7 +17,16 @@ CFLAGS  = $(ARCH) -O1 -g -nostdlib -ffreestanding -Wall -Wextra \
           -Isrc -Iinclude
 LDFLAGS = $(ARCH) -nostdlib -T link.ld -lgcc
 
-SRCS    = src/crt0.S src/main.c
+SRCS    = src/crt0.S \
+          src/main.c \
+          src/complex_g3.c \
+          src/decoder.c \
+          src/bit_freq_codec.c \
+          src/bit_input_packer.c \
+          src/bit_output_packer.c \
+          src/char_packet.c \
+          src/char_packet_router.c \
+          src/command_dict.c
 TARGET  = firmware
 
 all: $(TARGET).hex $(TARGET).bin $(TARGET).dump
