@@ -1,7 +1,12 @@
 v 4
-file . "dma.vhd" "6b029d1e574a596ebba4f52594575ba25557c39e" "20260421181704.757":
-  entity dma at 1( 0) + 0 on 413;
-  architecture behavioral of dma at 49( 1772) + 0 on 414;
+file . "fft_sim/fft.vhd" "65ab6a07ccd0beec20805f5979718ff0b2b09dcb" "20260422154852.265":
+  entity fft_top at 1( 0) + 0 on 609;
+  architecture behavioral of fft_top at 44( 1648) + 0 on 610;
+file . "fft_stub/fft_top_stub.vhd" "30cbf2b5e9063622ad4edd9a360fda12bae09c04" "20260422134406.076":
+  architecture stub of fft_top at 27( 836) + 0 on 512;
+file . "dma.vhd" "4f5a51c3e079b570318c515f6c3a2bf67ca55549" "20260422154852.319":
+  entity dma at 1( 0) + 0 on 611;
+  architecture behavioral of dma at 58( 2014) + 0 on 612;
 file . "gpio_generic.vhd" "530a70152f716052b2ca5c086e50523c41a303b2" "20260417003045.166":
   entity gpio_generic at 1( 0) + 0 on 119;
   architecture gpio_generic_behavioral of gpio_generic at 25( 673) + 0 on 120;
@@ -11,14 +16,12 @@ file . "pwm_generic_master.vhd" "a3721383052b72bf0ceb70a8cc02ab46a6e4f6e1" "2026
 file . "pwm_10_master.vhd" "e5f649ea78f039510516561f7c54f9b08b5494df" "20260416230214.870":
   entity pwm_10 at 1( 0) + 0 on 79;
   architecture pwm_10_behavioral of pwm_10 at 21( 527) + 0 on 80;
-file . "spi_master.vhd" "f4ff22b0d99a9eeb07e608dfbdc837189d7ede52" "20260421182346.450":
-  entity spi_master at 1( 0) + 0 on 419;
-  architecture spi_master_behavioral of spi_master at 32( 1166) + 0 on 420;
-file . "wb_interconnect.vhd" "e2060e300bdb2f37bebf113f29b4f0be89099f60" "20260421182346.506":
-  entity wb_interconnect at 1( 0) + 0 on 421;
-  architecture behavioral of wb_interconnect at 114( 4865) + 0 on 422;
-file . "tb_dma.vhd" "b8016f0966ac91ed46e2087bf56296aa65866a51" "20260421181704.803":
-  entity fft_top at 1( 0) + 0 on 415;
-  architecture stub of fft_top at 26( 742) + 0 on 416;
-  entity testbench at 40( 1007) + 0 on 417;
-  architecture tbarch of testbench at 47( 1113) + 0 on 418;
+file . "spi_master.vhd" "f4ff22b0d99a9eeb07e608dfbdc837189d7ede52" "20260422154852.153":
+  entity spi_master at 1( 0) + 0 on 605;
+  architecture spi_master_behavioral of spi_master at 32( 1166) + 0 on 606;
+file . "wb_interconnect.vhd" "e2060e300bdb2f37bebf113f29b4f0be89099f60" "20260422154852.208":
+  entity wb_interconnect at 1( 0) + 0 on 607;
+  architecture behavioral of wb_interconnect at 114( 4865) + 0 on 608;
+file . "tb_dma.vhd" "bc3b937be65031871a9c8e3a8f1c9d556d8ea7eb" "20260422154852.369":
+  entity testbench at 1( 0) + 0 on 613;
+  architecture tbarch of testbench at 8( 106) + 0 on 614;

@@ -2,45 +2,6 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- Stub FFT_Top: outputs fissi a 0, nessuna logica interna
-entity FFT_Top is
-    port (
-        idx   : out std_logic_vector(8 downto 0);
-        xk_re : out std_logic_vector(15 downto 0);
-        xk_im : out std_logic_vector(15 downto 0);
-        sod   : out std_logic;
-        ipd   : out std_logic;
-        eod   : out std_logic;
-        busy  : out std_logic;
-        soud  : out std_logic;
-        opd   : out std_logic;
-        eoud  : out std_logic;
-        xn_re : in  std_logic_vector(15 downto 0);
-        xn_im : in  std_logic_vector(15 downto 0);
-        start : in  std_logic;
-        clk   : in  std_logic;
-        rst   : in  std_logic
-    );
-end FFT_Top;
-
-architecture stub of FFT_Top is
-begin
-    idx   <= (others => '0');
-    xk_re <= (others => '0');
-    xk_im <= (others => '0');
-    sod   <= '0';
-    ipd   <= '0';
-    eod   <= '0';
-    busy  <= '0';
-    soud  <= '0';
-    opd   <= '0';
-    eoud  <= '0';
-end stub;
-
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
-
 entity TestBench is
 end TestBench;
 
@@ -134,8 +95,10 @@ architecture TBarch of TestBench is
     signal irq_o             : std_logic;
     signal spi_data_ready_s  : std_logic;
 
-    signal m1_ack_bus  : std_logic := '0'; -- ack dall'interconnect (SPI)
-    signal m_ack_sdram : std_logic := '0'; -- ack BFM diretto per SDRAM
+    signal m1_ack_bus    : std_logic := '0'; -- ack dall'interconnect (SPI via s1)
+    signal m_ack_sdram   : std_logic := '0'; -- ack BFM diretto SDRAM
+    signal sdram_dat_r   : std_logic_vector(31 downto 0) := (others => '0');
+    signal m_dat_from_bus: std_logic_vector(31 downto 0); -- dati da SPI via interconnect
 
     signal s0_adr_s  : std_logic_vector(31 downto 0);
     signal s0_dat_ws : std_logic_vector(31 downto 0);
@@ -190,7 +153,7 @@ begin
     port map (
         m0_adr_i => (others => '0'), m0_dat_i => (others => '0'), m0_dat_o => open,
         m0_we_i  => '0',             m0_sel_i => "0000",           m0_stb_i => '0', m0_cyc_i => '0', m0_ack_o => open,
-        m1_adr_i => m_adr_o,         m1_dat_i => m_dat_o,          m1_dat_o => m_dat_i,
+        m1_adr_i => m_adr_o,         m1_dat_i => m_dat_o,          m1_dat_o => m_dat_from_bus,
         m1_we_i  => m_we_o,          m1_sel_i => "1111",            m1_stb_i => m_stb_o, m1_cyc_i => m_cyc_o, m1_ack_o => m1_ack_bus,
         s0_adr_o => s0_adr_s,  s0_dat_o => s0_dat_ws, s0_dat_i => s0_dat_rs,
         s0_we_o  => s0_we_s,   s0_sel_o => s0_sel_s,  s0_stb_o => s0_stb_s, s0_cyc_o => s0_cyc_s, s0_ack_i => s0_ack_s,
@@ -228,7 +191,9 @@ begin
         CS           => CS
     );
 
-    sdram_bfm: process(clk_i)
+    -- s0 BFM minimale: solo ack (dati SDRAM gestiti dal BFM diretto sotto)
+    s0_dat_rs <= (others => '0');
+    sdram_s0_ack: process(clk_i)
     begin
         if rising_edge(clk_i) then
             s0_ack_s <= '0';
@@ -238,19 +203,33 @@ begin
         end if;
     end process;
 
-    -- BFM diretto: ack al DMA per accessi SDRAM (indirizzi non-SPI, bit[31:28] /= 0x4)
-    sdram_direct_bfm: process(clk_i)
+    -- BFM SDRAM diretto: bypassa l'interconnect per SDRAM (bit[31:28]=0001).
+    -- Array 8192x32-bit: campioni 256..1279, risultati FFT 0x1300..0x14FF.
+    sdram_bfm: process(clk_i)
+        type mem_t is array (0 to 8191) of std_logic_vector(31 downto 0);
+        variable mem  : mem_t := (others => (others => '0'));
+        variable addr : integer range 0 to 8191;
     begin
         if rising_edge(clk_i) then
             m_ack_sdram <= '0';
-            if m_cyc_o = '1' and m_stb_o = '1' and m_adr_o(31 downto 28) /= "0100" then
+            sdram_dat_r <= (others => '0');
+            if m_cyc_o = '1' and m_stb_o = '1' and
+               m_adr_o(31 downto 28) = "0001" then
                 m_ack_sdram <= '1';
+                addr := to_integer(unsigned(m_adr_o(12 downto 0)));
+                if m_we_o = '1' then
+                    mem(addr) := m_dat_o;
+                else
+                    sdram_dat_r <= mem(addr);
+                end if;
             end if;
         end if;
     end process;
 
-    -- m_ack_i: OR tra ack SPI (dall'interconnect) e ack SDRAM diretto
+    -- Ack: SPI dall'interconnect, SDRAM dal BFM diretto
     m_ack_i <= m1_ack_bus or m_ack_sdram;
+    -- Data: SPI dall'interconnect (SPI master via s1), SDRAM dal BFM diretto
+    m_dat_i <= m_dat_from_bus when m_adr_o(31 downto 28) = "0100" else sdram_dat_r;
 
     process(SCK)
     begin

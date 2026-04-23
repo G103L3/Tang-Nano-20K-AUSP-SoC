@@ -3,20 +3,29 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 --
--- Register map (WB slave, byte-addressed, offset from 0x30000000):
---   0x01  WR: start   -- avvia acquisizione continua SPI->SDRAM
---   0x02  WR: stop    -- ferma acquisizione
---   0x03  WR: base    -- imposta indirizzo base SDRAM (dat[20:0] = word address 21-bit)
+-- Register map (WB slave, byte-addressed):
+--   0x01 WR: start  -- avvia acquisizione continua SPI
+--   0x02 WR: stop   -- ferma acquisizione
+--   0x03 WR: base   -- indirizzo SDRAM output FFT (dat[20:0] = word address 21-bit)
 --
--- SPI: MCP3201 12-bit ADC, 16 periodi SCK x 36 clk = 576 clk/campione (~46.875 kHz)
--- Il DMA scrive 1 parola da 16 bit per campione (bit[11:0] = dato ADC, bit[15:12] = 0).
--- Ogni 512 parole scatta la FFT a 512 punti sul blocco appena completato.
--- Risultati FFT (xk_re) scritti in SDRAM a partire da word address 0x1300.
--- IRQ (bit 20) generato alla fine della FFT.
--- Ping-pong: blocco A = base..base+511, blocco B = base+512..base+1023.
--- Dopo il blocco B l'indirizzo torna a base automaticamente.
--- Durante la FFT (tutti gli stati FFT_*) se arriva un nuovo campione SPI
--- il DMA lo scrive subito in SDRAM con priorita' assoluta.
+-- Architettura a DUE macchine a stati indipendenti (due processi VHDL):
+--
+--   dma_proc  (DMA FSM):
+--     SPI → spi_raw_buf (ping-pong 1024×16, Gowin 16K BSRAM)
+--     Non tocca mai l'SDRAM, non conosce l'FFT.
+--     Ogni 512 campioni pulsa fft_trigger e imposta fft_win_base.
+--
+--   fft_proc  (FFT FSM):
+--     Legge spi_raw_buf[fft_win_base..+511] → alimenta FFT core
+--     Cattura xk_re in fft_result_buf (512×16, Gowin 8K BSRAM)
+--     Drena fft_result_buf su SDRAM @ base_address..+511
+--     Manda IRQ al termine.
+--
+--   Bus WB condiviso:  DMA ha priorità assoluta.
+--     Mux combinatorio: quando dma_cyc='1' il bus è del DMA; altrimenti del FFT.
+--     In FS_DRAIN, se DMA prende il bus, l'ack non arriva al FFT → stallo automatico.
+--     FFT non può mai essere interrotto durante la lettura BSRAM (FS_FEED1/2)
+--     o la scrittura dei risultati (FS_COLLECT): nessun accesso WB in queste fasi.
 --
 
 entity dma is
@@ -68,40 +77,74 @@ architecture behavioral of dma is
         );
     end component;
 
-    signal xn_re_s  : std_logic_vector(15 downto 0) := (others => '0');
-    signal xk_re_s  : std_logic_vector(15 downto 0);
-    signal xk_im_s  : std_logic_vector(15 downto 0);
-    signal idx_s    : std_logic_vector(8 downto 0);
-    signal fft_start_s, fft_sod_s, fft_ipd_s, fft_eod_s : std_logic;
-    signal fft_busy_s, fft_soud_s, fft_opd_s, fft_eoud_s : std_logic;
+    -- ── FFT core ──────────────────────────────────────────────────────────────
+    signal xn_re_s    : std_logic_vector(15 downto 0) := (others => '0');
+    signal xk_re_s    : std_logic_vector(15 downto 0);
+    signal xk_im_s    : std_logic_vector(15 downto 0);
+    signal idx_s      : std_logic_vector(8 downto 0);
+    signal fft_start_s : std_logic := '0';
+    signal fft_sod_s   : std_logic;
+    signal fft_ipd_s   : std_logic;
+    signal fft_eod_s   : std_logic;
+    signal fft_busy_s  : std_logic;
+    signal fft_soud_s  : std_logic;
+    signal fft_opd_s   : std_logic;
+    signal fft_eoud_s  : std_logic;
 
-    constant FFT_OUT_BASE : unsigned(20 downto 0) := to_unsigned(16#1300#, 21);
+    -- ── Ping-pong input BRAM: 1024 campioni SPI, 16-bit (Gowin 16K BSRAM) ────
+    type t_spi_raw_buf is array (0 to 1023) of std_logic_vector(15 downto 0);
+    signal spi_raw_buf : t_spi_raw_buf := (others => (others => '0'));
+    signal spi_wr_ptr  : unsigned(9 downto 0) := (others => '0');
 
-    type state_type is (
-        S_IDLE, S_OPEN, S_CLOSE,
-        S_READ_1, S_R_DEV, S_WRITE_1, S_IRQ,
-        S_FFT_READ1, S_FFT_READ2,
-        S_FFT_BUSY, S_FFT_BUSY_RD, S_FFT_BUSY_CLRDY, S_FFT_BUSY_WR,
-        S_FFT_SPI_RD, S_FFT_SPI_CLRDY, S_FFT_SPI_WR,
-        S_FFT_WRITE, S_FFT_WRITE_WAIT,
-        S_FFT_END
-    );
+    -- ── FFT result BRAM: 512 bin xk_re, 16-bit (Gowin 8K BSRAM) ─────────────
+    type t_fft_result_buf is array (0 to 511) of std_logic_vector(15 downto 0);
+    signal fft_result_buf : t_fft_result_buf := (others => (others => '0'));
 
-    signal curr_state      : state_type;
-    signal data            : std_logic_vector(31 downto 0) := (others => '0');
-    signal address_local   : unsigned(20 downto 0) := (others => '0');
-    signal base_address    : unsigned(20 downto 0) := (others => '0');
-    signal start           : std_logic := '0';
+    -- ── Handshake DMA → FFT ───────────────────────────────────────────────────
+    signal fft_trigger  : std_logic := '0';            -- pulse 1 ciclo
+    signal fft_win_base : unsigned(9 downto 0) := (others => '0');
 
-    signal fft_sdram_base  : unsigned(20 downto 0) := (others => '0');
-    signal fft_rd_idx      : unsigned(8 downto 0)  := (others => '0');
-    signal fft_wr_cnt      : unsigned(8 downto 0)  := (others => '0');
-    signal fft_spi_return  : state_type;
-    signal fft_out_waddr   : unsigned(20 downto 0) := (others => '0');
-    signal fft_out_data    : std_logic_vector(15 downto 0) := (others => '0');
-    signal fft_eoud_seen   : std_logic := '0';
+    -- ── WB master bus — DMA side (priorità alta) ─────────────────────────────
+    signal dma_cyc : std_logic := '0';
+    signal dma_stb : std_logic := '0';
+    signal dma_we  : std_logic := '0';
+    signal dma_adr : std_logic_vector(31 downto 0) := (others => '0');
+    signal dma_dat : std_logic_vector(31 downto 0) := (others => '0');
+
+    -- ── WB master bus — FFT side (priorità bassa, solo durante FS_DRAIN) ─────
+    signal fft_cyc : std_logic := '0';
+    signal fft_stb : std_logic := '0';
+    signal fft_we  : std_logic := '0';
+    signal fft_adr : std_logic_vector(31 downto 0) := (others => '0');
+    signal fft_dat : std_logic_vector(31 downto 0) := (others => '0');
+
+    -- ── DMA FSM ───────────────────────────────────────────────────────────────
+    type dma_state_t is (DS_IDLE, DS_OPEN, DS_POLL, DS_READ, DS_CLRDY, DS_STORE);
+    signal dma_state : dma_state_t := DS_IDLE;
+    signal dma_rdata : std_logic_vector(31 downto 0) := (others => '0');
+
+    -- ── FFT FSM ───────────────────────────────────────────────────────────────
+    type fft_state_t is (FS_IDLE, FS_FEED1, FS_COMPUTE, FS_COLLECT, FS_DRAIN, FS_IRQ);
+    signal fft_state  : fft_state_t := FS_IDLE;
+    signal fft_rd_idx : unsigned(8 downto 0) := (others => '0');
+    signal drain_cnt  : unsigned(8 downto 0) := (others => '0');
+
+    -- ── Registri CPU ─────────────────────────────────────────────────────────
+    signal start_r      : std_logic := '0';
+    signal base_address : unsigned(20 downto 0) := (others => '0');
+
+    signal start_req : std_logic := '0';
 
 begin
+
+    -- ── WB master mux: DMA ha priorità assoluta ───────────────────────────────
+    -- Quando dma_cyc='1' il bus è del DMA; altrimenti è del FFT.
+    -- L'ack torna a entrambi, ma fft_proc avanza solo se dma_cyc='0' (vedi FS_DRAIN).
+    m_cyc_o <= dma_cyc when dma_cyc = '1' else fft_cyc;
+    m_stb_o <= dma_stb when dma_cyc = '1' else fft_stb;
+    m_we_o  <= dma_we  when dma_cyc = '1' else fft_we;
+    m_adr_o <= dma_adr when dma_cyc = '1' else fft_adr;
+    m_dat_o <= dma_dat when dma_cyc = '1' else fft_dat;
 
     fft_inst_0 : FFT_Top
         port map (
@@ -122,299 +165,198 @@ begin
             rst   => rst_i
         );
 
-    seq_clk: process(clk_i)
+    -- ── WB slave: registri di configurazione CPU ──────────────────────────────
+    wb_slave: process(clk_i)
     begin
         if rising_edge(clk_i) then
             s_ack_o <= '0';
             s_dat_o <= (others => '0');
-            m_cyc_o <= '0';
-            m_stb_o <= '0';
-            m_we_o  <= '0';
-            irq_o   <= '0';
+            if rst_i = '0' then
+                start_r      <= '0';
+                base_address <= (others => '0');
+            elsif s_cyc_i = '1' and s_stb_i = '1' then
+                s_ack_o <= '1';
+                if s_we_i = '1' then
+                    case s_adr_i(7 downto 0) is
+                        when x"01" => start_r      <= '1';
+                        when x"02" => start_r      <= '0';
+                        when x"03" => base_address <= unsigned(s_dat_i(20 downto 0));
+                        when others => null;
+                    end case;
+                end if;
+            end if;
+        end if;
+    end process;
+
+    -- ── DMA FSM ───────────────────────────────────────────────────────────────
+    -- Compito unico: leggere campioni SPI e scriverli in spi_raw_buf.
+    -- Non conosce l'FFT, non accede mai all'SDRAM.
+    -- Ogni 512 campioni: pulsa fft_trigger + imposta fft_win_base.
+    dma_proc: process(clk_i)
+    begin
+        if rising_edge(clk_i) then
+            dma_cyc     <= '0';
+            dma_stb     <= '0';
+            dma_we      <= '0';
+            fft_trigger <= '0';
 
             if rst_i = '0' then
-                curr_state     <= S_IDLE;
-                m_adr_o        <= (others => '0');
-                m_dat_o        <= (others => '0');
-                start          <= '0';
-                base_address   <= (others => '0');
-                address_local  <= (others => '0');
-                data           <= (others => '0');
-                fft_start_s    <= '0';
-                xn_re_s        <= (others => '0');
-                fft_rd_idx     <= (others => '0');
-                fft_wr_cnt     <= (others => '0');
-                fft_sdram_base <= (others => '0');
-                fft_out_waddr  <= (others => '0');
-                fft_out_data   <= (others => '0');
-                fft_eoud_seen  <= '0';
+                dma_state  <= DS_IDLE;
+                spi_wr_ptr <= (others => '0');
             else
-                if s_cyc_i = '1' and s_stb_i = '1' then
-                    s_ack_o <= '1';
-                    if s_we_i = '1' then
-                        if s_adr_i(7 downto 0) = x"03" then
-                            base_address <= unsigned(s_dat_i(20 downto 0));
-                        elsif s_adr_i(7 downto 0) = x"01" then
-                            start <= '1';
-                        elsif s_adr_i(7 downto 0) = x"02" then
-                            start <= '0';
-                        end if;
-                    end if;
-                end if;
+                case dma_state is
 
-                case curr_state is
-
-                    when S_IDLE =>
-                        address_local <= base_address;
-                        fft_start_s   <= '0';
-                        if start = '1' then
-                            curr_state <= S_OPEN;
+                    when DS_IDLE =>
+                        spi_wr_ptr <= (others => '0');
+                        if start_r = '1' then
+                            dma_state <= DS_OPEN;
                         end if;
 
-                    when S_OPEN =>
-                        m_cyc_o <= '1';
-                        m_stb_o <= '1';
-                        m_we_o  <= '1';
-                        m_adr_o <= x"40000001";
-                        m_dat_o <= x"00000001";
+                    -- Abilita SPI master: write 0x40000001 ← 1
+                    when DS_OPEN =>
+                        dma_cyc <= '1';
+                        dma_stb <= '1';
+                        dma_we  <= '1';
+                        dma_adr <= x"40000001";
+                        dma_dat <= x"00000001";
                         if m_ack_i = '1' then
-                            m_cyc_o    <= '0';
-                            m_stb_o    <= '0';
-                            curr_state <= S_READ_1;
+                            dma_state <= DS_POLL;
                         end if;
 
-                    -- Read 12-bit sample from SPI (WB stalls until data_ready)
-                    when S_READ_1 =>
-                        m_cyc_o <= '1';
-                        m_stb_o <= '1';
-                        m_we_o  <= '0';
-                        m_adr_o <= x"40000000";
-                        if m_ack_i = '1' then
-                            data       <= m_dat_i;
-                            m_cyc_o    <= '0';
-                            m_stb_o    <= '0';
-                            curr_state <= S_R_DEV;
+                    -- Attende DATA_READY dall'SPI master
+                    when DS_POLL =>
+                        if spi_data_ready_i = '1' then
+                            dma_state <= DS_READ;
                         end if;
 
-                    when S_R_DEV =>
-                        m_cyc_o <= '1';
-                        m_stb_o <= '1';
-                        m_we_o  <= '1';
-                        m_adr_o <= x"40000003";
-                        m_dat_o <= (others => '0');
+                    -- Legge dato SPI: read 0x40000000
+                    when DS_READ =>
+                        dma_cyc <= '1';
+                        dma_stb <= '1';
+                        dma_we  <= '0';
+                        dma_adr <= x"40000000";
                         if m_ack_i = '1' then
-                            m_cyc_o    <= '0';
-                            m_stb_o    <= '0';
-                            curr_state <= S_WRITE_1;
+                            dma_rdata <= m_dat_i;
+                            dma_state <= DS_CLRDY;
                         end if;
 
-                    -- One write per sample: 12-bit ADC value in bits[11:0]
-                    when S_WRITE_1 =>
-                        m_cyc_o <= '1';
-                        m_stb_o <= '1';
-                        m_we_o  <= '1';
-                        m_adr_o <= "0001" & "0000000" & std_logic_vector(address_local);
-                        m_dat_o <= x"00000" & data(11 downto 0);
+                    -- Pulisce DATA_READY: write 0x40000003 ← 0 toglie il flag ack_o = 1
+                    when DS_CLRDY =>
+                        dma_cyc <= '1';
+                        dma_stb <= '1';
+                        dma_we  <= '1';
+                        dma_adr <= x"40000003";
+                        dma_dat <= (others => '0');
                         if m_ack_i = '1' then
-                            m_cyc_o <= '0';
-                            m_stb_o <= '0';
-                            address_local <= address_local + 1;
-                            if to_integer(address_local + 1 - base_address) mod 512 = 0 then
-                                -- 512-sample window just completed: trigger FFT
-                                fft_sdram_base <= address_local - 510;
-                                fft_rd_idx     <= (others => '0');
-                                fft_wr_cnt     <= (others => '0');
-                                fft_eoud_seen  <= '0';
-                                fft_start_s    <= '1';
-                                -- Wrap address at 1024 (ping-pong boundary)
-                                if to_integer(address_local + 1 - base_address) = 1024 then
-                                    address_local <= base_address;
-                                end if;
-                                curr_state <= S_FFT_READ1;
+                            dma_state <= DS_STORE;
+                        end if;
+
+                    -- Scrive campione in spi_raw_buf (1 ciclo, nessun WB)
+                    -- Ogni 512 campioni: seleziona blocco completato e pulsa fft_trigger
+                    when DS_STORE =>
+                        spi_raw_buf(to_integer(spi_wr_ptr)) <= x"0" & dma_rdata(11 downto 0);
+                        if spi_wr_ptr(8 downto 0) = "111111111" then
+                            if spi_wr_ptr(9) = '0' then
+                                fft_win_base <= (others => '0');       -- blocco A: 0-511
                             else
-                                curr_state <= S_READ_1;
+                                fft_win_base <= to_unsigned(512, 10);  -- blocco B: 512-1023
                             end if;
+                            fft_trigger <= '1';
                         end if;
+                        spi_wr_ptr <= spi_wr_ptr + 1;
+                        dma_state  <= DS_POLL;
 
-                    when S_FFT_READ1 =>
-                        if spi_data_ready_i = '1' then
-                            fft_spi_return <= S_FFT_READ1;
-                            curr_state     <= S_FFT_SPI_RD;
-                        else
-                            m_cyc_o <= '1';
-                            m_stb_o <= '1';
-                            m_we_o  <= '0';
-                            m_adr_o <= "0001" & "0000000" &
-                                       std_logic_vector(fft_sdram_base + fft_rd_idx);
-                            if m_ack_i = '1' then
-                                xn_re_s    <= x"0" & m_dat_i(11 downto 0);
-                                m_cyc_o    <= '0';
-                                m_stb_o    <= '0';
-                                curr_state <= S_FFT_READ2;
-                            end if;
-                        end if;
+                end case;
+            end if;
+        end if;
+    end process;
 
-                    --  wait for FFT to accept (ipd pulse)
-                    when S_FFT_READ2 =>
-                        if spi_data_ready_i = '1' then
-                            fft_spi_return <= S_FFT_READ2;
-                            curr_state     <= S_FFT_SPI_RD;
-                        elsif fft_ipd_s = '1' then
+    -- ── FFT FSM ───────────────────────────────────────────────────────────────
+    -- Compito: aspetta fft_trigger → legge BSRAM → alimenta FFT → cattura risultati
+    --          → drena su SDRAM → IRQ.
+    -- Non interagisce mai con l'SPI master.
+    -- Le fasi FS_FEED1/2 e FS_COLLECT non usano il WB: impossibile interferire
+    -- con il DMA durante la lettura/scrittura BSRAM.
+    -- In FS_DRAIN: se DMA prende il bus (dma_cyc='1'), il mux devia il bus al DMA;
+    --              l'ack non arriva al FFT → drain_cnt non avanza → stallo automatico.
+    fft_proc: process(clk_i)
+    begin
+        if rising_edge(clk_i) then
+            fft_cyc     <= '0';
+            fft_stb     <= '0';
+            fft_we      <= '0';
+            irq_o       <= '0';
+            fft_start_s <= start_req; 
+            start_req   <= '0';
+
+            if rst_i = '0' then
+                fft_state   <= FS_IDLE;
+                fft_rd_idx  <= (others => '0');
+                drain_cnt   <= (others => '0');
+            else
+                case fft_state is
+
+                    when FS_IDLE =>
+                        fft_rd_idx <= (others => '0');
+                        if fft_trigger = '1' then
+                            fft_state <= FS_FEED1;
+                            start_req <= '1';
+                            xn_re_s     <= spi_raw_buf(to_integer(fft_win_base + resize(fft_rd_idx, 10)));
                             fft_rd_idx <= fft_rd_idx + 1;
+                        end if;
+
+                    -- Presenta xn_re e pulsa start='1' per esattamente 1 ciclo di clock
+                    when FS_FEED1 =>
+                        start_req <= '1';
+                        xn_re_s     <= spi_raw_buf(to_integer(fft_win_base + resize(fft_rd_idx, 10)));
+                        fft_rd_idx <= fft_rd_idx + 1;
                             if fft_eod_s = '1' then
-                                fft_start_s <= '0';
-                                curr_state  <= S_FFT_BUSY;
-                            else
-                                curr_state <= S_FFT_READ1;
+                                fft_state <= FS_COMPUTE;
+                            elsif fft_ipd_s = '1' and fft_eod_s = '0' then
+                                fft_state <= FS_FEED1;
+                            end if;
+
+                    -- Attende fine calcolo FFT (busy='0')
+                    when FS_COMPUTE =>
+                        fft_state <= FS_COLLECT;
+
+                    -- Cattura i 512 bin FFT in fft_result_buf (nessun WB)
+                    -- Impossibile essere interrotti: nessun accesso WB in questo stato
+                    when FS_COLLECT =>
+                        if fft_opd_s = '1' then
+                            fft_result_buf(to_integer(unsigned(idx_s))) <= xk_re_s;
+                        end if;
+                        if fft_eoud_s = '1' then
+                            drain_cnt <= (others => '0');
+                            fft_state <= FS_DRAIN;
+                        end if;
+
+                    -- Drena fft_result_buf su SDRAM @ base_address..base_address+511
+                    -- DMA ha priorità: se dma_cyc='1' il mux toglie il bus al FFT,
+                    -- l'ack non viene mai ricevuto → ciclo WB si ripete il clock dopo.
+                    when FS_DRAIN =>
+                        fft_adr <= "0001" & "0000000" &
+                                   std_logic_vector(base_address + resize(drain_cnt, 21));
+                        fft_dat <= x"0000" & fft_result_buf(to_integer(drain_cnt));
+                        if dma_cyc = '0' then
+                            fft_cyc <= '1';
+                            fft_stb <= '1';
+                            fft_we  <= '1';
+                            if m_ack_i = '1' then
+                                -- Abbassa CYC prima di cambiare stato (last-assignment wins)
+                                fft_cyc <= '0';
+                                fft_stb <= '0';
+                                if drain_cnt = 511 then
+                                    fft_state <= FS_IRQ;
+                                else
+                                    drain_cnt <= drain_cnt + 1;
+                                end if;
                             end if;
                         end if;
 
-                    when S_FFT_BUSY =>
-                        fft_start_s <= '0';
-                        if spi_data_ready_i = '1' then
-                            curr_state <= S_FFT_BUSY_RD;
-                            --Dopo che è busy quindi il BUSY_RD legge i falori dal FFT per poi scriverli
-                        elsif fft_busy_s = '0' then
-                            curr_state <= S_FFT_WRITE;
-                        end if;
-
-                    when S_FFT_BUSY_RD =>
-                        m_cyc_o <= '1';
-                        m_stb_o <= '1';
-                        m_we_o  <= '0';
-                        m_adr_o <= x"40000000";
-                        if m_ack_i = '1' then
-                            data       <= m_dat_i;
-                            m_cyc_o    <= '0';
-                            m_stb_o    <= '0';
-                            curr_state <= S_FFT_BUSY_CLRDY;
-                        end if;
-
-                    when S_FFT_BUSY_CLRDY =>
-                        m_cyc_o <= '1';
-                        m_stb_o <= '1';
-                        m_we_o  <= '1';
-                        m_adr_o <= x"40000003";
-                        m_dat_o <= (others => '0');
-                        if m_ack_i = '1' then
-                            m_cyc_o    <= '0';
-                            m_stb_o    <= '0';
-                            curr_state <= S_FFT_BUSY_WR;
-                        end if;
-
-                    when S_FFT_BUSY_WR =>
-                        m_cyc_o <= '1';
-                        m_stb_o <= '1';
-                        m_we_o  <= '1';
-                        m_adr_o <= "0001" & "0000000" & std_logic_vector(address_local);
-                        m_dat_o <= x"00000" & data(11 downto 0);
-                        if m_ack_i = '1' then
-                            address_local <= address_local + 1;
-                            m_cyc_o       <= '0';
-                            m_stb_o       <= '0';
-                            curr_state    <= S_FFT_BUSY;
-                        end if;
-
-                    when S_FFT_SPI_RD =>
-                        m_cyc_o <= '1';
-                        m_stb_o <= '1';
-                        m_we_o  <= '0';
-                        m_adr_o <= x"40000000";
-                        if m_ack_i = '1' then
-                            data       <= m_dat_i;
-                            m_cyc_o    <= '0';
-                            m_stb_o    <= '0';
-                            curr_state <= S_FFT_SPI_CLRDY;
-                        end if;
-
-                    when S_FFT_SPI_CLRDY =>
-                        m_cyc_o <= '1';
-                        m_stb_o <= '1';
-                        m_we_o  <= '1';
-                        m_adr_o <= x"40000003";
-                        m_dat_o <= (others => '0');
-                        if m_ack_i = '1' then
-                            m_cyc_o    <= '0';
-                            m_stb_o    <= '0';
-                            curr_state <= S_FFT_SPI_WR;
-                        end if;
-
-                    when S_FFT_SPI_WR =>
-                        m_cyc_o <= '1';
-                        m_stb_o <= '1';
-                        m_we_o  <= '1';
-                        m_adr_o <= "0001" & "0000000" & std_logic_vector(address_local);
-                        m_dat_o <= x"00000" & data(11 downto 0);
-                        if m_ack_i = '1' then
-                            address_local <= address_local + 1;
-                            m_cyc_o       <= '0';
-                            m_stb_o       <= '0';
-                            curr_state    <= fft_spi_return;
-                        end if;
-
-                    -- --------------------------------------------------------
-                    -- FFT OUTPUT PHASE: write xk_re bins to SDRAM @ 0x1300+idx
-                    -- --------------------------------------------------------
-                    when S_FFT_WRITE =>
-                        if fft_eoud_s = '1' then
-                            fft_eoud_seen <= '1';
-                        end if;
-                        if spi_data_ready_i = '1' then
-                            fft_spi_return <= S_FFT_WRITE;
-                            curr_state     <= S_FFT_SPI_RD;
-                        elsif fft_opd_s = '1' then
-                            fft_out_waddr <= FFT_OUT_BASE + resize(unsigned(idx_s), 21);
-                            fft_out_data  <= xk_re_s;
-                            curr_state    <= S_FFT_WRITE_WAIT;
-                        elsif fft_eoud_seen = '1' then
-                            curr_state <= S_FFT_END;
-                        end if;
-
-                    when S_FFT_WRITE_WAIT =>
-                        if fft_eoud_s = '1' then
-                            fft_eoud_seen <= '1';
-                        end if;
-                        m_cyc_o <= '1';
-                        m_stb_o <= '1';
-                        m_we_o  <= '1';
-                        m_adr_o <= "0001" & "0000000" & std_logic_vector(fft_out_waddr);
-                        m_dat_o <= x"0000" & fft_out_data;
-                        if m_ack_i = '1' then
-                            m_cyc_o    <= '0';
-                            m_stb_o    <= '0';
-                            fft_wr_cnt <= fft_wr_cnt + 1;
-                            if fft_eoud_seen = '1' or
-                               to_integer(fft_wr_cnt) = 511 then
-                                curr_state <= S_FFT_END;
-                            else
-                                curr_state <= S_FFT_WRITE;
-                            end if;
-                        end if;
-
-                    when S_FFT_END =>
-                        curr_state <= S_IRQ;
-
-                    -- --------------------------------------------------------
-                    -- IRQ: notifica CPU, riprende campionamento
-                    -- --------------------------------------------------------
-                    when S_IRQ =>
-                        irq_o      <= '1';
-                        curr_state <= S_READ_1;
-
-                    when S_CLOSE =>
-                        m_cyc_o <= '1';
-                        m_stb_o <= '1';
-                        m_we_o  <= '1';
-                        m_adr_o <= x"40000002";
-                        m_dat_o <= x"00000000";
-                        if m_ack_i = '1' then
-                            m_cyc_o    <= '0';
-                            m_stb_o    <= '0';
-                            curr_state <= S_IDLE;
-                        end if;
-
-                    when others =>
-                        curr_state <= S_IDLE;
+                    when FS_IRQ =>
+                        irq_o     <= '1';
+                        fft_state <= FS_IDLE;
 
                 end case;
             end if;

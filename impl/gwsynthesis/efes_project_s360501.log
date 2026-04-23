@@ -1,5 +1,6 @@
 GowinSynthesis start
 Running parser ...
+Analyzing Verilog file 'C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\fft\fft.v'
 Analyzing VHDL file 'C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\gowin_picorv32\gowin_picorv32.vhd'
 Analyzing entity 'picorv32_pcpi_fast_mul'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\gowin_picorv32\gowin_picorv32.vhd":31484)
 Analyzing architecture 'beh'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\gowin_picorv32\gowin_picorv32.vhd":31484)
@@ -200,29 +201,41 @@ Analyzing architecture 'beh'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Do
 Analyzing entity 'sdram_controller_hs_top'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\sdram_controller_hs\sdram_controller_hs.vhd":1514)
 Analyzing architecture 'beh'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\sdram_controller_hs\sdram_controller_hs.vhd":1514)
 Analyzing VHDL file 'C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\spi_master.vhd'
-Analyzing entity 'spi_master'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\spi_master.vhd":5)
-Analyzing architecture 'spi_master_behavioral'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\spi_master.vhd":24)
+Analyzing entity 'spi_master'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\spi_master.vhd":13)
+Analyzing architecture 'spi_master_behavioral'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\spi_master.vhd":32)
 Analyzing VHDL file 'C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\top.vhd'
 Analyzing entity 'top_system'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\top.vhd":4)
-Analyzing architecture 'behavioral'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\top.vhd":24)
+Analyzing architecture 'behavioral'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\top.vhd":26)
+WARN  (EX4557) : Actual for formal port 'm1_stb_i' is neither a static name nor a globally static expression("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\top.vhd":261)
+WARN  (EX4557) : Actual for formal port 'm1_cyc_i' is neither a static name nor a globally static expression("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\top.vhd":262)
+Analyzing VHDL file 'C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\uart_generic.vhd'
+Analyzing entity 'uart_generic'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\uart_generic.vhd":5)
+Analyzing architecture 'uart_generic_behavioral'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\uart_generic.vhd":21)
 Analyzing VHDL file 'C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\wb_interconnect.vhd'
-Analyzing entity 'wb_interconnect'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\wb_interconnect.vhd":18)
-Analyzing architecture 'behavioral'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\wb_interconnect.vhd":113)
+Analyzing entity 'wb_interconnect'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\wb_interconnect.vhd":19)
+Analyzing architecture 'behavioral'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\wb_interconnect.vhd":114)
+Analyzing VHDL file 'C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\dma.vhd'
+Analyzing entity 'dma'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\dma.vhd":31)
+Analyzing architecture 'behavioral'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\dma.vhd":58)
 Processing 'top_system(behavioral)'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\top.vhd":4)
-WARN  (EX4206) : Using initial value for 'dummy_m1_adr' since it is never assigned("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\top.vhd":151)
-WARN  (EX4206) : Using initial value for 'dummy_m1_sel' since it is never assigned("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\top.vhd":153)
-WARN  (EX4206) : Using initial value for 'dma_adr' since it is never assigned("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\top.vhd":157)
-WARN  (EX4206) : Using initial value for 'dummy_s_dat_i' since it is never assigned("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\top.vhd":162)
-WARN  (EX4206) : Using initial value for 'irq_dummy' since it is never assigned("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\top.vhd":169)
+WARN  (EX4206) : Using initial value for 'dummy_s_dat_i' since it is never assigned("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\top.vhd":202)
 Processing '**(**)'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\gowin_picorv32\gowin_picorv32.vhd":31484)
-Processing 'wb_interconnect(behavioral)'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\wb_interconnect.vhd":18)
+Processing 'wb_interconnect(behavioral)'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\wb_interconnect.vhd":19)
 Processing 'memory_arbiter(structural)'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\memory_arbiter.vhd":9)
 Processing '**(**)'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\sdram_controller_hs\sdram_controller_hs.vhd":1514)
-Processing 'SPI_Master(SPI_Master_BEHAVIORAL)'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\spi_master.vhd":5)
-'others' clause is never selected("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\spi_master.vhd":127)
+Processing 'dma(behavioral)'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\dma.vhd":31)
+Extracting RAM for identifier 'spi_raw_buf'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\dma.vhd":96)
+Extracting RAM for identifier 'fft_result_buf'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\dma.vhd":101)
+Switching to Verilog mode to elaborate module 'FFT_Top'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\dma.vhd":166)
+Compiling module '**'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\fft\fft.v":2971)
+Returning to VHDL mode to continue with elaboration("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\dma.vhd":166)
+Processing 'SPI_Master(SPI_Master_BEHAVIORAL)'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\spi_master.vhd":13)
 Processing 'PWM_GENERIC(PWM_GENERIC_BEHAVIORAL)'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\pwm_generic_master.vhd":5)
 Processing 'PWM_GENERIC(nbit=4)(PWM_GENERIC_BEHAVIORAL)'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\pwm_generic_master.vhd":5)
 Processing 'GPIO_GENERIC(nbit=1)(GPIO_GENERIC_BEHAVIORAL)'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\gpio_generic.vhd":5)
+Processing 'UART_GENERIC(UART_GENERIC_BEHAVIORAL)'("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\uart_generic.vhd":5)
+'others' clause is never selected("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\uart_generic.vhd":193)
+'others' clause is never selected("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\uart_generic.vhd":257)
 NOTE  (EX0101) : Current top module is "top_system"
 [5%] Running netlist conversion ...
 WARN  (CV0023) : Sweep user defined iobuf instance "IO_sdram_dq_0_iobuf" with dangling iopin("C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\sdram_controller_hs\sdram_controller_hs.vhd":1514)

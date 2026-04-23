@@ -218,8 +218,7 @@ begin
     gpio_in_v <= (others => '0');
     gpio_1_o  <= gpio_out_v(0);
 
-    irq_vec       <= (others => '0');
-    irq_vec(20)   <= dma_irq;
+    irq_vec   <= x"00" & "000" & dma_irq;
 
     dma_to_sdram  <= '1' when dma_m_adr(31 downto 28) = "0001" else '0';
     dma_m_ack_s   <= dma_ack  when dma_to_sdram = '1' else dma_wb_ack;

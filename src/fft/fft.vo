@@ -2,7 +2,7 @@
 //All rights reserved.
 //File Title: Post-PnR Verilog Simulation Model file
 //Tool Version: V1.9.11.03 Education
-//Created Time: Mon Apr 20 20:15:12 2026
+//Created Time: Wed Apr 22 17:47:46 2026
 
 `timescale 100 ps/100 ps
 module FFT_Top(
@@ -143,11 +143,11 @@ wire \fft_top_inst/ld_inst/n37_4 ;
 wire \fft_top_inst/ld_inst/n39_4 ;
 wire \fft_top_inst/ld_inst/n38_6 ;
 wire \fft_top_inst/tf_inst/slfRst_3 ;
-wire \fft_top_inst/tf_inst/n417_6 ;
+wire \fft_top_inst/tf_inst/n409_6 ;
 wire \fft_top_inst/tf_inst/btfy_ea ;
 wire \fft_top_inst/tf_inst/twBtfy_ea ;
-wire [17:0] \fft_top_inst/tf_inst/btfy_twre ;
-wire [17:0] \fft_top_inst/tf_inst/btfy_twim ;
+wire [15:0] \fft_top_inst/tf_inst/btfy_twre ;
+wire [15:0] \fft_top_inst/tf_inst/btfy_twim ;
 wire [8:0] \fft_top_inst/tf_inst/tw_ad ;
 wire [8:0] \fft_top_inst/tf_inst/twBtfy_dwnad ;
 wire [15:0] \fft_top_inst/tf_inst/btfy_xnare ;
@@ -171,73 +171,73 @@ wire \fft_top_inst/tf_inst/btfy_inst/constructG_13_4 ;
 wire \fft_top_inst/tf_inst/btfy_inst/constructG_14_4 ;
 wire \fft_top_inst/tf_inst/btfy_inst/constructG_15_4 ;
 wire \fft_top_inst/tf_inst/btfy_inst/constructG_16_1_COUT ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_0_4 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_1_4 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_2_4 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_3_4 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_4_4 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_5_4 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_6_4 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_7_4 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_8_4 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_9_4 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_10_4 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_11_4 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_12_4 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_13_4 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_14_4 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_15_4 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_16_1_COUT ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_0_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_1_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_2_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_3_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_4_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_5_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_6_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_7_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_8_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_9_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_10_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_11_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_12_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_13_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_14_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_15_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_16_1_COUT ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_0_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_1_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_2_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_3_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_4_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_5_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_6_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_7_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_8_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_9_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_10_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_11_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_12_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_13_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_14_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_15_5 ;
-wire \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_16_1_COUT ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_0_4 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_1_4 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_2_4 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_3_4 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_4_4 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_5_4 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_6_4 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_7_4 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_8_4 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_9_4 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_10_4 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_11_4 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_12_4 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_13_4 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_14_4 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_15_4 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_16_1_COUT ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_0_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_1_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_2_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_3_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_4_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_5_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_6_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_7_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_8_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_9_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_10_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_11_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_12_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_13_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_14_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_15_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_16_1_COUT ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_0_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_1_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_2_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_3_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_4_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_5_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_6_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_7_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_8_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_9_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_10_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_11_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_12_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_13_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_14_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_15_5 ;
+wire \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_16_1_COUT ;
 wire [15:0] \fft_top_inst/tf_inst/btfy_inst/mltA ;
 wire [15:0] \fft_top_inst/tf_inst/btfy_inst/mltB ;
 wire [0:0] \fft_top_inst/tf_inst/btfy_inst/constructG ;
-wire [0:0] \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH ;
-wire [0:0] \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI ;
-wire [0:0] \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ ;
-wire [15:0] \fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX ;
-wire [15:0] \fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY ;
-wire [53:0] \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/DOUT ;
-wire [54:0] \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/CASO ;
-wire [17:0] \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/SOA ;
-wire [17:0] \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/SOB ;
-wire [53:0] \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/DOUT ;
-wire [54:0] \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/CASO ;
-wire [17:0] \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/SOA ;
-wire [17:0] \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/SOB ;
+wire [0:0] \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH ;
+wire [0:0] \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI ;
+wire [0:0] \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ ;
+wire [15:0] \fft_top_inst/tf_inst/btfy_inst/reconstructX ;
+wire [15:0] \fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY ;
+wire [53:0] \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/DOUT ;
+wire [54:0] \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/CASO ;
+wire [17:0] \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/SOA ;
+wire [17:0] \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/SOB ;
+wire [53:0] \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/DOUT ;
+wire [54:0] \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/CASO ;
+wire [17:0] \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/SOA ;
+wire [17:0] \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/SOB ;
 wire \fft_top_inst/tf_inst/twBtfyParm_inst/isLstLvl ;
 wire \fft_top_inst/tf_inst/twBtfyParm_inst/isLstGrp ;
 wire \fft_top_inst/tf_inst/twBtfyParm_inst/isLstBtfy ;
@@ -2380,94 +2380,94 @@ LUT2 \fft_top_inst/tf_inst/slfRst_s1  (
 	.F(\fft_top_inst/tf_inst/slfRst_3 )
 );
 defparam \fft_top_inst/tf_inst/slfRst_s1 .INIT=4'hE;
-LUT3 \fft_top_inst/tf_inst/n417_s1  (
+LUT3 \fft_top_inst/tf_inst/n409_s1  (
 	.I0(\fft_top_inst/fft_ok ),
 	.I1(\fft_top_inst/ftCtl_ea ),
 	.I2(eod),
-	.F(\fft_top_inst/tf_inst/n417_6 )
+	.F(\fft_top_inst/tf_inst/n409_6 )
 );
-defparam \fft_top_inst/tf_inst/n417_s1 .INIT=8'hF4;
+defparam \fft_top_inst/tf_inst/n409_s1 .INIT=8'hF4;
 DFFR \fft_top_inst/tf_inst/start_reg_s1  (
-	.D(\fft_top_inst/tf_inst/n417_6 ),
+	.D(\fft_top_inst/tf_inst/n409_6 ),
 	.CLK(clk),
 	.RESET(\fft_top_inst/slfRst ),
 	.Q(\fft_top_inst/ftCtl_ea )
 );
 defparam \fft_top_inst/tf_inst/start_reg_s1 .INIT=1'b0;
-pROMX9 \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s  (
+pROM \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s  (
 	.CLK(clk),
 	.OCE(GND),
 	.CE(VCC),
 	.RESET(\fft_top_inst/tf_inst/slfRst_3 ),
 	.AD({\fft_top_inst/tf_inst/tw_ad [8:0], GND, VCC, VCC, VCC, VCC}),
-	.DO({\fft_top_inst/tf_inst/btfy_twim [17:0], \fft_top_inst/tf_inst/btfy_twre [17:0]})
+	.DO({\fft_top_inst/tf_inst/btfy_twim [15:0], \fft_top_inst/tf_inst/btfy_twre [15:0]})
 );
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_00=288'hF5049FE1CF6959FE9CF826DFF08F9B85FF61FB4A1FFA6FCDBDFFD8FE6E1FFF500001FFFF;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_01=288'hE8925F759EA1E1F875EBAA9F97FED381FA74EEC61FB57F0551FC25F1E45FCE0F3745FD88;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_02=288'hDC599EBBDDDDC9ED73DF60DEF17E0E61F0A7E26CDF224E3F49F38EE57D9F4E5E7075F629;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_03=288'hD078DDB64D1EF1DDB0D3671DFEAD4E11E211D65C5E426D7D95E628D9581E817DAD81E9F3;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_04=288'hC50D5C678C6735C954C7DB9CC1EC9461CED7CAB29D17ECC215D412CD91DD695CF045D906;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_05=288'hBA331AD2BBB855B090BCDA9B3E4BE321B727BF8C5BA5AC0E8DBD7BC2481C08BC3A99C38A;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_06=288'hB004D8FBCB140593A1B27ED9777B3C059B3DB504D9EF3B64C1A29AB7965A630B8E35A9B6;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_07=288'hA69BD6E74A7BD572D0A8E25771EAA0A97B5DAB3657F8EAC65183B0AD97187C3AECC58BC7;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_08=288'h9E0F549A49F1414E6CA01C95327A128D57D6A23895C77A34C1610BA46316591A57DD6A09;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_09=288'h9674121A79759926D0984352BED9930D30FF9A22536059B17D3AFF9C1113FED9D0E544CF;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_0A=288'h8FDD4F6E090A14FC5D9169901CF923650738930710C9693DC111EB94B551734959291C73;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_0B=288'h8A5ACC9B98AFB8CF7B8BA08D5368C4A4DAE88CF88E0928DAB0E6338E620EBCB8F1D8F15A;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_0C=288'h85FA49AA086760A09B86F68A68F877BCAC7C88058B26488940B84489270BE1D89BE8C3EF;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_0D=288'h82C6C6A0A831C8702E83770764D83D647C68843A4827D84A34888E8510C8E9A8583494A0;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_0E=288'h80C80386F80F6C3EAC812A444E8816304B2081A04515681E2C57888229C5DB78275C63E3;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_0F=288'h8002C0648800A00C918016812D88027C191F803E01F658059025AA807902BEE809E0322F;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_10=288'h80793D41280593DA56803E3E09B8027FE6E18016BED28800A3F36F8002FF9B8800040000;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_11=288'h8229FA24981E2FA87881A07AEAA81633B4E0812A7BB1880F6FC15480C83C791809E3CDD1;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_12=288'h8510F716684A377772843A77D8383D6783988377389B3831CB8FD282C6F95F68275F9C1D;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_13=288'h8927341E38894347BC8805B4D9C877BF538486F6B5971867635F6585FA76560858376B60;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_14=288'h8E62314358DAB319CD8CF8B1F6E8C4A725188BA0B2ACA8AFBB30858A5AF364789BEB3C11;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_15=288'h94B56E8CC93DC2EE1593072F36A92366F8C89169AFE3190A1703A38FDD709208F1DB0EA6;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_16=288'h9C112C0139B17EC5019A226C9FB9930ECF0198436D4139759AD93096742DE599592AE38D;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_17=288'hA46329A6FA34C29EF5A238AA389A128EA82AA01CAACD99F142B1949E0F6B65C9D0E6BB31;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_18=288'hAD972783DAC6527C50AB3668072AA0AA84A3A8E2688E2A7BD68D30A69BE918CA57DE95F7;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_19=288'hB796659D0B64C25D66B504E610DB3C0664C3B27EE6889B14066C5FB004E7044AECC67439;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_1A=288'hC24823F75C0E8E4285BF8C645A6BE32248D9BCDAA4C1CBB8564F70BA33252D5B8E36564A;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_1B=288'hCD91E296BCC2162BEECAB2A2E82C94623129C7DBA33E2C673636ACC50D63988C3A9A3C76;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_1C=288'hD958217E9D7D9619D8D65C61BDAD4E121DEFD36722016D1EF22250D078E249CCF04626FA;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_1D=288'hE57DA0B1BE3F4A0C72E26CE0DDCE0E620F59DF60E10E9DDDCA128DDC59A1443DAD82160D;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_1E=288'hF1E460320F055203DBEEC6204A9ED382058CEBAAA0681EA1E2078BE892608A7E707609D7;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_1F=288'hFE6E2000BFCDBE0028FB4A2005AF9B86009FF826E00F8F695A0164F504A01E4F37460278;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_20=288'h0AFBA01E4096AA016407D9600F80647E009F04B62005A03246002801922000B000020001;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_21=288'h176DE08A715E22078B1455A068112C82058C113A204A90FAB203DB0E1BE03200C8BE0278;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_22=288'h23A6A14432223A128D209F610E91F1A20F591D9360DDC1C0BA0C721A82A0B1B18F8E09D7;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_23=288'h2F876249C2E11222502C99220162B1F21DEF29A3E1BDA2826E19D826A8217E925282160D;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_24=288'h3AF2E3988398CE36AC3824A33E236BA23129354DA2E8233DEE2BEE326E6296B30FBE26FA;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_25=288'h45CD252D5447AE4F704325A4C1C41CE248D94073E45A63F17642853DB823F753C56A3C76;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_26=288'h4FFB670444EBFE6C5F4D81668894C3FE64C34AFB6610D49B425D664869E59D0471CE564A;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_27=288'h59646918C5842E8D30571DE88E255F5A84A354C9E8072539B27C5052692783D5133E7439;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_28=288'h61F0EB65C60EC2B1945FE3AACD95ED76A82A5DC7AA3895CB429EF55B9D29A6F5A82695F7;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_29=288'h698C2DE5968A6AD93067BCED41366CF6CF0165DDEC9FB64E86C50163EF2C01362F1EBB31;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_2A=288'h7022F09206F5EF03A36E96AFE316DC9EF8C86CF92F36A6C242EE156B4AEE8CC6A6DAE38D;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_2B=288'h75A5736477504B3085745FB2ACA73B5F25187307B1F6E7255319CD719E3143570E2B0EA6;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_2C=288'h7A05F6560798A35F657909B597178847538477FAB4D9C776C347BC76D9341E37641B3C11;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_2D=288'h7D39795F67CE3B8FD27C89389B37C29F83987BC5F7D837B5CF77727AEF771667A7CF6B60;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_2E=288'h7F383C7917F097C1547ED5FBB187E9D3B4E07E5FFAEAA7E1D7A8787DD67A2497D8A79C1D;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_2F=288'h7FFD7F9B87FF63F36F7FE9BED287FD87E6E17FC23E09B7FA73DA567F873D4127F623CDD1;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_30=288'h7F8702BEE7FA7025AA7FC201F657FD84191F7FE9812D87FF600C917FFD406487FFFC0000;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_31=288'h7DD645DB77E1D457887E5FC51567E9D04B207ED5C44E87F0943EAC7F380386F7F620322F;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_32=288'h7AEF48E9A7B5CC888E7BC5C827D7C29C7C687C890764D7CE38702E7D3946A0A7D8A463E3;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_33=288'h76D90BE1D776C0B84477FA8B26478844AC7C79098A68F798A0A09B7A05C9AA07A7CC94A0;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_34=288'h719E0EBCB72550E63373078E09273B5CDAE8745F8D53675048CF7B75A54C9B976418C3EF;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_35=288'h6B4AD17346C24111EB6CF910C966DC9D07386E96901CF6F5ECFC5D7022CF6E070E28F15A;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_36=288'h63EF13FED64E853AFF65DDD360566CF530FF67BCD2BED68A6926D0698C121A76A6D91C73;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_37=288'h5B9D165915CB41610B5DC795C775ED7557D65FE39532760EC14E6C61F0D49A462F1D44CF;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_38=288'h5269187C3539B183B054C9D7F8E55F597B5D571DD771E5842D72D0596456E745A8256A09;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_39=288'h4869DA63049B41A29A4AFB59EF34C3FD9B3D4D81597774EBFD93A14FFB58FBC5133D8BC7;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_3A=288'h3DB81C08B3F175BD7B4073DBA5A41CE1B72743259B3E4447ADB09045CD1AD2B471CDA9B6;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_3B=288'h326E5D69533DEDD412354D9D17E36BA1CED738249CC1E398CDC9543AF2DC6783C569C38A;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_3C=288'h26A81E8172826DE62829A3DE4262B1F1E2112C991DFEA2E111DDB02F875DB6430FBDD906;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_3D=288'h1A829F4E51C0B9F38E1D935F2241F1A1F0A7209F5EF1722239ED7323A69EBBD25281E9F3;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_3E=288'h0E1BDFCE00FAB1FC25113A1FB5712C81FA7414559F97F15E21F875176DDF75918F8DF629;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_3F=288'h01921FFF503245FFD804B61FFA60647DFF6107D95FF08096A9FE9C0AFB9FE1C0C8BDFD88;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_00=256'hF5057F86F6967FA6F8277FC1F9B87FD8FB4A7FE9FCDC7FF5FE6E7FFD00007FFF;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_01=256'hE8927DD5EA1E7E1DEBAB7E5FED387E9CEEC67ED5F0557F09F1E47F37F3747F61;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_02=256'hDC5A7AEEDDDD7B5CDF617BC5E0E67C29E26D7C88E3F57CE3E57E7D39E7077D89;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_03=256'hD07976D8D1EF776BD36777FAD4E17884D65D7909D7DA7989D9587A05DAD87A7C;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_04=256'hC50E719DC6747254C7DC7307C94673B5CAB3745FCC217504CD9275A5CF057641;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_05=256'hBA336B4ABB866C23BCDB6CF8BE326DC9BF8D6E96C0E96F5EC2487022C3AA70E2;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_06=256'hB00563EEB14164E8B27F65DDB3C166CFB50567BCB64C68A6B797698BB8E46A6D;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_07=256'hA69C5B9CA7BE5CB3A8E35DC7AA0B5ED7AB375FE3AC6560EBAD9861F0AECD62F1;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_08=256'h9E1052689F15539BA01D54C9A12955F5A239571DA34D5842A4645964A57E5A82;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_09=256'h96754869975A49B498444AFB99314C3F9A234D819B184EBF9C124FFB9D0F5133;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_0A=256'h8FDE3DB890A23F17916A4073923741CE9308432593DD447A94B645CD9593471C;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_0B=256'h8A5B326E8AFC33DF8BA1354D8C4B36BA8CF938248DAC398C8E633AF28F1E3C56;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_0C=256'h85FB26A88677282686F729A3877C2B1F88062C9988952E1189282F8789BF30FB;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_0D=256'h82C71A82831D1C0B83781D9383D71F1A843B209F84A42223851223A685842528;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_0E=256'h80C90E1C80F70FAB812B113A816412C881A1145581E315E2822B176E827718F9;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_0F=256'h80030192800B0324801704B680280648803F07D9805A096A807A0AFB809F0C8C;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_10=256'h807AF505805AF696803FF8278028F9B88017FB4A800BFCDC8003FE6E80010000;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_11=256'h822BE89281E3EA1E81A1EBAB8164ED38812BEEC680F7F05580C9F1E4809FF374;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_12=256'h8512DC5A84A4DDDD843BDF6183D7E0E68378E26D831DE3F582C7E57E8277E707;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_13=256'h8928D0798895D1EF8806D367877CD4E186F7D65D8677D7DA85FBD9588584DAD8;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_14=256'h8E63C50E8DACC6748CF9C7DC8C4BC9468BA1CAB38AFCCC218A5BCD9289BFCF05;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_15=256'h94B6BA3393DDBB869308BCDB9237BE32916ABF8D90A2C0E98FDEC2488F1EC3AA;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_16=256'h9C12B0059B18B1419A23B27F9931B3C19844B505975AB64C9675B7979593B8E4;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_17=256'hA464A69CA34DA7BEA239A8E3A129AA0BA01DAB379F15AC659E10AD989D0FAECD;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_18=256'hAD989E10AC659F15AB37A01DAA0BA129A8E3A239A7BEA34DA69CA464A57EA57E;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_19=256'hB7979675B64C975AB5059844B3C19931B27F9A23B1419B18B0059C12AECD9D0F;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_1A=256'hC2488FDEC0E990A2BF8D916ABE329237BCDB9308BB8693DDBA3394B6B8E49593;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_1B=256'hCD928A5BCC218AFCCAB38BA1C9468C4BC7DC8CF9C6748DACC50E8E63C3AA8F1E;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_1C=256'hD95885FBD7DA8677D65D86F7D4E1877CD3678806D1EF8895D0798928CF0589BF;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_1D=256'hE57E82C7E3F5831DE26D8378E0E683D7DF61843BDDDD84A4DC5A8512DAD88584;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_1E=256'hF1E480C9F05580F7EEC6812BED388164EBAB81A1EA1E81E3E892822BE7078277;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_1F=256'hFE6E8003FCDC800BFB4A8017F9B88028F827803FF696805AF505807AF374809F;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_20=256'h0AFB807A096A805A07D9803F0648802804B680170324800B0192800300008001;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_21=256'h176E822B15E281E3145581A112C88164113A812B0FAB80F70E1C80C90C8C809F;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_22=256'h23A68512222384A4209F843B1F1A83D71D9383781C0B831D1A8282C718F98277;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_23=256'h2F8789282E1188952C9988062B1F877C29A386F72826867726A885FB25288584;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_24=256'h3AF28E63398C8DAC38248CF936BA8C4B354D8BA133DF8AFC326E8A5B30FB89BF;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_25=256'h45CD94B6447A93DD4325930841CE92374073916A3F1790A23DB88FDE3C568F1E;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_26=256'h4FFB9C124EBF9B184D819A234C3F99314AFB984449B4975A48699675471C9593;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_27=256'h5964A4645842A34D571DA23955F5A12954C9A01D539B9F1552689E1051339D0F;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_28=256'h61F0AD9860EBAC655FE3AB375ED7AA0B5DC7A8E35CB3A7BE5B9CA69C5A82A57E;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_29=256'h698BB79768A6B64C67BCB50566CFB3C165DDB27F64E8B14163EEB00562F1AECD;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_2A=256'h7022C2486F5EC0E96E96BF8D6DC9BE326CF8BCDB6C23BB866B4ABA336A6DB8E4;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_2B=256'h75A5CD927504CC21745FCAB373B5C9467307C7DC7254C674719DC50E70E2C3AA;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_2C=256'h7A05D9587989D7DA7909D65D7884D4E177FAD367776BD1EF76D8D0797641CF05;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_2D=256'h7D39E57E7CE3E3F57C88E26D7C29E0E67BC5DF617B5CDDDD7AEEDC5A7A7CDAD8;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_2E=256'h7F37F1E47F09F0557ED5EEC67E9CED387E5FEBAB7E1DEA1E7DD5E8927D89E707;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_2F=256'h7FFDFE6E7FF5FCDC7FE9FB4A7FD8F9B87FC1F8277FA6F6967F86F5057F61F374;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_30=256'h7F860AFB7FA6096A7FC107D97FD806487FE904B67FF503247FFD01927FFF0000;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_31=256'h7DD5176E7E1D15E27E5F14557E9C12C87ED5113A7F090FAB7F370E1C7F610C8C;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_32=256'h7AEE23A67B5C22237BC5209F7C291F1A7C881D937CE31C0B7D391A827D8918F9;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_33=256'h76D82F87776B2E1177FA2C9978842B1F790929A3798928267A0526A87A7C2528;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_34=256'h719D3AF27254398C7307382473B536BA745F354D750433DF75A5326E764130FB;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_35=256'h6B4A45CD6C23447A6CF843256DC941CE6E9640736F5E3F1770223DB870E23C56;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_36=256'h63EE4FFB64E84EBF65DD4D8166CF4C3F67BC4AFB68A649B4698B48696A6D471C;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_37=256'h5B9C59645CB358425DC7571D5ED755F55FE354C960EB539B61F0526862F15133;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_38=256'h526861F0539B60EB54C95FE355F55ED7571D5DC758425CB359645B9C5A825A82;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_39=256'h4869698B49B468A64AFB67BC4C3F66CF4D8165DD4EBF64E84FFB63EE513362F1;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_3A=256'h3DB870223F176F5E40736E9641CE6DC943256CF8447A6C2345CD6B4A471C6A6D;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_3B=256'h326E75A533DF7504354D745F36BA73B538247307398C72543AF2719D3C5670E2;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_3C=256'h26A87A052826798929A379092B1F78842C9977FA2E11776B2F8776D830FB7641;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_3D=256'h1A827D391C0B7CE31D937C881F1A7C29209F7BC522237B5C23A67AEE25287A7C;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_3E=256'h0E1C7F370FAB7F09113A7ED512C87E9C14557E5F15E27E1D176E7DD518F97D89;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .INIT_RAM_3F=256'h01927FFD03247FF504B67FE906487FD807D97FC1096A7FA60AFB7F860C8C7F61;
 defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .READ_MODE=1'b0;
-defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .BIT_WIDTH=36;
+defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .BIT_WIDTH=32;
 defparam \fft_top_inst/tf_inst/tw_inst/twRe_r_twRe_r_0_0_s .RESET_MODE="SYNC";
 DFFRE \fft_top_inst/tf_inst/btfy_inst/xa_re_r_14_s0  (
 	.D(\fft_top_inst/tf_inst/btfy_xnare [14]),
@@ -2727,7 +2727,7 @@ DFFRE \fft_top_inst/tf_inst/btfy_inst/xa_re_r_15_s0  (
 defparam \fft_top_inst/tf_inst/btfy_inst/xa_re_r_15_s0 .INIT=1'b0;
 ALU \fft_top_inst/tf_inst/btfy_inst/constructG_0_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [0]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [0]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [0]),
 	.I3(GND),
 	.CIN(GND),
 	.COUT(\fft_top_inst/tf_inst/btfy_inst/constructG_0_4 ),
@@ -2736,7 +2736,7 @@ ALU \fft_top_inst/tf_inst/btfy_inst/constructG_0_s0  (
 defparam \fft_top_inst/tf_inst/btfy_inst/constructG_0_s0 .ALU_MODE=0;
 ALU \fft_top_inst/tf_inst/btfy_inst/constructG_1_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [1]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [1]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [1]),
 	.I3(GND),
 	.CIN(\fft_top_inst/tf_inst/btfy_inst/constructG_0_4 ),
 	.COUT(\fft_top_inst/tf_inst/btfy_inst/constructG_1_4 ),
@@ -2745,7 +2745,7 @@ ALU \fft_top_inst/tf_inst/btfy_inst/constructG_1_s0  (
 defparam \fft_top_inst/tf_inst/btfy_inst/constructG_1_s0 .ALU_MODE=0;
 ALU \fft_top_inst/tf_inst/btfy_inst/constructG_2_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [2]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [2]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [2]),
 	.I3(GND),
 	.CIN(\fft_top_inst/tf_inst/btfy_inst/constructG_1_4 ),
 	.COUT(\fft_top_inst/tf_inst/btfy_inst/constructG_2_4 ),
@@ -2754,7 +2754,7 @@ ALU \fft_top_inst/tf_inst/btfy_inst/constructG_2_s0  (
 defparam \fft_top_inst/tf_inst/btfy_inst/constructG_2_s0 .ALU_MODE=0;
 ALU \fft_top_inst/tf_inst/btfy_inst/constructG_3_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [3]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [3]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [3]),
 	.I3(GND),
 	.CIN(\fft_top_inst/tf_inst/btfy_inst/constructG_2_4 ),
 	.COUT(\fft_top_inst/tf_inst/btfy_inst/constructG_3_4 ),
@@ -2763,7 +2763,7 @@ ALU \fft_top_inst/tf_inst/btfy_inst/constructG_3_s0  (
 defparam \fft_top_inst/tf_inst/btfy_inst/constructG_3_s0 .ALU_MODE=0;
 ALU \fft_top_inst/tf_inst/btfy_inst/constructG_4_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [4]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [4]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [4]),
 	.I3(GND),
 	.CIN(\fft_top_inst/tf_inst/btfy_inst/constructG_3_4 ),
 	.COUT(\fft_top_inst/tf_inst/btfy_inst/constructG_4_4 ),
@@ -2772,7 +2772,7 @@ ALU \fft_top_inst/tf_inst/btfy_inst/constructG_4_s0  (
 defparam \fft_top_inst/tf_inst/btfy_inst/constructG_4_s0 .ALU_MODE=0;
 ALU \fft_top_inst/tf_inst/btfy_inst/constructG_5_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [5]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [5]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [5]),
 	.I3(GND),
 	.CIN(\fft_top_inst/tf_inst/btfy_inst/constructG_4_4 ),
 	.COUT(\fft_top_inst/tf_inst/btfy_inst/constructG_5_4 ),
@@ -2781,7 +2781,7 @@ ALU \fft_top_inst/tf_inst/btfy_inst/constructG_5_s0  (
 defparam \fft_top_inst/tf_inst/btfy_inst/constructG_5_s0 .ALU_MODE=0;
 ALU \fft_top_inst/tf_inst/btfy_inst/constructG_6_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [6]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [6]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [6]),
 	.I3(GND),
 	.CIN(\fft_top_inst/tf_inst/btfy_inst/constructG_5_4 ),
 	.COUT(\fft_top_inst/tf_inst/btfy_inst/constructG_6_4 ),
@@ -2790,7 +2790,7 @@ ALU \fft_top_inst/tf_inst/btfy_inst/constructG_6_s0  (
 defparam \fft_top_inst/tf_inst/btfy_inst/constructG_6_s0 .ALU_MODE=0;
 ALU \fft_top_inst/tf_inst/btfy_inst/constructG_7_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [7]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [7]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [7]),
 	.I3(GND),
 	.CIN(\fft_top_inst/tf_inst/btfy_inst/constructG_6_4 ),
 	.COUT(\fft_top_inst/tf_inst/btfy_inst/constructG_7_4 ),
@@ -2799,7 +2799,7 @@ ALU \fft_top_inst/tf_inst/btfy_inst/constructG_7_s0  (
 defparam \fft_top_inst/tf_inst/btfy_inst/constructG_7_s0 .ALU_MODE=0;
 ALU \fft_top_inst/tf_inst/btfy_inst/constructG_8_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [8]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [8]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [8]),
 	.I3(GND),
 	.CIN(\fft_top_inst/tf_inst/btfy_inst/constructG_7_4 ),
 	.COUT(\fft_top_inst/tf_inst/btfy_inst/constructG_8_4 ),
@@ -2808,7 +2808,7 @@ ALU \fft_top_inst/tf_inst/btfy_inst/constructG_8_s0  (
 defparam \fft_top_inst/tf_inst/btfy_inst/constructG_8_s0 .ALU_MODE=0;
 ALU \fft_top_inst/tf_inst/btfy_inst/constructG_9_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [9]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [9]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [9]),
 	.I3(GND),
 	.CIN(\fft_top_inst/tf_inst/btfy_inst/constructG_8_4 ),
 	.COUT(\fft_top_inst/tf_inst/btfy_inst/constructG_9_4 ),
@@ -2817,7 +2817,7 @@ ALU \fft_top_inst/tf_inst/btfy_inst/constructG_9_s0  (
 defparam \fft_top_inst/tf_inst/btfy_inst/constructG_9_s0 .ALU_MODE=0;
 ALU \fft_top_inst/tf_inst/btfy_inst/constructG_10_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [10]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [10]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [10]),
 	.I3(GND),
 	.CIN(\fft_top_inst/tf_inst/btfy_inst/constructG_9_4 ),
 	.COUT(\fft_top_inst/tf_inst/btfy_inst/constructG_10_4 ),
@@ -2826,7 +2826,7 @@ ALU \fft_top_inst/tf_inst/btfy_inst/constructG_10_s0  (
 defparam \fft_top_inst/tf_inst/btfy_inst/constructG_10_s0 .ALU_MODE=0;
 ALU \fft_top_inst/tf_inst/btfy_inst/constructG_11_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [11]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [11]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [11]),
 	.I3(GND),
 	.CIN(\fft_top_inst/tf_inst/btfy_inst/constructG_10_4 ),
 	.COUT(\fft_top_inst/tf_inst/btfy_inst/constructG_11_4 ),
@@ -2835,7 +2835,7 @@ ALU \fft_top_inst/tf_inst/btfy_inst/constructG_11_s0  (
 defparam \fft_top_inst/tf_inst/btfy_inst/constructG_11_s0 .ALU_MODE=0;
 ALU \fft_top_inst/tf_inst/btfy_inst/constructG_12_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [12]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [12]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [12]),
 	.I3(GND),
 	.CIN(\fft_top_inst/tf_inst/btfy_inst/constructG_11_4 ),
 	.COUT(\fft_top_inst/tf_inst/btfy_inst/constructG_12_4 ),
@@ -2844,7 +2844,7 @@ ALU \fft_top_inst/tf_inst/btfy_inst/constructG_12_s0  (
 defparam \fft_top_inst/tf_inst/btfy_inst/constructG_12_s0 .ALU_MODE=0;
 ALU \fft_top_inst/tf_inst/btfy_inst/constructG_13_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [13]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [13]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [13]),
 	.I3(GND),
 	.CIN(\fft_top_inst/tf_inst/btfy_inst/constructG_12_4 ),
 	.COUT(\fft_top_inst/tf_inst/btfy_inst/constructG_13_4 ),
@@ -2853,7 +2853,7 @@ ALU \fft_top_inst/tf_inst/btfy_inst/constructG_13_s0  (
 defparam \fft_top_inst/tf_inst/btfy_inst/constructG_13_s0 .ALU_MODE=0;
 ALU \fft_top_inst/tf_inst/btfy_inst/constructG_14_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [14]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [14]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [14]),
 	.I3(GND),
 	.CIN(\fft_top_inst/tf_inst/btfy_inst/constructG_13_4 ),
 	.COUT(\fft_top_inst/tf_inst/btfy_inst/constructG_14_4 ),
@@ -2862,7 +2862,7 @@ ALU \fft_top_inst/tf_inst/btfy_inst/constructG_14_s0  (
 defparam \fft_top_inst/tf_inst/btfy_inst/constructG_14_s0 .ALU_MODE=0;
 ALU \fft_top_inst/tf_inst/btfy_inst/constructG_15_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [15]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [15]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [15]),
 	.I3(GND),
 	.CIN(\fft_top_inst/tf_inst/btfy_inst/constructG_14_4 ),
 	.COUT(\fft_top_inst/tf_inst/btfy_inst/constructG_15_4 ),
@@ -2871,473 +2871,473 @@ ALU \fft_top_inst/tf_inst/btfy_inst/constructG_15_s0  (
 defparam \fft_top_inst/tf_inst/btfy_inst/constructG_15_s0 .ALU_MODE=0;
 ALU \fft_top_inst/tf_inst/btfy_inst/constructG_16_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [15]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [15]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [15]),
 	.I3(GND),
 	.CIN(\fft_top_inst/tf_inst/btfy_inst/constructG_15_4 ),
 	.COUT(\fft_top_inst/tf_inst/btfy_inst/constructG_16_1_COUT ),
 	.SUM(\fft_top_inst/btfy_xkare [15])
 );
 defparam \fft_top_inst/tf_inst/btfy_inst/constructG_16_s0 .ALU_MODE=0;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_0_s0  (
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_0_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [0]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [0]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [0]),
 	.I3(GND),
 	.CIN(GND),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_0_4 ),
-	.SUM(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH [0])
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_0_4 ),
+	.SUM(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH [0])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_0_s0 .ALU_MODE=0;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_1_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_0_s0 .ALU_MODE=0;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_1_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [1]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [1]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [1]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_0_4 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_1_4 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_0_4 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_1_4 ),
 	.SUM(\fft_top_inst/btfy_xkaim [0])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_1_s0 .ALU_MODE=0;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_2_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_1_s0 .ALU_MODE=0;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_2_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [2]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [2]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [2]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_1_4 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_2_4 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_1_4 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_2_4 ),
 	.SUM(\fft_top_inst/btfy_xkaim [1])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_2_s0 .ALU_MODE=0;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_3_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_2_s0 .ALU_MODE=0;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_3_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [3]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [3]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [3]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_2_4 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_3_4 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_2_4 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_3_4 ),
 	.SUM(\fft_top_inst/btfy_xkaim [2])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_3_s0 .ALU_MODE=0;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_4_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_3_s0 .ALU_MODE=0;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_4_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [4]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [4]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [4]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_3_4 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_4_4 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_3_4 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_4_4 ),
 	.SUM(\fft_top_inst/btfy_xkaim [3])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_4_s0 .ALU_MODE=0;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_5_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_4_s0 .ALU_MODE=0;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_5_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [5]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [5]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [5]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_4_4 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_5_4 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_4_4 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_5_4 ),
 	.SUM(\fft_top_inst/btfy_xkaim [4])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_5_s0 .ALU_MODE=0;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_6_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_5_s0 .ALU_MODE=0;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_6_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [6]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [6]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [6]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_5_4 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_6_4 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_5_4 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_6_4 ),
 	.SUM(\fft_top_inst/btfy_xkaim [5])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_6_s0 .ALU_MODE=0;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_7_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_6_s0 .ALU_MODE=0;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_7_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [7]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [7]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [7]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_6_4 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_7_4 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_6_4 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_7_4 ),
 	.SUM(\fft_top_inst/btfy_xkaim [6])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_7_s0 .ALU_MODE=0;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_8_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_7_s0 .ALU_MODE=0;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_8_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [8]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [8]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [8]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_7_4 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_8_4 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_7_4 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_8_4 ),
 	.SUM(\fft_top_inst/btfy_xkaim [7])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_8_s0 .ALU_MODE=0;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_9_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_8_s0 .ALU_MODE=0;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_9_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [9]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [9]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [9]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_8_4 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_9_4 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_8_4 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_9_4 ),
 	.SUM(\fft_top_inst/btfy_xkaim [8])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_9_s0 .ALU_MODE=0;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_10_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_9_s0 .ALU_MODE=0;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_10_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [10]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [10]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [10]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_9_4 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_10_4 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_9_4 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_10_4 ),
 	.SUM(\fft_top_inst/btfy_xkaim [9])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_10_s0 .ALU_MODE=0;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_11_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_10_s0 .ALU_MODE=0;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_11_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [11]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [11]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [11]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_10_4 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_11_4 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_10_4 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_11_4 ),
 	.SUM(\fft_top_inst/btfy_xkaim [10])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_11_s0 .ALU_MODE=0;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_12_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_11_s0 .ALU_MODE=0;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_12_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [12]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [12]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [12]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_11_4 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_12_4 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_11_4 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_12_4 ),
 	.SUM(\fft_top_inst/btfy_xkaim [11])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_12_s0 .ALU_MODE=0;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_13_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_12_s0 .ALU_MODE=0;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_13_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [13]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [13]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [13]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_12_4 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_13_4 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_12_4 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_13_4 ),
 	.SUM(\fft_top_inst/btfy_xkaim [12])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_13_s0 .ALU_MODE=0;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_14_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_13_s0 .ALU_MODE=0;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_14_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [14]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [14]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [14]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_13_4 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_14_4 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_13_4 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_14_4 ),
 	.SUM(\fft_top_inst/btfy_xkaim [13])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_14_s0 .ALU_MODE=0;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_15_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_14_s0 .ALU_MODE=0;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_15_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [15]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [15]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [15]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_14_4 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_15_4 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_14_4 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_15_4 ),
 	.SUM(\fft_top_inst/btfy_xkaim [14])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_15_s0 .ALU_MODE=0;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_16_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_15_s0 .ALU_MODE=0;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_16_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [15]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [15]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [15]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_15_4 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_16_1_COUT ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_15_4 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_16_1_COUT ),
 	.SUM(\fft_top_inst/btfy_xkaim [15])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructH_16_s0 .ALU_MODE=0;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_0_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructH_16_s0 .ALU_MODE=0;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_0_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [0]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [0]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [0]),
 	.I3(GND),
 	.CIN(VCC),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_0_5 ),
-	.SUM(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI [0])
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_0_5 ),
+	.SUM(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI [0])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_0_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_1_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_0_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_1_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [1]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [1]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [1]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_0_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_1_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_0_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_1_5 ),
 	.SUM(\fft_top_inst/qxnb_di_re [0])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_1_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_2_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_1_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_2_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [2]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [2]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [2]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_1_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_2_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_1_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_2_5 ),
 	.SUM(\fft_top_inst/qxnb_di_re [1])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_2_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_3_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_2_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_3_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [3]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [3]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [3]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_2_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_3_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_2_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_3_5 ),
 	.SUM(\fft_top_inst/qxnb_di_re [2])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_3_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_4_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_3_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_4_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [4]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [4]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [4]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_3_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_4_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_3_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_4_5 ),
 	.SUM(\fft_top_inst/qxnb_di_re [3])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_4_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_5_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_4_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_5_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [5]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [5]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [5]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_4_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_5_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_4_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_5_5 ),
 	.SUM(\fft_top_inst/qxnb_di_re [4])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_5_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_6_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_5_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_6_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [6]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [6]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [6]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_5_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_6_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_5_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_6_5 ),
 	.SUM(\fft_top_inst/qxnb_di_re [5])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_6_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_7_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_6_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_7_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [7]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [7]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [7]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_6_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_7_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_6_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_7_5 ),
 	.SUM(\fft_top_inst/qxnb_di_re [6])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_7_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_8_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_7_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_8_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [8]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [8]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [8]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_7_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_8_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_7_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_8_5 ),
 	.SUM(\fft_top_inst/qxnb_di_re [7])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_8_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_9_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_8_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_9_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [9]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [9]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [9]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_8_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_9_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_8_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_9_5 ),
 	.SUM(\fft_top_inst/qxnb_di_re [8])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_9_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_10_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_9_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_10_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [10]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [10]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [10]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_9_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_10_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_9_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_10_5 ),
 	.SUM(\fft_top_inst/qxnb_di_re [9])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_10_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_11_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_10_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_11_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [11]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [11]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [11]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_10_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_11_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_10_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_11_5 ),
 	.SUM(\fft_top_inst/qxnb_di_re [10])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_11_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_12_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_11_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_12_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [12]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [12]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [12]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_11_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_12_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_11_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_12_5 ),
 	.SUM(\fft_top_inst/qxnb_di_re [11])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_12_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_13_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_12_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_13_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [13]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [13]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [13]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_12_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_13_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_12_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_13_5 ),
 	.SUM(\fft_top_inst/qxnb_di_re [12])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_13_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_14_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_13_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_14_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [14]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [14]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [14]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_13_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_14_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_13_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_14_5 ),
 	.SUM(\fft_top_inst/qxnb_di_re [13])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_14_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_15_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_14_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_15_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [15]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [15]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [15]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_14_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_15_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_14_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_15_5 ),
 	.SUM(\fft_top_inst/qxnb_di_re [14])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_15_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_16_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_15_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_16_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltA [15]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [15]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/reconstructX [15]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_15_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_16_1_COUT ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_15_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_16_1_COUT ),
 	.SUM(\fft_top_inst/qxnb_di_re [15])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructI_16_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_0_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructI_16_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_0_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [0]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [0]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [0]),
 	.I3(GND),
 	.CIN(VCC),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_0_5 ),
-	.SUM(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ [0])
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_0_5 ),
+	.SUM(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ [0])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_0_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_1_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_0_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_1_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [1]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [1]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [1]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_0_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_1_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_0_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_1_5 ),
 	.SUM(\fft_top_inst/qxnb_di_im [0])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_1_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_2_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_1_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_2_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [2]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [2]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [2]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_1_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_2_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_1_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_2_5 ),
 	.SUM(\fft_top_inst/qxnb_di_im [1])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_2_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_3_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_2_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_3_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [3]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [3]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [3]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_2_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_3_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_2_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_3_5 ),
 	.SUM(\fft_top_inst/qxnb_di_im [2])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_3_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_4_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_3_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_4_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [4]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [4]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [4]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_3_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_4_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_3_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_4_5 ),
 	.SUM(\fft_top_inst/qxnb_di_im [3])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_4_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_5_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_4_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_5_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [5]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [5]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [5]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_4_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_5_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_4_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_5_5 ),
 	.SUM(\fft_top_inst/qxnb_di_im [4])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_5_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_6_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_5_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_6_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [6]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [6]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [6]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_5_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_6_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_5_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_6_5 ),
 	.SUM(\fft_top_inst/qxnb_di_im [5])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_6_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_7_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_6_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_7_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [7]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [7]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [7]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_6_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_7_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_6_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_7_5 ),
 	.SUM(\fft_top_inst/qxnb_di_im [6])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_7_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_8_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_7_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_8_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [8]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [8]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [8]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_7_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_8_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_7_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_8_5 ),
 	.SUM(\fft_top_inst/qxnb_di_im [7])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_8_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_9_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_8_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_9_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [9]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [9]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [9]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_8_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_9_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_8_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_9_5 ),
 	.SUM(\fft_top_inst/qxnb_di_im [8])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_9_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_10_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_9_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_10_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [10]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [10]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [10]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_9_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_10_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_9_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_10_5 ),
 	.SUM(\fft_top_inst/qxnb_di_im [9])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_10_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_11_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_10_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_11_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [11]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [11]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [11]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_10_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_11_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_10_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_11_5 ),
 	.SUM(\fft_top_inst/qxnb_di_im [10])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_11_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_12_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_11_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_12_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [12]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [12]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [12]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_11_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_12_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_11_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_12_5 ),
 	.SUM(\fft_top_inst/qxnb_di_im [11])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_12_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_13_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_12_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_13_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [13]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [13]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [13]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_12_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_13_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_12_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_13_5 ),
 	.SUM(\fft_top_inst/qxnb_di_im [12])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_13_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_14_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_13_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_14_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [14]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [14]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [14]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_13_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_14_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_13_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_14_5 ),
 	.SUM(\fft_top_inst/qxnb_di_im [13])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_14_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_15_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_14_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_15_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [15]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [15]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [15]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_14_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_15_5 ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_14_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_15_5 ),
 	.SUM(\fft_top_inst/qxnb_di_im [14])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_15_s0 .ALU_MODE=1;
-ALU \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_16_s0  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_15_s0 .ALU_MODE=1;
+ALU \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_16_s0  (
 	.I0(\fft_top_inst/tf_inst/btfy_inst/mltB [15]),
-	.I1(\fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [15]),
+	.I1(\fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [15]),
 	.I3(GND),
-	.CIN(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_15_5 ),
-	.COUT(\fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_16_1_COUT ),
+	.CIN(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_15_5 ),
+	.COUT(\fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_16_1_COUT ),
 	.SUM(\fft_top_inst/qxnb_di_im [15])
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.constructJ_16_s0 .ALU_MODE=1;
-MULTADDALU18X18 \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/iMultaddalu18  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.constructJ_16_s0 .ALU_MODE=1;
+MULTADDALU18X18 \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/iMultaddalu18  (
 	.ACCLOAD(GND),
 	.CE(\fft_top_inst/tf_inst/btfy_ea ),
 	.CLK(clk),
@@ -3345,40 +3345,40 @@ MULTADDALU18X18 \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/iMultaddalu18  (
 	.SIA({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND}),
 	.SIB({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND}),
 	.A0({\fft_top_inst/tf_inst/btfy_xnbre [15], \fft_top_inst/tf_inst/btfy_xnbre [15], \fft_top_inst/tf_inst/btfy_xnbre [15:0]}),
-	.B0({\fft_top_inst/tf_inst/btfy_twre [17:0]}),
+	.B0({\fft_top_inst/tf_inst/btfy_twre [15], \fft_top_inst/tf_inst/btfy_twre [15], \fft_top_inst/tf_inst/btfy_twre [15:0]}),
 	.A1({\fft_top_inst/tf_inst/btfy_xnbim [15], \fft_top_inst/tf_inst/btfy_xnbim [15], \fft_top_inst/tf_inst/btfy_xnbim [15:0]}),
-	.B1({\fft_top_inst/tf_inst/btfy_twim [17:0]}),
+	.B1({\fft_top_inst/tf_inst/btfy_twim [15], \fft_top_inst/tf_inst/btfy_twim [15], \fft_top_inst/tf_inst/btfy_twim [15:0]}),
 	.C({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND}),
 	.CASI({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND}),
 	.ASIGN({VCC, VCC}),
 	.BSIGN({VCC, VCC}),
 	.ASEL({GND, GND}),
 	.BSEL({GND, GND}),
-	.SOA({\fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/SOA [17:0]}),
-	.SOB({\fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/SOB [17:0]}),
-	.CASO({\fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/CASO [54:0]}),
-	.DOUT({\fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/DOUT [53:33], \fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructX [15:0], \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/DOUT [16:0]})
+	.SOA({\fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/SOA [17:0]}),
+	.SOB({\fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/SOB [17:0]}),
+	.CASO({\fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/CASO [54:0]}),
+	.DOUT({\fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/DOUT [53:31], \fft_top_inst/tf_inst/btfy_inst/reconstructX [15:0], \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/DOUT [14:0]})
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/iMultaddalu18 .A0REG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/iMultaddalu18 .A1REG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/iMultaddalu18 .B0REG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/iMultaddalu18 .B1REG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/iMultaddalu18 .CREG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/iMultaddalu18 .SOA_REG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/iMultaddalu18 .OUT_REG=1'b1;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/iMultaddalu18 .PIPE0_REG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/iMultaddalu18 .PIPE1_REG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/iMultaddalu18 .ASIGN0_REG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/iMultaddalu18 .ASIGN1_REG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/iMultaddalu18 .BSIGN0_REG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/iMultaddalu18 .BSIGN1_REG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/iMultaddalu18 .B_ADD_SUB=1'b1;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/iMultaddalu18 .C_ADD_SUB=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/iMultaddalu18 .MULT_RESET_MODE="SYNC";
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/iMultaddalu18 .ACCLOAD_REG0=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/iMultaddalu18 .ACCLOAD_REG1=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multX/iMultaddalu18 .MULTADDALU18X18_MODE=0;
-MULTADDALU18X18 \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/iMultaddalu18  (
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/iMultaddalu18 .A0REG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/iMultaddalu18 .A1REG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/iMultaddalu18 .B0REG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/iMultaddalu18 .B1REG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/iMultaddalu18 .CREG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/iMultaddalu18 .SOA_REG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/iMultaddalu18 .OUT_REG=1'b1;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/iMultaddalu18 .PIPE0_REG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/iMultaddalu18 .PIPE1_REG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/iMultaddalu18 .ASIGN0_REG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/iMultaddalu18 .ASIGN1_REG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/iMultaddalu18 .BSIGN0_REG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/iMultaddalu18 .BSIGN1_REG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/iMultaddalu18 .B_ADD_SUB=1'b1;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/iMultaddalu18 .C_ADD_SUB=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/iMultaddalu18 .MULT_RESET_MODE="SYNC";
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/iMultaddalu18 .ACCLOAD_REG0=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/iMultaddalu18 .ACCLOAD_REG1=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multX/iMultaddalu18 .MULTADDALU18X18_MODE=0;
+MULTADDALU18X18 \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/iMultaddalu18  (
 	.ACCLOAD(GND),
 	.CE(\fft_top_inst/tf_inst/btfy_ea ),
 	.CLK(clk),
@@ -3386,39 +3386,39 @@ MULTADDALU18X18 \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/iMultaddalu18  (
 	.SIA({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND}),
 	.SIB({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND}),
 	.A0({\fft_top_inst/tf_inst/btfy_xnbre [15], \fft_top_inst/tf_inst/btfy_xnbre [15], \fft_top_inst/tf_inst/btfy_xnbre [15:0]}),
-	.B0({\fft_top_inst/tf_inst/btfy_twim [17:0]}),
+	.B0({\fft_top_inst/tf_inst/btfy_twim [15], \fft_top_inst/tf_inst/btfy_twim [15], \fft_top_inst/tf_inst/btfy_twim [15:0]}),
 	.A1({\fft_top_inst/tf_inst/btfy_xnbim [15], \fft_top_inst/tf_inst/btfy_xnbim [15], \fft_top_inst/tf_inst/btfy_xnbim [15:0]}),
-	.B1({\fft_top_inst/tf_inst/btfy_twre [17:0]}),
+	.B1({\fft_top_inst/tf_inst/btfy_twre [15], \fft_top_inst/tf_inst/btfy_twre [15], \fft_top_inst/tf_inst/btfy_twre [15:0]}),
 	.C({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND}),
 	.CASI({GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND, GND}),
 	.ASIGN({VCC, VCC}),
 	.BSIGN({VCC, VCC}),
 	.ASEL({GND, GND}),
 	.BSEL({GND, GND}),
-	.SOA({\fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/SOA [17:0]}),
-	.SOB({\fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/SOB [17:0]}),
-	.CASO({\fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/CASO [54:0]}),
-	.DOUT({\fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/DOUT [53:33], \fft_top_inst/tf_inst/btfy_inst/tdfWder.reconstructY [15:0], \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/DOUT [16:0]})
+	.SOA({\fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/SOA [17:0]}),
+	.SOB({\fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/SOB [17:0]}),
+	.CASO({\fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/CASO [54:0]}),
+	.DOUT({\fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/DOUT [53:31], \fft_top_inst/tf_inst/btfy_inst/ipdWder.reconstructY [15:0], \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/DOUT [14:0]})
 );
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/iMultaddalu18 .A0REG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/iMultaddalu18 .A1REG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/iMultaddalu18 .B0REG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/iMultaddalu18 .B1REG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/iMultaddalu18 .CREG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/iMultaddalu18 .SOA_REG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/iMultaddalu18 .OUT_REG=1'b1;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/iMultaddalu18 .PIPE0_REG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/iMultaddalu18 .PIPE1_REG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/iMultaddalu18 .ASIGN0_REG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/iMultaddalu18 .ASIGN1_REG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/iMultaddalu18 .BSIGN0_REG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/iMultaddalu18 .BSIGN1_REG=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/iMultaddalu18 .B_ADD_SUB=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/iMultaddalu18 .C_ADD_SUB=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/iMultaddalu18 .MULT_RESET_MODE="SYNC";
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/iMultaddalu18 .ACCLOAD_REG0=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/iMultaddalu18 .ACCLOAD_REG1=1'b0;
-defparam \fft_top_inst/tf_inst/btfy_inst/tdfWder.multY/iMultaddalu18 .MULTADDALU18X18_MODE=0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/iMultaddalu18 .A0REG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/iMultaddalu18 .A1REG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/iMultaddalu18 .B0REG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/iMultaddalu18 .B1REG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/iMultaddalu18 .CREG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/iMultaddalu18 .SOA_REG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/iMultaddalu18 .OUT_REG=1'b1;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/iMultaddalu18 .PIPE0_REG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/iMultaddalu18 .PIPE1_REG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/iMultaddalu18 .ASIGN0_REG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/iMultaddalu18 .ASIGN1_REG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/iMultaddalu18 .BSIGN0_REG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/iMultaddalu18 .BSIGN1_REG=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/iMultaddalu18 .B_ADD_SUB=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/iMultaddalu18 .C_ADD_SUB=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/iMultaddalu18 .MULT_RESET_MODE="SYNC";
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/iMultaddalu18 .ACCLOAD_REG0=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/iMultaddalu18 .ACCLOAD_REG1=1'b0;
+defparam \fft_top_inst/tf_inst/btfy_inst/ipdWder.multY/iMultaddalu18 .MULTADDALU18X18_MODE=0;
 LUT4 \fft_top_inst/tf_inst/twBtfyParm_inst/isLstLvl_s2  (
 	.I0(\fft_top_inst/tf_inst/twBtfyParm_inst/l_r [1]),
 	.I1(\fft_top_inst/tf_inst/twBtfyParm_inst/l_r [2]),

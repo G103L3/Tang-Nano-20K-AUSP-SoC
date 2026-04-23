@@ -12,8 +12,7 @@
         <Option type="include_path" value="C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/ipcore/FFT/data"/>
         <Option type="include_path" value="C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/fft/temp/FFT"/>
         <Option type="output_file" value="fft.vg"/>
-        <Option type="output_template" value="fft_tmp.vhd"/>
-        <Option type="output_vhdl_file" value="fft.vhg"/>
+        <Option type="output_template" value="fft_tmp.v"/>
         <Option type="ram_balance" value="1"/>
         <Option type="ram_rw_check" value="1"/>
         <Option type="vcc" value="1.0"/>

@@ -2,9 +2,8 @@
  "Device" : "GW2AR-18C",
  "Files" : [
   {
-   "Library" : "work",
-   "Path" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/fft/fft.vhd",
-   "Type" : "vhdl"
+   "Path" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/fft/fft.v",
+   "Type" : "verilog"
   },
   {
    "Library" : "work",
@@ -43,12 +42,17 @@
   },
   {
    "Library" : "work",
+   "Path" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/uart_generic.vhd",
+   "Type" : "vhdl"
+  },
+  {
+   "Library" : "work",
    "Path" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/wb_interconnect.vhd",
    "Type" : "vhdl"
   },
   {
    "Library" : "work",
-   "Path" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/uart_generic.vhd",
+   "Path" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/dma.vhd",
    "Type" : "vhdl"
   }
  ],

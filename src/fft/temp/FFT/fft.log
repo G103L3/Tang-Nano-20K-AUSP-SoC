@@ -41,8 +41,6 @@ Running technical mapping ...
 [80%] Tech-Mapping Phase 3 completed
 [90%] Tech-Mapping Phase 4 completed
 [95%] Generate netlist file "C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\fft\temp\FFT\fft.vg" completed
-[98%] Generate netlist file "C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\fft\temp\FFT\fft.vhg" completed
-Generate netlist file "C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\fft\temp\FFT\fft.vho" completed
-Generate template file "C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\fft\temp\FFT\fft_tmp.vhd" completed
+Generate template file "C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\fft\temp\FFT\fft_tmp.v" completed
 [100%] Generate report file "C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\fft\temp\FFT\fft_syn.rpt.html" completed
 GowinSynthesis finish

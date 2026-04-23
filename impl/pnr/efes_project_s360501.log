@@ -1,12 +1,12 @@
 Reading netlist file: "C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\impl\gwsynthesis\efes_project_s360501.vg"
 Parsing netlist file "C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\impl\gwsynthesis\efes_project_s360501.vg" completed
 Processing netlist completed
+Reading constraint file: "C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\efes_project_s360501.cst"
+Physical Constraint parsed completed
 Running placement......
 [10%] Placement Phase 0 completed
 [20%] Placement Phase 1 completed
 [30%] Placement Phase 2 completed
-WARN  (TA1132) :  'clk_in' was determined to be a clock but was not created.
-WARN  (TA1132) :  'jtag_TCK' was determined to be a clock but was not created.
 [50%] Placement Phase 3 completed
 Running routing......
 [60%] Routing Phase 0 completed
@@ -25,5 +25,5 @@ Generate file "C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_pr
 Generate file "C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\impl\pnr\efes_project_s360501.rpt.html" completed
 Generate file "C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\impl\pnr\efes_project_s360501.rpt.txt" completed
 Generate file "C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\impl\pnr\efes_project_s360501.tr.html" completed
-Tue Apr 14 10:00:21 2026
+Wed Apr 22 21:01:41 2026
 

@@ -9,7 +9,7 @@
   "SubInsts" : [
    {
     "InstFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/top.vhd",
-    "InstLine" : 193,
+    "InstLine" : 234,
     "InstName" : "u_cpu",
     "ModuleFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/gowin_picorv32/gowin_picorv32.vhd",
     "ModuleLine" : 21,
@@ -17,15 +17,7 @@
    },
    {
     "InstFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/top.vhd",
-    "InstLine" : 305,
-    "InstName" : "u_uart",
-    "ModuleFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/top.vhd",
-    "ModuleLine" : 126,
-    "ModuleName" : "uart_generic"
-   },
-   {
-    "InstFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/top.vhd",
-    "InstLine" : 214,
+    "InstLine" : 255,
     "InstName" : "u_bus",
     "ModuleFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/wb_interconnect.vhd",
     "ModuleLine" : 19,
@@ -33,7 +25,7 @@
    },
    {
     "InstFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/top.vhd",
-    "InstLine" : 250,
+    "InstLine" : 291,
     "InstName" : "u_sdram",
     "ModuleFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/memory_arbiter.vhd",
     "ModuleLine" : 9,
@@ -51,15 +43,33 @@
    },
    {
     "InstFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/top.vhd",
-    "InstLine" : 270,
+    "InstLine" : 311,
+    "InstName" : "u_dma",
+    "ModuleFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/dma.vhd",
+    "ModuleLine" : 31,
+    "ModuleName" : "dma",
+    "SubInsts" : [
+     {
+      "InstFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/dma.vhd",
+      "InstLine" : 149,
+      "InstName" : "fft_inst_0",
+      "ModuleFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/fft/fft.v",
+      "ModuleLine" : 9,
+      "ModuleName" : "FFT_Top"
+     }
+    ]
+   },
+   {
+    "InstFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/top.vhd",
+    "InstLine" : 325,
     "InstName" : "u_spi",
     "ModuleFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/spi_master.vhd",
-    "ModuleLine" : 5,
+    "ModuleLine" : 13,
     "ModuleName" : "SPI_Master"
    },
    {
     "InstFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/top.vhd",
-    "InstLine" : 278,
+    "InstLine" : 334,
     "InstName" : "u_pwm10",
     "ModuleFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/pwm_generic_master.vhd",
     "ModuleLine" : 5,
@@ -67,7 +77,7 @@
    },
    {
     "InstFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/top.vhd",
-    "InstLine" : 287,
+    "InstLine" : 343,
     "InstName" : "u_pwm4",
     "ModuleFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/pwm_generic_master.vhd",
     "ModuleLine" : 5,
@@ -75,11 +85,19 @@
    },
    {
     "InstFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/top.vhd",
-    "InstLine" : 296,
+    "InstLine" : 352,
     "InstName" : "u_gpio1",
     "ModuleFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/gpio_generic.vhd",
     "ModuleLine" : 5,
     "ModuleName" : "GPIO_GENERIC"
+   },
+   {
+    "InstFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/top.vhd",
+    "InstLine" : 361,
+    "InstName" : "u_uart",
+    "ModuleFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/uart_generic.vhd",
+    "ModuleLine" : 5,
+    "ModuleName" : "UART_GENERIC"
    }
   ]
  }
