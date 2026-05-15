@@ -1,15 +1,14 @@
--d C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\impl\gwsynthesis\efes_project_s360501.vg
+-d /Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/impl/gwsynthesis/efes_project_s360501.vg
 -p GW2AR-18C-QFN88-8
 -pn GW2AR-LV18QN88C8/I7
--cst C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\efes_project_s360501.cst
--cfg C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\impl\pnr\device.cfg
--sdc C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\efes_project_s360501.sdc
+-cst /Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/efes_project_s360501.cst
+-cfg /Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/impl/pnr/device.cfg
+-sdc /Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/efes_project_s360501.sdc
 -bit
 -tr
 -ph
 -timing
 -cst_error
--convert_sdp32_36_to_sdp16_18
 -place_option 0
 -route_option 0
 -clock_route_order 0

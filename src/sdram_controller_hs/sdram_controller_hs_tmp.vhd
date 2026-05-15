@@ -1,11 +1,12 @@
---Copyright (C)2014-2025 Gowin Semiconductor Corporation.
+--Copyright (C)2014-2026 Gowin Semiconductor Corporation.
 --All rights reserved.
 --File Title: Template file for instantiation
---Tool Version: V1.9.11.03 Education
+--Tool Version: V1.9.12.02_SP2
+--IP Version: 1.0
 --Part Number: GW2AR-LV18QN88C8/I7
 --Device: GW2AR-18
 --Device Version: C
---Created Time: Sat Apr 18 14:45:21 2026
+--Created Time: Sat May  9 19:31:10 2026
 
 --Change the instance name and port connections to the signal names
 ----------Copy here to design--------

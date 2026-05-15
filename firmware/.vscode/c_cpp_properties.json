@@ -1,0 +1,28 @@
+{
+    "configurations": [
+        {
+            "name": "RISC-V Bare-Metal",
+            "includePath": [
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/include",
+                "C:/msys64/mingw64/riscv64-unknown-elf/include",
+                "C:/msys64/mingw64/lib/gcc/riscv64-unknown-elf/15.1.0/include",
+                "C:/msys64/mingw64/riscv64-unknown-elf/lib/rv32im/ilp32/include"
+            ],
+            "defines": [
+                "_RV32_",
+                "__riscv",
+                "__riscv_xlen=32"
+            ],
+            "compilerPath": "C:/msys64/mingw64/bin/riscv64-unknown-elf-gcc.exe",
+            "compilerArgs": [
+                "-march=rv32imc",
+                "-mabi=ilp32",
+                "-ffreestanding"
+            ],
+            "cStandard": "c11",
+            "intelliSenseMode": "gcc-arm"
+        }
+    ],
+    "version": 4
+}

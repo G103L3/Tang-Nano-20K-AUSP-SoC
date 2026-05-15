@@ -1,38 +1,37 @@
 # Makefile per firmware PicoRV32 - GowinPicoSoC
-#
-# Toolchain richiesta: riscv32-unknown-elf-gcc  (o riscv64-unknown-elf-gcc)
-# Su Windows con MSYS2:
-#   pacman -S mingw-w64-x86_64-riscv32-unknown-elf-gcc
-# Oppure: xPack RISC-V GCC da https://github.com/xpack-dev-tools/riscv-none-elf-gcc-xpack/releases
-# In quel caso usa CROSS = riscv-none-elf
+# Toolchain: mingw-w64-x86_64-riscv64-unknown-elf-gcc (MSYS2 MINGW64)
 
-CROSS   = riscv32-unknown-elf
+CROSS   = riscv64-unknown-elf
 CC      = $(CROSS)-gcc
 OBJCOPY = $(CROSS)-objcopy
 OBJDUMP = $(CROSS)-objdump
 SIZE    = $(CROSS)-size
 
 ARCH    = -march=rv32imc -mabi=ilp32
-CFLAGS  = $(ARCH) -O1 -g -nostdlib -ffreestanding -Wall -Wextra \
+
+# -nostartfiles: usa crt0.S custom, ma linka ancora libc/libm/libgcc
+# -ffreestanding: non assume che esista main() OS-style
+CFLAGS  = $(ARCH) -O1 -g -nostartfiles -ffreestanding -Wall -Wextra \
           -Isrc -Iinclude
-LDFLAGS = $(ARCH) -nostdlib -T link.ld -lgcc
+
+# Le librerie DEVONO venire DOPO i file oggetto (ordine linker)
+# --specs=nosys.specs: stub per syscall OS (write, read, exit, ...)
+# -lm: funzioni matematiche (sin, cos, sqrt, log10)
+# -lc: funzioni stringa (memset, strlen, strcmp, ...)
+# -lgcc: runtime compilatore (float software: __muldf3, __adddf3, ...)
+LDFLAGS = $(ARCH) -nostartfiles -T link.ld
+LDLIBS  = --specs=nosys.specs -lm -lc -lgcc
 
 SRCS    = src/crt0.S \
-          src/main.c \
-          src/complex_g3.c \
-          src/decoder.c \
-          src/bit_freq_codec.c \
-          src/bit_input_packer.c \
-          src/bit_output_packer.c \
-          src/char_packet.c \
-          src/char_packet_router.c \
-          src/command_dict.c
+          src/syscalls.c \
+          src/main.c
 TARGET  = firmware
 
 all: $(TARGET).hex $(TARGET).bin $(TARGET).dump
 
+# Librerie in coda ai sorgenti (risolve riferimenti in avanti)
 $(TARGET).elf: $(SRCS) link.ld
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(SRCS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(SRCS) $(LDLIBS)
 	$(SIZE) $@
 
 $(TARGET).hex: $(TARGET).elf
@@ -47,10 +46,4 @@ $(TARGET).dump: $(TARGET).elf
 clean:
 	rm -f $(TARGET).elf $(TARGET).hex $(TARGET).bin $(TARGET).dump
 
-# Carica via OpenOCD (JTAG)
-# Modifica il file di config OpenOCD per il tuo programmatore
-flash: $(TARGET).elf
-	openocd -f openocd.cfg \
-	  -c "program $(TARGET).elf verify reset exit"
-
-.PHONY: all clean flash
+.PHONY: all clean

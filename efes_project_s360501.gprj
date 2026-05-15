@@ -7,7 +7,7 @@
     <FileList>
         <File path="src/fft/fft.v" type="file.verilog" enable="1"/>
         <File path="src/dma.vhd" type="file.vhdl" enable="1"/>
-        <File path="src/gowin_picorv32/gowin_picorv32.vhd" type="file.vhdl" enable="1"/>
+        <File path="src/gowin_rpll/gowin_rpll.vhd" type="file.vhdl" enable="1"/>
         <File path="src/gpio_generic.vhd" type="file.vhdl" enable="1"/>
         <File path="src/memory_arbiter.vhd" type="file.vhdl" enable="1"/>
         <File path="src/pwm_generic_master.vhd" type="file.vhdl" enable="1"/>

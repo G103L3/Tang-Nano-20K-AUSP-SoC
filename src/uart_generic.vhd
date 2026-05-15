@@ -53,7 +53,7 @@ begin
     TX_o  <= TX_s;
 
     dat_o <= "00000000000000000000000" & rx_valid & rx_data        when adr_i = x"00" else
-             x"0000000" & "00" & rx_valid & tx_busy               when adr_i = x"05" else
+             x"0000000" & "00" & rx_valid & tx_busy               when adr_i = x"14" else
              (others => '0');
 
     seq_clk: process(clk_i)
@@ -98,13 +98,13 @@ begin
                                     tx_busy    <= '1';
                                     tx_parity  <= '0';
                                 end if;
-                            when x"01" =>
-                                enabled <= '1';
-                            when x"02" =>
-                                enabled <= '0';
-                            when x"03" =>
-                                baud_div <= to_integer(unsigned(dat_i(15 downto 0)));
                             when x"04" =>
+                                enabled <= '1';
+                            when x"08" =>
+                                enabled <= '0';
+                            when x"0C" =>
+                                baud_div <= to_integer(unsigned(dat_i(15 downto 0)));
+                            when x"10" =>
                                 parity_cfg <= dat_i(1 downto 0);
                                 if dat_i(2) = '1' then
                                     stop_bits <= 2;

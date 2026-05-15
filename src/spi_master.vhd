@@ -22,6 +22,7 @@ entity SPI_Master is
         dat_o        : out STD_LOGIC_VECTOR(31 downto 0);
         ack_o        : out STD_LOGIC;
         data_ready_o : out STD_LOGIC;
+        dbg_cap_o    : out STD_LOGIC;
         MOSI         : out STD_LOGIC;
         MISO         : in  STD_LOGIC;
         SCK          : out STD_LOGIC;
@@ -49,6 +50,9 @@ begin
 
     dat_o        <= data_o_s;
     data_ready_o <= data_ready_s;
+    -- HIGH solo durante la finestra di cattura (bit_cnt 2..13, CS basso)
+    -- Media su pin 49 = stessa del raw MISO se la state machine è allineata
+    dbg_cap_o    <= MISO when (active = '1' and bit_cnt >= 2 and bit_cnt <= 13) else '0';
     SCK          <= SCK_s;
     CS           <= CS_s;
     MOSI         <= '0';
@@ -73,13 +77,13 @@ begin
                 if cyc_i = '1' and stb_i = '1' then
                     if we_i = '1' then
                         case adr_i is
-                            when x"01" =>
+                            when x"04" =>
                                 start <= '1';
                                 ack_o <= '1';
-                            when x"02" =>
+                            when x"08" =>
                                 start <= '0';
                                 ack_o <= '1';
-                            when x"03" =>
+                            when x"0C" =>
                                 data_ready_s <= '0';
                                 ack_o        <= '1';
                             when others =>
@@ -90,7 +94,7 @@ begin
                             if data_ready_s = '1' then
                                 ack_o <= '1';
                             end if;
-                        elsif adr_i = x"03" then
+                        elsif adr_i = x"0C" then
                             data_ready_s <= '0';
                             ack_o        <= '1';
                         end if;
@@ -105,18 +109,18 @@ begin
                 end if;
 
                 if active = '1' then
-                    if bit_cnt <= 12 then
+                    if bit_cnt <= 13 then
                         CS_s <= '0';
                         if pre_cnt = HALF_PRE - 1 then
                             SCK_s <= '1';
-                            if bit_cnt >= 1 then
+                            if bit_cnt >= 2 then
                                 shift_reg <= shift_reg(10 downto 0) & MISO;
                             end if;
                             pre_cnt <= pre_cnt + 1;
                         elsif pre_cnt = PRESCALER - 1 then
                             SCK_s   <= '0';
                             pre_cnt <= 0;
-                            if bit_cnt = 12 then
+                            if bit_cnt = 13 then
                                 data_o_s     <= x"00000" & shift_reg;
                                 data_ready_s <= '1';
                                 shift_reg    <= (others => '0');

@@ -1,12 +1,10 @@
 /*
  * Linker script per PicoRV32 - GowinPicoSoC
  *
- * ITCM: 0x02000000 - codice e constanti (caricato via JTAG)
- * DTCM: 0x01000000 - dati, BSS, stack
+ * ITCM: 0x02000000  64K  codice + rodata (pre-caricato nel bitstream)
+ * DTCM: 0x01000000  64K  dati, BSS, heap, stack
  *
- * IMPORTANTE: verifica le dimensioni ITCM/DTCM che hai scelto
- * nel Gowin IP Generator (default: ITCM=64K, DTCM=16K).
- * Modifica LENGTH qui se hai configurato valori diversi.
+ * DTCM configurato a 64K in pico_define.vh (D_MEM_K_BYTE 64).
  */
 
 MEMORY {
@@ -16,12 +14,11 @@ MEMORY {
 
 SECTIONS {
     .text : {
-        *(.text.reset)      /* crt0.S deve stare prima di tutto */
+        *(.text.reset)
         *(.text*)
         *(.rodata*)
     } > ITCM
 
-    /* .data vive in DTCM a runtime, ma è salvato in ITCM nel binario */
     .data : {
         _data_start = .;
         *(.data*)
@@ -36,6 +33,9 @@ SECTIONS {
         *(COMMON)
         _bss_end = .;
     } > DTCM
+
+    /* _end: inizio heap (usato da _sbrk in syscalls.c) */
+    _end = .;
 
     /* Stack cresce verso il basso dalla fine del DTCM */
     _stack_top = ORIGIN(DTCM) + LENGTH(DTCM);

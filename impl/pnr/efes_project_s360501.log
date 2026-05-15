@@ -1,7 +1,7 @@
-Reading netlist file: "C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\impl\gwsynthesis\efes_project_s360501.vg"
-Parsing netlist file "C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\impl\gwsynthesis\efes_project_s360501.vg" completed
+Reading netlist file: "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/impl/gwsynthesis/efes_project_s360501.vg"
+Parsing netlist file "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/impl/gwsynthesis/efes_project_s360501.vg" completed
 Processing netlist completed
-Reading constraint file: "C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\src\efes_project_s360501.cst"
+Reading constraint file: "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/efes_project_s360501.cst"
 Physical Constraint parsed completed
 Running placement......
 [10%] Placement Phase 0 completed
@@ -12,6 +12,7 @@ Running routing......
 [60%] Routing Phase 0 completed
 [70%] Routing Phase 1 completed
 [80%] Routing Phase 2 completed
+WARN  (PR1014) : Generic routing resource will be used to clock signal 'clk_i_d' by the specified constraint. And then it may lead to the excessive delay or skew
 [90%] Routing Phase 3 completed
 Running timing analysis......
 [95%] Timing analysis completed
@@ -20,10 +21,10 @@ Bitstream generation in progress......
 Bitstream generation completed
 Running power analysis......
 [100%] Power analysis completed
-Generate file "C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\impl\pnr\efes_project_s360501.power.html" completed
-Generate file "C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\impl\pnr\efes_project_s360501.pin.html" completed
-Generate file "C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\impl\pnr\efes_project_s360501.rpt.html" completed
-Generate file "C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\impl\pnr\efes_project_s360501.rpt.txt" completed
-Generate file "C:\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\efes_project_s360501\impl\pnr\efes_project_s360501.tr.html" completed
-Wed Apr 22 21:01:41 2026
+Generate file "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/impl/pnr/efes_project_s360501.power.html" completed
+Generate file "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/impl/pnr/efes_project_s360501.pin.html" completed
+Generate file "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/impl/pnr/efes_project_s360501.rpt.html" completed
+Generate file "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/impl/pnr/efes_project_s360501.rpt.txt" completed
+Generate file "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/impl/pnr/efes_project_s360501.tr.html" completed
+Fri May 15 23:31:52 2026
 

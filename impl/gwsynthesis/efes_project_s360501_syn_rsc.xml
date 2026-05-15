@@ -1,11 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Module name="top_system" Register="3157" Alu="562" Lut="4694" MULT36X36="1" Bsram="32" T_Register="3735(3157)" T_Alu="685(562)" T_Lut="6439(4694)" T_MULT36X36="1(1)" T_MULTADDALU18X18="2(0)" T_Bsram="38(32)" T_Ssram="192(0)">
- <SubModule name="u_bus" Lut="78" T_Lut="78(78)"/>
- <SubModule name="u_sdram" Register="94" Alu="15" Lut="126" T_Register="94(94)" T_Alu="15(15)" T_Lut="126(126)"/>
- <SubModule name="u_dma" Register="288" Alu="94" Lut="1175" MULTADDALU18X18="2" Bsram="6" Ssram="192" T_Register="288(288)" T_Alu="94(94)" T_Lut="1175(1175)" T_MULTADDALU18X18="2(2)" T_Bsram="6(6)" T_Ssram="192(192)"/>
- <SubModule name="u_spi" Register="40" Lut="49" T_Register="40(40)" T_Lut="49(49)"/>
- <SubModule name="u_pwm10" Register="34" Alu="10" Lut="43" T_Register="34(34)" T_Alu="10(10)" T_Lut="43(43)"/>
- <SubModule name="u_pwm4" Register="16" Alu="4" Lut="19" T_Register="16(16)" T_Alu="4(4)" T_Lut="19(19)"/>
- <SubModule name="u_gpio1" Register="3" Lut="2" T_Register="3(3)" T_Lut="2(2)"/>
- <SubModule name="u_uart" Register="103" Lut="253" T_Register="103(103)" T_Lut="253(253)"/>
+<Module name="top_system" Register="257" Alu="56" Lut="463" T_Register="534(257)" T_Alu="71(56)" T_Lut="898(463)">
+ <SubModule name="u_pll"/>
+ <SubModule name="u_sdram_direct" Register="171" Alu="15" Lut="240" T_Register="171(171)" T_Alu="15(15)" T_Lut="240(240)"/>
+ <SubModule name="u_dma" Register="90" Lut="159" T_Register="90(90)" T_Lut="159(159)"/>
+ <SubModule name="u_spi" Register="16" Lut="36" T_Register="16(16)" T_Lut="36(36)"/>
 </Module>

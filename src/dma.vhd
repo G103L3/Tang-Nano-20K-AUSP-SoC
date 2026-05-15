@@ -3,10 +3,10 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 --
--- Register map (WB slave, byte-addressed):
---   0x01 WR: start  -- avvia acquisizione continua SPI
---   0x02 WR: stop   -- ferma acquisizione
---   0x03 WR: base   -- indirizzo SDRAM output FFT (dat[20:0] = word address 21-bit)
+-- Register map (WB slave, word-aligned):
+--   0x04 WR: start  -- avvia acquisizione continua SPI
+--   0x08 WR: stop   -- ferma acquisizione
+--   0x0C WR: base   -- indirizzo SDRAM output FFT (dat[20:0] = word address 21-bit)
 --
 -- Architettura a DUE macchine a stati indipendenti (due processi VHDL):
 --
@@ -51,7 +51,14 @@ entity dma is
 
         spi_data_ready_i : in  std_logic;
 
-        irq_o    : out std_logic
+        irq_o          : out std_logic;
+        fft_trigger_o  : out std_logic;
+        fft_dbg_o      : out std_logic;  -- '1' once FS_DRAIN is first reached
+        fft_ack_dbg_o  : out std_logic;  -- '1' once first ack received in FS_DRAIN
+        fft_ser_o      : out std_logic;  -- serial bit stream: 512 words x 16 bit MSB-first @ clk_i
+        fft_idx_o      : out std_logic_vector(8 downto 0);   -- bin index corrente FFT output
+        fft_xk_re_o    : out std_logic_vector(15 downto 0);  -- parte reale bin corrente
+        fft_opd_o      : out std_logic                       -- '1' quando bin valido su idx/xk_re
     );
 end dma;
 
@@ -124,18 +131,32 @@ architecture behavioral of dma is
     signal dma_rdata : std_logic_vector(31 downto 0) := (others => '0');
 
     -- ── FFT FSM ───────────────────────────────────────────────────────────────
-    type fft_state_t is (FS_IDLE, FS_FEED1, FS_COMPUTE, FS_COLLECT, FS_DRAIN, FS_IRQ);
+    type fft_state_t is (FS_IDLE, FS_FEED1, FS_COMPUTE, FS_COLLECT, FS_DRAIN, FS_IRQ, FS_SERIAL);
     signal fft_state  : fft_state_t := FS_IDLE;
     signal fft_rd_idx : unsigned(8 downto 0) := (others => '0');
     signal drain_cnt  : unsigned(8 downto 0) := (others => '0');
 
     -- ── Registri CPU ─────────────────────────────────────────────────────────
-    signal start_r      : std_logic := '0';
+    signal start_r      : std_logic := '1';  -- auto-start: no CPU needed
     signal base_address : unsigned(20 downto 0) := (others => '0');
 
-    signal start_req : std_logic := '0';
+    signal start_req   : std_logic := '0';
+    signal drain_reached  : std_logic := '0';
+    signal drain_ack_seen : std_logic := '0';
+
+    -- ── Serial debug output ────────────────────────────────────────────────────
+    signal ser_word_cnt : unsigned(8 downto 0)          := (others => '0');
+    signal ser_bit_cnt  : unsigned(3 downto 0)          := (others => '0');
+    signal ser_sreg     : std_logic_vector(15 downto 0) := (others => '0');
 
 begin
+
+    fft_trigger_o  <= fft_trigger;
+    fft_dbg_o      <= drain_reached;
+    fft_ack_dbg_o  <= drain_ack_seen;
+    fft_idx_o      <= idx_s;
+    fft_xk_re_o    <= xk_re_s;
+    fft_opd_o      <= fft_opd_s;
 
     -- ── WB master mux: DMA ha priorità assoluta ───────────────────────────────
     -- Quando dma_cyc='1' il bus è del DMA; altrimenti è del FFT.
@@ -162,7 +183,7 @@ begin
             xn_im => (others => '0'),
             start => fft_start_s,
             clk   => clk_i,
-            rst   => rst_i
+            rst   => '0'
         );
 
     -- ── WB slave: registri di configurazione CPU ──────────────────────────────
@@ -171,16 +192,13 @@ begin
         if rising_edge(clk_i) then
             s_ack_o <= '0';
             s_dat_o <= (others => '0');
-            if rst_i = '0' then
-                start_r      <= '0';
-                base_address <= (others => '0');
-            elsif s_cyc_i = '1' and s_stb_i = '1' then
+            if s_cyc_i = '1' and s_stb_i = '1' then
                 s_ack_o <= '1';
                 if s_we_i = '1' then
                     case s_adr_i(7 downto 0) is
-                        when x"01" => start_r      <= '1';
-                        when x"02" => start_r      <= '0';
-                        when x"03" => base_address <= unsigned(s_dat_i(20 downto 0));
+                        when x"04" => start_r      <= '1';
+                        when x"08" => start_r      <= '0';
+                        when x"0C" => base_address <= unsigned(s_dat_i(20 downto 0));
                         when others => null;
                     end case;
                 end if;
@@ -200,10 +218,6 @@ begin
             dma_we      <= '0';
             fft_trigger <= '0';
 
-            if rst_i = '0' then
-                dma_state  <= DS_IDLE;
-                spi_wr_ptr <= (others => '0');
-            else
                 case dma_state is
 
                     when DS_IDLE =>
@@ -212,12 +226,12 @@ begin
                             dma_state <= DS_OPEN;
                         end if;
 
-                    -- Abilita SPI master: write 0x40000001 ← 1
+                    -- Abilita SPI master: write 0x40000004 (offset +0x04 = start)
                     when DS_OPEN =>
                         dma_cyc <= '1';
                         dma_stb <= '1';
                         dma_we  <= '1';
-                        dma_adr <= x"40000001";
+                        dma_adr <= x"40000004";
                         dma_dat <= x"00000001";
                         if m_ack_i = '1' then
                             dma_state <= DS_POLL;
@@ -240,12 +254,12 @@ begin
                             dma_state <= DS_CLRDY;
                         end if;
 
-                    -- Pulisce DATA_READY: write 0x40000003 ← 0 toglie il flag ack_o = 1
+                    -- Pulisce DATA_READY: write 0x4000000C (offset +0x0C = clear)
                     when DS_CLRDY =>
                         dma_cyc <= '1';
                         dma_stb <= '1';
                         dma_we  <= '1';
-                        dma_adr <= x"40000003";
+                        dma_adr <= x"4000000C";
                         dma_dat <= (others => '0');
                         if m_ack_i = '1' then
                             dma_state <= DS_STORE;
@@ -267,7 +281,6 @@ begin
                         dma_state  <= DS_POLL;
 
                 end case;
-            end if;
         end if;
     end process;
 
@@ -286,35 +299,28 @@ begin
             fft_stb     <= '0';
             fft_we      <= '0';
             irq_o       <= '0';
-            fft_start_s <= start_req; 
+            fft_ser_o   <= '0';
+            fft_start_s <= start_req;
             start_req   <= '0';
 
-            if rst_i = '0' then
-                fft_state   <= FS_IDLE;
-                fft_rd_idx  <= (others => '0');
-                drain_cnt   <= (others => '0');
-            else
                 case fft_state is
 
                     when FS_IDLE =>
                         fft_rd_idx <= (others => '0');
                         if fft_trigger = '1' then
-                            fft_state <= FS_FEED1;
                             start_req <= '1';
-                            xn_re_s     <= spi_raw_buf(to_integer(fft_win_base + resize(fft_rd_idx, 10)));
-                            fft_rd_idx <= fft_rd_idx + 1;
+                            fft_state <= FS_FEED1;
                         end if;
 
-                    -- Presenta xn_re e pulsa start='1' per esattamente 1 ciclo di clock
+                    -- Attende ipd='1' prima di presentare campioni; start già pulsato in FS_IDLE
                     when FS_FEED1 =>
-                        start_req <= '1';
-                        xn_re_s     <= spi_raw_buf(to_integer(fft_win_base + resize(fft_rd_idx, 10)));
-                        fft_rd_idx <= fft_rd_idx + 1;
-                            if fft_eod_s = '1' then
-                                fft_state <= FS_COMPUTE;
-                            elsif fft_ipd_s = '1' and fft_eod_s = '0' then
-                                fft_state <= FS_FEED1;
-                            end if;
+                        if fft_ipd_s = '1' then
+                            xn_re_s    <= spi_raw_buf(to_integer(fft_win_base + resize(fft_rd_idx, 10)));
+                            fft_rd_idx <= fft_rd_idx + 1;
+                        end if;
+                        if fft_eod_s = '1' then
+                            fft_state <= FS_COMPUTE;
+                        end if;
 
                     -- Attende fine calcolo FFT (busy='0')
                     when FS_COMPUTE =>
@@ -331,19 +337,18 @@ begin
                             fft_state <= FS_DRAIN;
                         end if;
 
-                    -- Drena fft_result_buf su SDRAM @ base_address..base_address+511
-                    -- DMA ha priorità: se dma_cyc='1' il mux toglie il bus al FFT,
-                    -- l'ack non viene mai ricevuto → ciclo WB si ripete il clock dopo.
                     when FS_DRAIN =>
+                        drain_reached <= '1';
                         fft_adr <= "0001" & "0000000" &
                                    std_logic_vector(base_address + resize(drain_cnt, 21));
-                        fft_dat <= x"0000" & fft_result_buf(to_integer(drain_cnt));
+                        -- fft_dat <= x"0000" & fft_result_buf(to_integer(drain_cnt));  -- PRODUZIONE
+                        fft_dat <= x"00007FFF";  -- TEST: 32767 = max positivo 15-bit → UART "32767" se write+read ok
                         if dma_cyc = '0' then
                             fft_cyc <= '1';
                             fft_stb <= '1';
                             fft_we  <= '1';
                             if m_ack_i = '1' then
-                                -- Abbassa CYC prima di cambiare stato (last-assignment wins)
+                                drain_ack_seen <= '1';
                                 fft_cyc <= '0';
                                 fft_stb <= '0';
                                 if drain_cnt = 511 then
@@ -355,11 +360,32 @@ begin
                         end if;
 
                     when FS_IRQ =>
-                        irq_o     <= '1';
-                        fft_state <= FS_IDLE;
+                        irq_o        <= '1';
+                        ser_word_cnt <= (others => '0');
+                        ser_bit_cnt  <= (others => '0');
+                        ser_sreg     <= fft_result_buf(0);
+                        fft_state    <= FS_SERIAL;
+
+                    -- Trasmette fft_result_buf serialmente: 512 word x 16 bit, MSB per primo.
+                    -- Ogni bit dura 1 ciclo di clock (37 ns @ 27 MHz).
+                    -- Frame totale: 8192 cicli = 303 µs. Poi torna a FS_IDLE.
+                    -- fft_ser_o = '0' fuori da questo stato (default in cima al processo).
+                    when FS_SERIAL =>
+                        fft_ser_o <= ser_sreg(15);
+                        if ser_bit_cnt = 15 then
+                            ser_bit_cnt <= (others => '0');
+                            if ser_word_cnt = 511 then
+                                fft_state <= FS_IDLE;
+                            else
+                                ser_word_cnt <= ser_word_cnt + 1;
+                                ser_sreg     <= fft_result_buf(to_integer(ser_word_cnt + 1));
+                            end if;
+                        else
+                            ser_sreg    <= ser_sreg(14 downto 0) & '0';
+                            ser_bit_cnt <= ser_bit_cnt + 1;
+                        end if;
 
                 end case;
-            end if;
         end if;
     end process;
 

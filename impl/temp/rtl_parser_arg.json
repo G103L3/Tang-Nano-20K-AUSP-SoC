@@ -2,57 +2,57 @@
  "Device" : "GW2AR-18C",
  "Files" : [
   {
-   "Path" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/fft/fft.v",
+   "Path" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/fft/fft.v",
    "Type" : "verilog"
   },
   {
    "Library" : "work",
-   "Path" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/gowin_picorv32/gowin_picorv32.vhd",
+   "Path" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/dma.vhd",
    "Type" : "vhdl"
   },
   {
    "Library" : "work",
-   "Path" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/gpio_generic.vhd",
+   "Path" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/gowin_rpll/gowin_rpll.vhd",
    "Type" : "vhdl"
   },
   {
    "Library" : "work",
-   "Path" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/memory_arbiter.vhd",
+   "Path" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/gpio_generic.vhd",
    "Type" : "vhdl"
   },
   {
    "Library" : "work",
-   "Path" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/pwm_generic_master.vhd",
+   "Path" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/memory_arbiter.vhd",
    "Type" : "vhdl"
   },
   {
    "Library" : "work",
-   "Path" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/sdram_controller_hs/sdram_controller_hs.vhd",
+   "Path" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/pwm_generic_master.vhd",
    "Type" : "vhdl"
   },
   {
    "Library" : "work",
-   "Path" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/spi_master.vhd",
+   "Path" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/sdram_controller_hs/sdram_controller_hs.vhd",
    "Type" : "vhdl"
   },
   {
    "Library" : "work",
-   "Path" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/top.vhd",
+   "Path" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/spi_master.vhd",
    "Type" : "vhdl"
   },
   {
    "Library" : "work",
-   "Path" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/uart_generic.vhd",
+   "Path" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd",
    "Type" : "vhdl"
   },
   {
    "Library" : "work",
-   "Path" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/wb_interconnect.vhd",
+   "Path" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/uart_generic.vhd",
    "Type" : "vhdl"
   },
   {
    "Library" : "work",
-   "Path" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/src/dma.vhd",
+   "Path" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/wb_interconnect.vhd",
    "Type" : "vhdl"
   }
  ],
@@ -60,7 +60,7 @@
 
  ],
  "LoopLimit" : 2000,
- "ResultFile" : "C:/Gowin/Gowin_V1.9.11.03_Education_x64/IDE/bin/Documents/efes_project_s360501/impl/temp/rtl_parser.result",
+ "ResultFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/impl/temp/rtl_parser.result",
  "Top" : "Top_System",
  "VerilogStd" : "verilog_2001",
  "VhdlStd" : "vhdl_93"
