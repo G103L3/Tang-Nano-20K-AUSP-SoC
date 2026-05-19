@@ -32,7 +32,7 @@ end SPI_Master;
 
 architecture SPI_Master_BEHAVIORAL of SPI_Master is
 
-    constant PRESCALER  : natural := 36;
+    constant PRESCALER  : natural := 54;  -- 40.5MHz: 36*1.5 -> fSCK = 40.5e6/54 = 750 kHz (come a 27MHz/36)
     constant HALF_PRE   : natural := PRESCALER / 2;
     constant TOTAL_BITS : natural := 16;
 

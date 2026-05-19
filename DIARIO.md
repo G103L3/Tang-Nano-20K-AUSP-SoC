@@ -1006,6 +1006,69 @@ a pipeline calda. Nessuna modifica alla cattura raw né al timing core.
 
 **Conclusione test SDRAM:** scrittura+lettura di 520 parole consecutive
 (>512) su 20 righe SDRAM, sequenza pulita 1…520 — **completo e verificato**.
+
+---
+
+## 2026-05-19 — Refactor: dati FFT reali in SDRAM (pipeline DMA)
+
+**Obiettivo:** sostituire il test SDRAM con la pipeline reale — il DMA
+scrive i 512 risultati FFT (`fft_result_buf`) in SDRAM con la **stessa
+procedura collaudata** (warm-up + burst + pattern reference), poi su IRQ
+una FSM nel top li rilegge e li stampa via UART. Scelta architetturale
+(utente): spostare la logica SDRAM **dentro il DMA** e far girare il DMA
+alla frequenza del SIP (**40.5 MHz**), scalando le temporizzazioni ×1.5.
+
+Refactor a 3 fasi (per non sprecare i lunghi build):
+
+### Fase 1 — DMA+SPI a clk_sdram (40.5 MHz)
+- `top.vhd`: `u_dma` e `u_spi` da `clk_i` (27 MHz) → `clk_sdram` (40.5 MHz).
+- `spi_master.vhd`: `PRESCALER 36 → 54` (×1.5) ⇒ fSCK = 40.5e6/54 =
+  750 kHz, identica all'originale 27e6/36.
+- `wb_interconnect` è combinatorio (nessun clock) ⇒ niente CDC sul bus;
+  DMA↔SPI ora stesso dominio. Nessun master CPU attivo (DMA auto-start).
+- FSM test SDRAM lasciata attiva: output UART deve restare i 520 valori
+  → conferma sistema stabile. **Verifica chiave: il P&R deve chiudere il
+  timing dell'IP FFT a 40.5 MHz** (rischio isolato prima delle fasi 2-3).
+- Esito: UART = 520 valori ok (sistema regge 40.5 MHz). IP FFT "swept"
+  (eliminato): atteso, perché senza pipeline reale non ha output → il suo
+  timing si verificherà solo in Fase 2/3 (quando i risultati FFT vanno
+  davvero in SDRAM→UART e l'IP non è più logica morta).
+
+### Fase 2 — logica write SDRAM dentro il DMA (`dma.vhd`)
+- Nuove porte DMA→SIP: `sdr_own_o, sdr_wr_n_o, sdr_addr_o, sdr_data_o`,
+  ingressi `sdr_busy_n_i, sdr_initdone_i`.
+- `FS_DRAIN` (scriveva via WB un valore di test fisso) **sostituito** da
+  `FS_SDR_SETTLE → FS_SDR_WW → FS_SDR_W`: replica esatta della procedura
+  collaudata (settle init+200k, warm-up write-only riga 1, 20 burst×26 su
+  righe 2+k, `data_len` SIP = 0x1A). Sorgente dato = `fft_result_buf`
+  (16-bit esteso a 32: `x"0000" & buf`), indice `buf_idx` clamp 0..511.
+- A fine scrittura: `FS_IRQ` pulsa `irq_o`, rilascia il SIP (`sdr_own=0`),
+  `sdr_done=1` ⇒ **un solo ciclo** di scrittura SDRAM (evita il conflitto
+  SIP fra write-DMA e read-top finché non aggiungiamo l'handshake).
+
+### Fase 3 — lettura su IRQ + UART (`top.vhd`)
+- SIP **muxato**: `sdr_own=1` ⇒ lo pilota il DMA (write); `=0` ⇒ la FSM
+  top (read). Tutto su `clk_sdram` ⇒ nessun CDC, `dma_irq` stesso dominio.
+- FSM `tst_st` resa **read-only**: `TS_INIT` attende il fronte di
+  `dma_irq` → `TS_PREAMBLE` (256 spazi) → 20× (`TS_READ_WAIT/TS_READ`
+  riga 2+k → `TS_TX_WORD/CRLF`) → `TS_PAUSE → TS_INIT` (riarmo). Niente
+  più write/contatore/warm-up nel top (il warm-up è write-only nel DMA).
+- Atteso UART: `FPGA ON` + preambolo + 520 valori = **i risultati reali
+  dell'FFT** (`xk_re` a 16-bit, formato `0000XXXX`), una volta sola.
+- Verifica: P&R con FFT non più swept (timing 40.5 MHz reale); i valori
+  riflettono il segnale ADC (silenzio ⇒ valori piccoli).
+- Esito 1° build Fasi 2-3: pipeline **funzionante** — 520 valori puliti
+  via UART (write-DMA + read-top + SDRAM ok), FFT non più swept. MA tutti
+  i valori ≈ `0000FFFC` (−4): nessun bin0 alto atteso per input ≈ costante.
+
+### Fix off-by-one bin0
+Il SIP scarta il valore presentato in `TS_WRITE_WAIT`/`FS_SDR_WW` e scrive
+dal 1° presentato in `*_W` (nel test mascherato: dati = contatore, base=0
+→ si leggeva 1,2,…). Con sorgente `fft_result_buf` questo **scartava
+`fft_result_buf[0]` = bin0** (il valore grande per input quasi-costante).
+I `0000FFFx` osservati erano i bin 1…511 ≈ 0 (rumore). Fix: in `FS_SDR_W`
+indice dato = `buf_idx(burst, sdr_widx)` invece di `sdr_widx+1` → il 1°
+valore scritto/letto è `fft_result_buf[0]`.
 - Timing core invariato (29 cicli `TS_WRITE`, 200 `TS_READ`, cattura raw,
   PLL 40.5 MHz, baud 351): aggiunto solo il loop di burst e l'indirizzo
   dinamico in `TS_WRITE_WAIT`/`TS_READ_WAIT`, con ritorno burst da

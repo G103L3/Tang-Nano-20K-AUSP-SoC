@@ -27,7 +27,7 @@
   "SubInsts" : [
    {
     "InstFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd",
-    "InstLine" : 354,
+    "InstLine" : 370,
     "InstName" : "u_pll",
     "ModuleFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/gowin_rpll/gowin_rpll.vhd",
     "ModuleLine" : 14,
@@ -35,7 +35,7 @@
    },
    {
     "InstFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd",
-    "InstLine" : 377,
+    "InstLine" : 393,
     "InstName" : "u_bus",
     "ModuleFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/wb_interconnect.vhd",
     "ModuleLine" : 19,
@@ -43,7 +43,7 @@
    },
    {
     "InstFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd",
-    "InstLine" : 410,
+    "InstLine" : 431,
     "InstName" : "u_sdram_direct",
     "ModuleFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/SDRAM_controller_top_SIP/SDRAM_controller_top_SIP.v",
     "ModuleLine" : 2842,
@@ -61,7 +61,7 @@
    },
    {
     "InstFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd",
-    "InstLine" : 434,
+    "InstLine" : 455,
     "InstName" : "u_dma",
     "ModuleFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/dma.vhd",
     "ModuleLine" : 31,
@@ -69,7 +69,7 @@
     "SubInsts" : [
      {
       "InstFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/dma.vhd",
-      "InstLine" : 170,
+      "InstLine" : 207,
       "InstName" : "fft_inst_0",
       "ModuleFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/fft/fft.v",
       "ModuleLine" : 9,
@@ -79,7 +79,7 @@
    },
    {
     "InstFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd",
-    "InstLine" : 444,
+    "InstLine" : 469,
     "InstName" : "u_spi",
     "ModuleFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/spi_master.vhd",
     "ModuleLine" : 13,
@@ -87,7 +87,7 @@
    },
    {
     "InstFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd",
-    "InstLine" : 450,
+    "InstLine" : 475,
     "InstName" : "u_pwm10",
     "ModuleFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/pwm_generic_master.vhd",
     "ModuleLine" : 5,
@@ -95,7 +95,7 @@
    },
    {
     "InstFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd",
-    "InstLine" : 455,
+    "InstLine" : 480,
     "InstName" : "u_pwm4",
     "ModuleFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/pwm_generic_master.vhd",
     "ModuleLine" : 5,
@@ -103,7 +103,7 @@
    },
    {
     "InstFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd",
-    "InstLine" : 460,
+    "InstLine" : 485,
     "InstName" : "u_gpio1",
     "ModuleFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/gpio_generic.vhd",
     "ModuleLine" : 5,

@@ -141,6 +141,12 @@ architecture behavioral of top_system is
             m_adr_o : out std_logic_vector(31 downto 0); m_dat_o : out std_logic_vector(31 downto 0);
             m_dat_i : in  std_logic_vector(31 downto 0); m_ack_i : in  std_logic;
             spi_data_ready_i : in  std_logic;
+            sdr_own_o      : out std_logic;
+            sdr_wr_n_o     : out std_logic;
+            sdr_addr_o     : out std_logic_vector(20 downto 0);
+            sdr_data_o     : out std_logic_vector(31 downto 0);
+            sdr_busy_n_i   : in  std_logic;
+            sdr_initdone_i : in  std_logic;
             irq_o          : out std_logic;
             fft_trigger_o  : out std_logic;
             fft_dbg_o      : out std_logic;
@@ -194,6 +200,15 @@ architecture behavioral of top_system is
     signal dma_cyc_s, dma_stb_s, dma_we_s : std_logic;
     signal dma_adr_s, dma_wdata_s : std_logic_vector(31 downto 0);
     signal dma_irq        : std_logic;
+    -- ── Bridge DMA → SIP SDRAM (fase WRITE pilotata dal DMA) ─────────────────
+    signal dma_sdr_own    : std_logic;
+    signal dma_sdr_wr_n   : std_logic;
+    signal dma_sdr_addr   : std_logic_vector(20 downto 0);
+    signal dma_sdr_data   : std_logic_vector(31 downto 0);
+    signal sip_wr_n  : std_logic;
+    signal sip_rd_n  : std_logic;
+    signal sip_addr  : std_logic_vector(20 downto 0);
+    signal sip_data  : std_logic_vector(31 downto 0);
     signal dma_fft_trig   : std_logic;
     signal sdram_init_done : std_logic;
     signal fft_trig_led_s : std_logic := '0';
@@ -240,6 +255,7 @@ architecture behavioral of top_system is
     -- Warm-up: 1 burst write+read scartato (riga dummy) per "scaldare" la
     -- pipeline del SIP prima del burst 0 reale (1a transazione post-init).
     signal tst_warm     : std_logic := '1';
+    signal tst_irq_prev : std_logic := '0';  -- edge-detect dma_irq (stesso dominio clk_sdram)
 
     signal spi_data_ready_s : std_logic;
     signal gpio_in_v, gpio_out_v : std_logic_vector(0 downto 0);
@@ -407,6 +423,11 @@ begin
 
     -- ── SDRAM Controller IP ──────────────────────────────────────────────────
     test_uart_s <= tst_tx_sr(0);
+    -- Mux SIP: DMA possiede il bus in WRITE (sdr_own=1), la FSM top in READ.
+    sip_wr_n <= dma_sdr_wr_n when dma_sdr_own = '1' else '1';
+    sip_rd_n <= tst_rd_n     when dma_sdr_own = '0' else '1';
+    sip_addr <= dma_sdr_addr when dma_sdr_own = '1' else tst_addr;
+    sip_data <= dma_sdr_data when dma_sdr_own = '1' else tst_wr_data;
     u_sdram_direct: SDRAM_controller_top_SIP
     port map (
         O_sdram_clk      => O_sdram_clk,    O_sdram_cke      => O_sdram_cke,
@@ -417,9 +438,9 @@ begin
         I_sdrc_rst_n     => pll_lock,       I_sdrc_clk       => clk_sdram,
         I_sdram_clk      => clk_sdram_p,
         I_sdrc_selfrefresh => '0',          I_sdrc_power_down  => '0',
-        I_sdrc_wr_n      => tst_wr_n,       I_sdrc_rd_n      => tst_rd_n,
-        I_sdrc_addr      => tst_addr,       I_sdrc_dqm       => "0000",
-        I_sdrc_data      => tst_wr_data,    
+        I_sdrc_wr_n      => sip_wr_n,       I_sdrc_rd_n      => sip_rd_n,
+        I_sdrc_addr      => sip_addr,       I_sdrc_dqm       => "0000",
+        I_sdrc_data      => sip_data,
         I_sdrc_data_len  => x"1A",  -- 26 = 27-word burst: la 27a (difettosa) scartata da tst_idx<26
         O_sdrc_data      => tst_rd_data,    O_sdrc_init_done => tst_init_done,
         O_sdrc_busy_n    => tst_busy_n_s,   O_sdrc_rd_valid  => tst_rd_valid_s,
@@ -432,17 +453,21 @@ begin
 
     -- ── Altri blocchi ... ─────────────────────────────────────────────────────
     u_dma: dma port map (
-        clk_i => clk_i,  rst_i => rst_i, s_cyc_i => s5_cyc, s_stb_i => s5_stb, s_we_i  => s5_we,
+        clk_i => clk_sdram,  rst_i => rst_i, s_cyc_i => s5_cyc, s_stb_i => s5_stb, s_we_i  => s5_we,
         s_adr_i => s5_adr, s_dat_i => s5_wdata, s_dat_o => s5_rdata, s_ack_o => s5_ack,
         m_cyc_o => dma_m_cyc, m_stb_o => dma_m_stb, m_we_o => dma_m_we, m_adr_o => dma_m_adr,
         m_dat_o => dma_m_wdat, m_dat_i => dma_m_rdat, m_ack_i => dma_m_ack_s,
-        spi_data_ready_i => spi_data_ready_s, irq_o => dma_irq, fft_trigger_o => dma_fft_trig,
+        spi_data_ready_i => spi_data_ready_s,
+        sdr_own_o => dma_sdr_own, sdr_wr_n_o => dma_sdr_wr_n,
+        sdr_addr_o => dma_sdr_addr, sdr_data_o => dma_sdr_data,
+        sdr_busy_n_i => tst_busy_n_s, sdr_initdone_i => tst_init_done,
+        irq_o => dma_irq, fft_trigger_o => dma_fft_trig,
         fft_dbg_o => fft_dbg_s, fft_ack_dbg_o => fft_ack_dbg_s, fft_ser_o => fft_ser_s,
         fft_idx_o => fft_idx_s, fft_xk_re_o => fft_xk_re_s, fft_opd_o => fft_opd_s
     );
 
     u_spi: spi_master port map (
-        clk_i => clk_i, rst_i => '1', cyc_i => s1_cyc, stb_i => s1_stb, we_i => s1_we,
+        clk_i => clk_sdram, rst_i => '1', cyc_i => s1_cyc, stb_i => s1_stb, we_i => s1_we,
         adr_i => s1_adr(7 downto 0), dat_i => s1_wdata, dat_o => s1_rdata, ack_o => s1_ack,
         data_ready_o => spi_data_ready_s, dbg_cap_o => spi_dbg_cap, mosi => mosi_p, miso => miso_p, sck => sck_p, cs => cs_p
     );
@@ -680,9 +705,11 @@ begin
         end procedure;
     begin
         if rising_edge(clk_sdram) then
-            tst_tx_load <= '0';
-            
-            -- Lettura asincrona per non perdere nemmeno un ciclo
+            tst_tx_load   <= '0';
+            tst_irq_prev  <= dma_irq;
+
+            -- Cattura lettura SDRAM (stessa modalità del test): ogni rd_valid
+            -- nella finestra di READ campiona O_sdrc_data.
             if tst_rd_valid_s = '1' then
                 if tst_idx < 26 then
                     tst_rd_arr2(tst_idx) <= tst_rd_data;
@@ -691,114 +718,58 @@ begin
             end if;
 
             case tst_st is
+                -- Attende l'IRQ del DMA (scrittura SDRAM dei 512 FFT completata).
                 when TS_INIT =>
-                    tst_wr_n    <= '1';
-                    tst_rd_n    <= '1';
-                    tst_wr_data <= (others => '0');
-                    if tst_init_done = '1' then
-                        tst_timer <= tst_timer + 1;
-                        if tst_timer = 200000 then
-                            tst_timer   <= 0;
-                            tst_wrd_cnt <= 0;
-                            tst_idx     <= 0;
-                            tst_timeout <= 0;
-                            tst_burst   <= 0;
-                            tst_wrd_cnt <= 0;
-                            tst_warm    <= '1';
-                            tst_st      <= TS_PREAMBLE;
-                        end if;
+                    tst_rd_n <= '1';
+                    if dma_irq = '1' and tst_irq_prev = '0' then
+                        tst_wrd_cnt <= 0;
+                        tst_idx     <= 0;
+                        tst_timeout <= 0;
+                        tst_burst   <= 0;
+                        tst_st      <= TS_PREAMBLE;
                     end if;
 
                 when TS_PREAMBLE =>
                     -- Caratteri sacrificali: assorbono il transitorio di
-                    -- sincronizzazione della UART di test (bug #5) così i
-                    -- dati reali (burst 0) non vengono corrotti.
-                    tst_wr_n <= '1';
+                    -- sincronizzazione della UART di test (bug #5).
                     tst_rd_n <= '1';
                     if tst_tx_busy = '0' and tst_tx_load = '0' then
                         tst_tx_load <= '1';
                         tst_tx_byte <= x"20";
                         if tst_wrd_cnt = 255 then
                             tst_wrd_cnt <= 0;
-                            tst_st      <= TS_WRITE_WAIT;
+                            tst_burst   <= 0;
+                            tst_st      <= TS_READ_WAIT;
                         else
                             tst_wrd_cnt <= tst_wrd_cnt + 1;
                         end if;
                     end if;
 
-                when TS_WRITE_WAIT =>
-                    tst_wr_n    <= '1';
-                    tst_rd_n    <= '1';
-                    -- base dato del burst: burst*26 -> sequenza globale continua 1..520
-                    tst_wr_data <= std_logic_vector(to_unsigned(tst_burst * 26, 32));
-                    if tst_busy_n_s = '1' then
-                        tst_wr_n    <= '0';
-                        -- 1 burst per riga SDRAM: bank=2, row=2+burst, col=5
-                        -- warm-up: riga dummy 1 (scartata)
-                        if tst_warm = '1' then
-                            tst_addr <= "10"
-                                     & std_logic_vector(to_unsigned(1, 11))
-                                     & "00000101";
-                        else
-                            tst_addr <= "10"
-                                     & std_logic_vector(to_unsigned(2 + tst_burst, 11))
-                                     & "00000101";
-                        end if;
-                        tst_timeout <= 0;
-                        tst_st      <= TS_WRITE;
-                    end if;
-
-                when TS_WRITE =>
-                    tst_wr_n    <= '1';
-                    tst_rd_n    <= '1';
-                    tst_wr_data <= std_logic_vector(unsigned(tst_wr_data) + 1);
-                    tst_timeout <= tst_timeout + 1;
-                    if tst_timeout = 28 then
-                        -- Pattern reference Gowin: ogni WRITE seguito subito
-                        -- dal suo READ (no write back-to-back).
-                        tst_timeout <= 0;
-                        tst_st      <= TS_READ_WAIT;
-                    end if;
-
-                when TS_WRITE_DONE =>
-                    -- Stato non utilizzato (pattern write/read alternato).
-                    tst_st <= TS_READ_WAIT;
+                -- Stati di scrittura non più usati (la WRITE è nel DMA).
+                when TS_WRITE_WAIT | TS_WRITE | TS_WRITE_DONE =>
+                    tst_st <= TS_PAUSE;
 
                 when TS_READ_WAIT =>
-                    tst_wr_n <= '1';
                     tst_rd_n <= '1';
                     if tst_busy_n_s = '1' then
                         tst_rd_n    <= '0';
-                        if tst_warm = '1' then
-                            tst_addr <= "10"
-                                     & std_logic_vector(to_unsigned(1, 11))
-                                     & "00000101";
-                        else
-                            tst_addr <= "10"
+                        -- legge la riga dove il DMA ha scritto il burst k
+                        tst_addr    <= "10"
                                      & std_logic_vector(to_unsigned(2 + tst_burst, 11))
                                      & "00000101";
-                        end if;
                         tst_idx     <= 0;
                         tst_timeout <= 0;
                         tst_st      <= TS_READ;
                     end if;
 
                 when TS_READ =>
-                    tst_wr_n    <= '1';
                     tst_rd_n    <= '1';
                     tst_timeout <= tst_timeout + 1;
                     if tst_timeout = 200 then
-                        tst_timeout <= 0;
-                        if tst_warm = '1' then
-                            -- fine warm-up: scarta, parti col burst 0 reale
-                            tst_warm  <= '0';
-                            tst_burst <= 0;
-                            tst_st    <= TS_WRITE_WAIT;
-                        else
-                            tst_word_idx   <= 0;
-                            tst_nibble_idx <= 0;
-                            tst_st         <= TS_TX_WORD;
-                        end if;
+                        tst_timeout    <= 0;
+                        tst_word_idx   <= 0;
+                        tst_nibble_idx <= 0;
+                        tst_st         <= TS_TX_WORD;
                     end if;
 
                 when TS_TX_WORD =>
@@ -842,13 +813,14 @@ begin
                             else
                                 tst_burst   <= tst_burst + 1;
                                 tst_timeout <= 0;
-                                tst_st      <= TS_WRITE_WAIT;
+                                tst_st      <= TS_READ_WAIT;
                             end if;
                         end if;
                     end if;
 
                 when TS_PAUSE =>
-                    null;
+                    -- pronto per il prossimo IRQ del DMA
+                    tst_st <= TS_INIT;
             end case;
         end if;
     end process;

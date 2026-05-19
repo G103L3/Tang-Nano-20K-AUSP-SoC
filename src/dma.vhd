@@ -51,6 +51,14 @@ entity dma is
 
         spi_data_ready_i : in  std_logic;
 
+        -- ── Interfaccia diretta verso il SIP SDRAM (fase WRITE) ───────────────
+        sdr_own_o      : out std_logic;                       -- '1' = DMA possiede il SIP
+        sdr_wr_n_o     : out std_logic;                       -- write strobe (attivo basso)
+        sdr_addr_o     : out std_logic_vector(20 downto 0);   -- {bank,row,col}
+        sdr_data_o     : out std_logic_vector(31 downto 0);   -- dato da scrivere
+        sdr_busy_n_i   : in  std_logic;                        -- SIP pronto
+        sdr_initdone_i : in  std_logic;                        -- SIP init completata
+
         irq_o          : out std_logic;
         fft_trigger_o  : out std_logic;
         fft_dbg_o      : out std_logic;  -- '1' once FS_DRAIN is first reached
@@ -131,10 +139,34 @@ architecture behavioral of dma is
     signal dma_rdata : std_logic_vector(31 downto 0) := (others => '0');
 
     -- ── FFT FSM ───────────────────────────────────────────────────────────────
-    type fft_state_t is (FS_IDLE, FS_FEED1, FS_COMPUTE, FS_COLLECT, FS_DRAIN, FS_IRQ, FS_SERIAL);
+    -- FS_DRAIN sostituito dalla procedura SDRAM collaudata (warm-up + burst).
+    type fft_state_t is (FS_IDLE, FS_FEED1, FS_COMPUTE, FS_COLLECT,
+                         FS_SDR_SETTLE, FS_SDR_WW, FS_SDR_W,
+                         FS_IRQ, FS_SERIAL);
     signal fft_state  : fft_state_t := FS_IDLE;
     signal fft_rd_idx : unsigned(8 downto 0) := (others => '0');
     signal drain_cnt  : unsigned(8 downto 0) := (others => '0');
+
+    -- ── FSM scrittura SDRAM (replica della procedura di test collaudata) ──────
+    constant SDR_NBURST : integer := 20;            -- 20 x 26 = 520 (>= 512)
+    signal sdr_own     : std_logic := '0';
+    signal sdr_wr_n    : std_logic := '1';
+    signal sdr_addr    : std_logic_vector(20 downto 0) := (others => '0');
+    signal sdr_data    : std_logic_vector(31 downto 0) := (others => '0');
+    signal sdr_burst   : integer range 0 to 19 := 0;
+    signal sdr_widx    : integer range 0 to 31 := 0;
+    signal sdr_timeout : integer range 0 to 255 := 0;
+    signal sdr_settle  : integer range 0 to 500000 := 0;
+    signal sdr_warm    : std_logic := '1';
+    signal sdr_done    : std_logic := '0';   -- 1 solo ciclo write SDRAM (no loop concorrente col top)
+
+    -- indice clamp 0..511 nel buffer FFT (520 indici logici -> ultimi 8 a 511)
+    function buf_idx(b, i : integer) return integer is
+        variable x : integer;
+    begin
+        x := b * 26 + i;
+        if x > 511 then return 511; else return x; end if;
+    end function;
 
     -- ── Registri CPU ─────────────────────────────────────────────────────────
     signal start_r      : std_logic := '1';  -- auto-start: no CPU needed
@@ -150,6 +182,11 @@ architecture behavioral of dma is
     signal ser_sreg     : std_logic_vector(15 downto 0) := (others => '0');
 
 begin
+
+    sdr_own_o      <= sdr_own;
+    sdr_wr_n_o     <= sdr_wr_n;
+    sdr_addr_o     <= sdr_addr;
+    sdr_data_o     <= sdr_data;
 
     fft_trigger_o  <= fft_trigger;
     fft_dbg_o      <= drain_reached;
@@ -302,12 +339,14 @@ begin
             fft_ser_o   <= '0';
             fft_start_s <= start_req;
             start_req   <= '0';
+            sdr_wr_n    <= '1';   -- default: write strobe non attivo
 
                 case fft_state is
 
                     when FS_IDLE =>
+                        sdr_own    <= '0';
                         fft_rd_idx <= (others => '0');
-                        if fft_trigger = '1' then
+                        if fft_trigger = '1' and sdr_done = '0' then
                             start_req <= '1';
                             fft_state <= FS_FEED1;
                         end if;
@@ -333,33 +372,83 @@ begin
                             fft_result_buf(to_integer(unsigned(idx_s))) <= xk_re_s;
                         end if;
                         if fft_eoud_s = '1' then
-                            drain_cnt <= (others => '0');
-                            fft_state <= FS_DRAIN;
+                            drain_reached <= '1';
+                            sdr_own    <= '1';   -- DMA prende il SIP per scrivere
+                            sdr_warm   <= '1';
+                            sdr_burst  <= 0;
+                            sdr_widx   <= 0;
+                            sdr_settle <= 0;
+                            fft_state  <= FS_SDR_SETTLE;
                         end if;
 
-                    when FS_DRAIN =>
-                        drain_reached <= '1';
-                        fft_adr <= "0001" & "0000000" &
-                                   std_logic_vector(base_address + resize(drain_cnt, 21));
-                        -- fft_dat <= x"0000" & fft_result_buf(to_integer(drain_cnt));  -- PRODUZIONE
-                        fft_dat <= x"00007FFF";  -- TEST: 32767 = max positivo 15-bit → UART "32767" se write+read ok
-                        if dma_cyc = '0' then
-                            fft_cyc <= '1';
-                            fft_stb <= '1';
-                            fft_we  <= '1';
-                            if m_ack_i = '1' then
-                                drain_ack_seen <= '1';
-                                fft_cyc <= '0';
-                                fft_stb <= '0';
-                                if drain_cnt = 511 then
-                                    fft_state <= FS_IRQ;
-                                else
-                                    drain_cnt <= drain_cnt + 1;
-                                end if;
+                    -- Attesa stabilizzazione SIP prima del 1o write (come TS_INIT
+                    -- del test: init_done + 200000 cicli).
+                    when FS_SDR_SETTLE =>
+                        sdr_own  <= '1';
+                        sdr_wr_n <= '1';
+                        if sdr_initdone_i = '1' then
+                            sdr_settle <= sdr_settle + 1;
+                            if sdr_settle = 200000 then
+                                sdr_settle  <= 0;
+                                sdr_warm    <= '1';
+                                sdr_burst   <= 0;
+                                sdr_widx    <= 0;
+                                sdr_timeout <= 0;
+                                fft_state   <= FS_SDR_WW;
+                            end if;
+                        end if;
+
+                    -- = TS_WRITE_WAIT : presenta dato base, attende busy_n,
+                    --   pulsa wr_n=0 con indirizzo del burst (warm-up = riga 1).
+                    when FS_SDR_WW =>
+                        sdr_own  <= '1';
+                        sdr_wr_n <= '1';
+                        sdr_widx <= 0;
+                        sdr_data <= x"0000" & fft_result_buf(buf_idx(sdr_burst, 0));
+                        if sdr_busy_n_i = '1' then
+                            sdr_wr_n <= '0';
+                            if sdr_warm = '1' then
+                                sdr_addr <= "10"
+                                          & std_logic_vector(to_unsigned(1, 11))
+                                          & "00000101";
+                            else
+                                sdr_addr <= "10"
+                                          & std_logic_vector(to_unsigned(2 + sdr_burst, 11))
+                                          & "00000101";
+                            end if;
+                            sdr_timeout <= 0;
+                            fft_state   <= FS_SDR_W;
+                        end if;
+
+                    -- = TS_WRITE : 29 cicli, dato = fft_result_buf avanzante.
+                    when FS_SDR_W =>
+                        sdr_own  <= '1';
+                        sdr_wr_n <= '1';
+                        sdr_widx <= sdr_widx + 1;
+                        -- allineamento: il SIP scarta il valore presentato in WW
+                        -- e scrive dal 1o presentato in W -> indice = sdr_widx
+                        -- (non +1) cosi' il 1o scritto/letto e' fft_result_buf[0]=bin0.
+                        sdr_data <= x"0000"
+                                  & fft_result_buf(buf_idx(sdr_burst, sdr_widx));
+                        sdr_timeout <= sdr_timeout + 1;
+                        if sdr_timeout = 28 then
+                            sdr_timeout <= 0;
+                            if sdr_warm = '1' then
+                                sdr_warm  <= '0';   -- fine warm-up write-only
+                                sdr_burst <= 0;
+                                fft_state <= FS_SDR_WW;
+                            elsif sdr_burst = SDR_NBURST - 1 then
+                                fft_state <= FS_IRQ;   -- tutte le 520 scritte
+                            else
+                                sdr_burst <= sdr_burst + 1;
+                                fft_state <= FS_SDR_WW;
                             end if;
                         end if;
 
                     when FS_IRQ =>
+                        sdr_own      <= '0';   -- rilascia il SIP: ora legge il top
+                        sdr_wr_n     <= '1';
+                        sdr_done     <= '1';   -- 1 solo ciclo SDRAM (verifica funzionale)
                         irq_o        <= '1';
                         ser_word_cnt <= (others => '0');
                         ser_bit_cnt  <= (others => '0');
