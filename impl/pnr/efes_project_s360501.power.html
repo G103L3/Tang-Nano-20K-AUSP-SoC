@@ -89,7 +89,7 @@ table.detail_table th.label {  min-width: 8%; width: 8%; }
 </tr>
 <tr>
 <td class="label">Created Time</td>
-<td>Fri May 15 23:31:52 2026
+<td>Tue May 19 21:45:25 2026
 </td>
 </tr>
 <tr>
@@ -161,7 +161,7 @@ table.detail_table th.label {  min-width: 8%; width: 8%; }
 <table class="summary_table">
 <tr>
 <td class="label">Total Power (mW)</td>
-<td>178.469</td>
+<td>157.623</td>
 </tr>
 <tr>
 <td class="label">Quiescent Power (mW)</td>
@@ -169,14 +169,14 @@ table.detail_table th.label {  min-width: 8%; width: 8%; }
 </tr>
 <tr>
 <td class="label">Dynamic Power (mW)</td>
-<td>55.693</td>
+<td>34.847</td>
 </tr>
 </table>
 <h2><a name="Thermal_Info">Thermal Information:</a></h2>
 <table class="summary_table">
 <tr>
 <td class="label">Junction Temperature</td>
-<td>30.326</td>
+<td>29.703</td>
 </tr>
 <tr>
 <td class="label">Theta JA</td>
@@ -184,7 +184,7 @@ table.detail_table th.label {  min-width: 8%; width: 8%; }
 </tr>
 <tr>
 <td class="label">Max Allowed Ambient Temperature</td>
-<td>79.674</td>
+<td>80.297</td>
 </tr>
 </table>
 <h2><a name="Supply_Summary">Supply Information:</a></h2>
@@ -199,16 +199,16 @@ table.detail_table th.label {  min-width: 8%; width: 8%; }
 <tr>
 <td>VCC</td>
 <td>1.000</td>
-<td>18.466</td>
+<td>20.444</td>
 <td>69.999</td>
-<td>88.465</td>
+<td>90.443</td>
 </tr>
 <tr>
 <td>VCCX</td>
 <td>3.300</td>
-<td>5.640</td>
+<td>2.182</td>
 <td>15.000</td>
-<td>68.114</td>
+<td>56.702</td>
 </tr>
 <tr>
 <td>VCCIO18</td>
@@ -220,9 +220,9 @@ table.detail_table th.label {  min-width: 8%; width: 8%; }
 <tr>
 <td>VCCIO33</td>
 <td>3.300</td>
-<td>5.640</td>
+<td>2.182</td>
 <td>0.986</td>
-<td>21.866</td>
+<td>10.454</td>
 </tr>
 </table>
 <h1><a name="Detail">Power Details</a></h1>
@@ -236,21 +236,33 @@ table.detail_table th.label {  min-width: 8%; width: 8%; }
 </tr>
 <tr>
 <td>Logic</td>
-<td>1.478</td>
+<td>0.764</td>
 <td>NA</td>
-<td>10.963</td>
+<td>4.593</td>
 </tr>
 <tr>
 <td>IO</td>
-<td>57.750
+<td>31.454
 <td>14.869
-<td>12.455
+<td>4.902
+</tr>
+<tr>
+<td>BSRAM</td>
+<td>13.086
+<td>NA</td>
+<td>NA</td>
 </tr>
 <tr>
 <td>PLL</td>
-<td>11.297
+<td>4.236
 <td>NA</td>
 <td>NA</td>
+</tr>
+<tr>
+<td>DSP</td>
+<td>0.159
+<td>NA</td>
+<td>3.242
 </tr>
 </table>
 <h2><a name="By_Hierarchy">Power By Hierarchy:</a></h2>
@@ -262,12 +274,12 @@ table.detail_table th.label {  min-width: 8%; width: 8%; }
 </tr>
 <tr>
 <td>top_system</td>
-<td>12.775</td>
-<td>12.775(11.824)</td>
+<td>18.245</td>
+<td>18.245(11.294)</td>
 <tr>
 <td>top_system/u_dma/</td>
-<td>0.054</td>
-<td>0.054(0.026)</td>
+<td>0.053</td>
+<td>0.053(0.026)</td>
 <tr>
 <td>top_system/u_dma/fft_inst_0/</td>
 <td>0.026</td>
@@ -294,24 +306,32 @@ table.detail_table th.label {  min-width: 8%; width: 8%; }
 <td>0.009(0.000)</td>
 <tr>
 <td>top_system/u_pll/</td>
-<td>11.297</td>
-<td>11.297(0.000)</td>
+<td>4.236</td>
+<td>4.236(0.000)</td>
 <tr>
 <td>top_system/u_sdram_direct/</td>
-<td>0.461</td>
-<td>0.461(0.461)</td>
+<td>6.991</td>
+<td>6.991(6.991)</td>
 <tr>
-<td>top_system/u_sdram_direct/u_sdrc_hs_top/</td>
-<td>0.461</td>
-<td>0.461(0.265)</td>
+<td>top_system/u_sdram_direct/sdrc_top_inst/</td>
+<td>6.991</td>
+<td>6.991(6.991)</td>
 <tr>
-<td>top_system/u_sdram_direct/u_sdrc_hs_top/u_sdrc_control_fsm/</td>
-<td>0.265</td>
-<td>0.265(0.000)</td>
+<td>top_system/u_sdram_direct/sdrc_top_inst/U0/</td>
+<td>0.131</td>
+<td>0.131(0.000)</td>
+<tr>
+<td>top_system/u_sdram_direct/sdrc_top_inst/U1/</td>
+<td>6.846</td>
+<td>6.846(0.000)</td>
+<tr>
+<td>top_system/u_sdram_direct/sdrc_top_inst/U2/</td>
+<td>0.014</td>
+<td>0.014(0.000)</td>
 <tr>
 <td>top_system/u_spi/</td>
-<td>0.012</td>
-<td>0.012(0.000)</td>
+<td>0.013</td>
+<td>0.013(0.000)</td>
 </table>
 <h2><a name="By_Clock_Domain">Power By Clock Domain:</a></h2>
 <table class="detail_table">
@@ -321,19 +341,19 @@ table.detail_table th.label {  min-width: 8%; width: 8%; }
 <th class="label">Total Dynamic Power(mW)</th>
 </tr>
 <tr>
-<td>clk_sdram</td>
-<td>108.003</td>
-<td>1.393</td>
+<td>u_pll/rpll_inst/CLKOUT.default_gen_clk</td>
+<td>40.500</td>
+<td>13.866</td>
+</tr>
+<tr>
+<td>clk</td>
+<td>27.000</td>
+<td>4.396</td>
 </tr>
 <tr>
 <td>NO CLOCK DOMAIN</td>
 <td>0.000</td>
 <td>0.000</td>
-</tr>
-<tr>
-<td>clk</td>
-<td>27.000</td>
-<td>11.419</td>
 </tr>
 </table>
 </div><!-- content -->

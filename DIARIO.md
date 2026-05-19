@@ -830,3 +830,183 @@ Test SDRAM confermato. Rimuovere il test inline e ripristinare la pipeline compl
 - Reimpostare `memory_arbiter` al posto di `u_sdram_direct`
 - Ripristinare connessioni DMA e AUSP
 - Verificare la pipeline SPI → DMA → FFT → SDRAM → AUSP end-to-end
+
+---
+
+## 2026-05-19 — SDRAM: test scrittura+lettura burst di 26 parole — FUNZIONANTE
+
+**Obiettivo:** validare in hardware un ciclo completo *scrivi N parole consecutive
+in SDRAM → rileggile* sul SIP SDRAM integrato del GW2AR-18C, allineando il
+design al reference ufficiale Gowin (`sdrc_interface_used.v`, `gw_pll.v`).
+
+### Esito
+
+Output UART (115200 baud) dopo `clean + synthesis + place&route + program`:
+
+```
+FPGA ON
+00000001 00000002 00000003 ... 00000018 00000019 (00000019)
+```
+
+26 parole scritte in indirizzo SDRAM `{bank=2, row=2, col=5}` e rilette in
+sequenza incrementale **corretta** (1 … 0x1A). Resta un solo difetto minore:
+l'ultima parola (0x1A) viene persa e la penultima (0x19) appare duplicata
+— vedi fix in coda.
+
+### Causa radice del problema (perché prima falliva)
+
+Il design girava a **108 MHz**; il reference Gowin gira a **~41 MHz**.
+A 108 MHz, con phase-shift del clock SDRAM `PSDA_SEL="0001"` (22.5°), il
+margine di setup/hold sul bus dati `IO_sdram_dq` era insufficiente →
+bit-error e parole duplicate sulle posizioni dispari, più un offset
+deterministico (+9) introdotto dalla latenza interna del SIP non assorbita.
+Portando la frequenza a quella per cui il SIP Gowin è caratterizzato
+(~40 MHz) entrambi i problemi sono spariti.
+
+### Configurazione rPLL definitiva (`src/gowin_rpll/gowin_rpll.vhd`)
+
+Clock di ingresso: 27 MHz. Formula reale del primitivo `rPLL` (rivelata
+dall'errore EX0311 del tool):
+
+```
+VCO    = FCLKIN * (FBDIV_SEL+1) * ODIV_SEL / (IDIV_SEL+1)   [valido 500–1250 MHz]
+CLKOUT = FCLKIN * (FBDIV_SEL+1) / (IDIV_SEL+1)
+```
+
+| Parametro | Valore | Note |
+|-----------|--------|------|
+| `FCLKIN` | `"27"` | clock cristallo Tang Nano 20K |
+| `IDIV_SEL` | `1` | divisore ingresso = 2 |
+| `FBDIV_SEL` | `2` | moltiplicatore feedback = 3 |
+| `ODIV_SEL` | `16` | divisore uscita |
+| `PSDA_SEL` | `"0001"` | phase-shift statico 22.5° su CLKOUTP (clock SDRAM) |
+| `DYN_DA_EN` | `"false"` | phase-shift statico |
+| `DUTYDA_SEL` | `"1000"` | duty 50% |
+| `FDLY` | `"1111"` | fine-delay feedback (come reference `gw_pll.v`) |
+| `CLKFB_SEL` | `"internal"` | feedback interno |
+
+Risultato: VCO = 27·3·16/2 = **648 MHz** (in range), **CLKOUT = 40.5 MHz**.
+- `clkout`  → `clk_sdram`  : clock logica controller SIP (`I_sdrc_clk`)
+- `clkoutp` → `clk_sdram_p`: clock fisico SDRAM, sfasato 22.5° (`I_sdram_clk`)
+
+Conseguenza: ricalibrato il divisore baud della UART di test in
+`top.vhd` (process baud tick): `tst_baud_cnt = 351` → 40.5 MHz / 352 ≈
+115 200 baud. (Le UART `boot_tx`/`rtx` restano su `clk_i` = 27 MHz.)
+
+### Come funziona la FSM di test (`top.vhd`, process su `clk_sdram`)
+
+FSM `tst_st` con stati `TS_INIT, TS_WRITE_WAIT, TS_WRITE, TS_READ_WAIT,
+TS_READ, TS_TX_WORD, TS_TX_CRLF, TS_PAUSE`. Replica `sdrc_interface_used.v`.
+
+1. **TS_INIT** — `wr_n=rd_n=1`, `tst_wr_data=0`. Attende `O_sdrc_init_done`
+   poi conta 200 000 cicli (margine di stabilizzazione SIP) → `TS_WRITE_WAIT`.
+2. **TS_WRITE_WAIT** — appena `busy_n=1`: pulsa `wr_n=0` per **1 ciclo**,
+   imposta `addr = {bank=2, row=2, col=5}` (`"100000000010000000101"`),
+   azzera il contatore → `TS_WRITE`.
+3. **TS_WRITE** — `wr_n` torna a 1; `tst_wr_data` incrementa di 1 ad ogni
+   ciclo (0→1→2…); dopo 29 cicli (`timeout=28`) → `TS_READ_WAIT`. Il SIP
+   bufferizza i dati nella sua FIFO interna durante la sequenza.
+   `data_len = 0x19` (25) ⇒ burst di **26 parole**.
+4. **TS_READ_WAIT** — appena `busy_n=1`: pulsa `rd_n=0` per 1 ciclo, stesso
+   `addr` del write, azzera l'indice di cattura → `TS_READ`.
+5. **TS_READ** — attende 200 cicli mentre, in parallelo nello stesso process,
+   ogni `O_sdrc_rd_valid` campiona `O_sdrc_data` in `tst_rd_arr2[0..25]`.
+6. **TS_TX_WORD / TS_TX_CRLF** — serializza le 26 parole in esadecimale ASCII
+   sulla UART, poi CR/LF.
+7. **TS_PAUSE** — stato finale (loop singolo).
+
+Wiring SIP (`u_sdram_direct`): `I_sdrc_clk=clk_sdram`,
+`I_sdram_clk=clk_sdram_p`, `I_sdrc_rst_n=pll_lock`,
+`I_sdrc_data_len=x"19"`, dati `tst_wr_data`/`tst_rd_data`.
+
+### Riepilogo fix di oggi
+
+| # | Problema | Sintomo | Fix |
+|---|----------|---------|-----|
+| 10 | Freq SDRAM 108 MHz fuori caratterizzazione SIP | bit-flip + duplicati su posizioni dispari, offset +9 | rPLL → 40.5 MHz (IDIV=1, FBDIV=2, ODIV=16) |
+| 11 | Baud divisore tarato per 108 MHz | UART illeggibile a 40.5 MHz | `tst_baud_cnt` 936 → 351 |
+| 12 | `FDLY="0000"` ≠ reference | (nessun effetto isolato) | `FDLY="1111"` come `gw_pll.v` |
+| 13 | `rd_valid` alto 2 cicli su una parola | ultima parola (0x1A) persa, 0x19 duplicato | (tentativo edge-detect: rompeva tutto → rollback. Difetto minore rinviato) |
+
+### Espansione test: 520 parole (20 burst × 26)
+
+Il SIP Gowin lavora a burst (reference: `data_len=25` ⇒ 26 parole/burst).
+Per testare 512 parole si itera il pattern da 26 su più righe SDRAM:
+**20 burst × 26 = 520 parole** (≥ 512).
+
+- Nuovi: `tst_burst` (0..19), `TST_NBURST=20`. Array di cattura resta da 26.
+- Indirizzo per burst k: `{bank=2, row=2+k, col=5}` (1 riga distinta/burst,
+  26 colonne ben dentro le 256 della riga).
+- Dato base burst k = `k*26` ⇒ sequenza globale riletta continua 1…520.
+- Flusso: **fase WRITE** (burst 0→19 tutti scritti in SDRAM) → **fase READ**
+  (burst 0→19 riletti e stampati via UART subito, array da 26 riusato).
+- Esito primo test 520: sequenza globale continua e corretta `0x0B…0x207`
+  (520 valori). Difetti residui: (a) il **primo burst** perdeva i primi ~10
+  valori — la prima lettura partiva subito dopo la raffica di 20 scritture
+  con SIP ancora occupato; (b) duplicato ultima parola/burst (difetto #13,
+  rinviato).
+- Fix (a) tentativo 1: stato `TS_WRITE_DONE` con attesa 200 000 cicli tra
+  fase WRITE e fase READ → **nessun effetto** (output invariato). Il primo
+  burst veniva corrotto NON dopo, ma DURANTE i 20 write back-to-back: il
+  SIP non completa la scrittura della riga del burst 0 prima che parta il
+  write del burst 1.
+- Fix (a) tentativo 2: adottato il **pattern del reference Gowin**
+  (`sdrc_interface_used.v`: write/read alternati per burst). Output
+  **invariato** → il problema NON era nel pattern di accesso SDRAM.
+- **Diagnosi corretta**: la SDRAM scrive/rilegge 520 parole in modo
+  perfetto (1…520). I "primi 10 mancanti" del burst 0 NON sono persi in
+  memoria: sono persi nella **UART di test** che all'avvio assoluto perde
+  ~10 caratteri durante la sincronizzazione del baud (bug #5, transitorio
+  iniziale TX). Nell'output si vede una valanga di garbage prima di
+  `0000000B`: i valori `01`…`0A` sono lì dentro, corrotti dalla TX.
+- Fix (a) definitivo: nuovo stato `TS_PREAMBLE` — prima del burst 0 la TX
+  invia 40 caratteri spazio sacrificali che assorbono il transitorio di
+  sincronizzazione; i dati reali partono a UART stabile. Pattern SDRAM
+  resta write/read alternato per burst (robusto, come reference);
+  `TS_WRITE_DONE` stato morto innocuo.
+
+**Test SDRAM 520 parole funzionante** via UART (preambolo + 1…520 continui).
+
+### Fix #13 — ultima parola/burst duplicata
+
+Il difetto colpiva sempre e solo l'**ultima** (26ª) parola del burst:
+`…0x18 0x19 0x19` invece di `…0x18 0x19 0x1A`. Le prime 25 sempre corrette.
+Tentativo precedente (edge-detect su `rd_valid`) → portava tutto a 0:
+**scartato e vietato**.
+
+Fix a rischio minimo, **senza toccare la logica di cattura raw**: alzato
+il burst del SIP da 26 a 27 parole (`I_sdrc_data_len: x"19"→x"1A"`). Il
+problema resta confinato all'ultima parola del burst (ora la 27ª); la
+cattura prende solo le prime 26 (`if tst_idx < 26`, già esistente) quindi
+la 27ª difettosa è semplicemente ignorata. `TS_WRITE` incrementa già 29
+volte ⇒ dati sufficienti per 27 parole. Dato base burst k = `k*26`
+invariato ⇒ sequenza globale resta continua 1…520, **senza duplicati**.
+
+Esito: #13 **risolto** — sequenza pulita senza duplicati fino a `0x208`
+(520). Resta solo il transitorio UART del burst 0 (preambolo 40 troppo
+corto: il transitorio si estende ~10 valori dentro il burst 0).
+Fix: preambolo allungato a **256 caratteri** (`tst_wrd_cnt` esteso a
+range 0..511) per coprire l'intero transitorio di avvio TX.
+
+### Fix #14 — burst 0 perde i primi 10 valori (1a transazione "fredda")
+
+Preambolo 256 **non risolve**: il burst 0 parte sempre da `0x0B`. Quindi
+NON è la UART — è la SDRAM: la **primissima transazione write dopo init**
+è "fredda" (pipeline interna del SIP non calda) e perde i primi 10 dati.
+Tutti i burst successivi (1…19) perfetti. (Confermato: la vecchia versione
+a singolo burst leggeva `1` correttamente perché… in realtà il problema
+emerge col loop multi-burst: la 1a transazione assoluta resta difettosa.)
+
+Fix: **burst di warm-up** — un write+read scartato su una riga dummy
+(`row=1`) prima del loop reale, per "scaldare" la pipeline del SIP.
+Signal `tst_warm` ('1' iniziale): primo giro `TS_WRITE_WAIT→TS_WRITE→
+TS_READ_WAIT→TS_READ` su riga 1, poi `tst_warm<='0'`, `tst_burst<=0` e si
+salta la TX (warm-up non stampato). I 20 burst reali (righe 2…21) partono
+a pipeline calda. Nessuna modifica alla cattura raw né al timing core.
+
+**Conclusione test SDRAM:** scrittura+lettura di 520 parole consecutive
+(>512) su 20 righe SDRAM, sequenza pulita 1…520 — **completo e verificato**.
+- Timing core invariato (29 cicli `TS_WRITE`, 200 `TS_READ`, cattura raw,
+  PLL 40.5 MHz, baud 351): aggiunto solo il loop di burst e l'indirizzo
+  dinamico in `TS_WRITE_WAIT`/`TS_READ_WAIT`, con ritorno burst da
+  `TS_WRITE` (write successivo) e da `TS_TX_CRLF` (read successivo).

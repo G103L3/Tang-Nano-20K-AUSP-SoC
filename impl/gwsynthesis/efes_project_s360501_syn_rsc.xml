@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Module name="top_system" Register="257" Alu="56" Lut="463" T_Register="534(257)" T_Alu="71(56)" T_Lut="898(463)">
+<Module name="top_system" Register="235" Alu="48" Lut="469" MULT9X9="1" Bsram="1" T_Register="773(235)" T_Alu="98(48)" T_Lut="1060(469)" T_MULT9X9="1(1)" T_Bsram="2(1)">
  <SubModule name="u_pll"/>
- <SubModule name="u_sdram_direct" Register="171" Alu="15" Lut="240" T_Register="171(171)" T_Alu="15(15)" T_Lut="240(240)"/>
- <SubModule name="u_dma" Register="90" Lut="159" T_Register="90(90)" T_Lut="159(159)"/>
- <SubModule name="u_spi" Register="16" Lut="36" T_Register="16(16)" T_Lut="36(36)"/>
+ <SubModule name="u_sdram_direct" Register="432" Alu="50" Lut="396" Bsram="1" T_Register="432(432)" T_Alu="50(50)" T_Lut="396(396)" T_Bsram="1(1)"/>
+ <SubModule name="u_dma" Register="90" Lut="155" T_Register="90(90)" T_Lut="155(155)"/>
+ <SubModule name="u_spi" Register="16" Lut="40" T_Register="16(16)" T_Lut="40(40)"/>
 </Module>

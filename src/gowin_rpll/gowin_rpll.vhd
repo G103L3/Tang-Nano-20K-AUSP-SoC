@@ -13,18 +13,19 @@ use IEEE.std_logic_1164.all;
 
 entity Gowin_rPLL is
     port (
-        clkout: out std_logic;
-        lock: out std_logic;
-        clkin: in std_logic
+        clkout:  out std_logic;
+        clkoutp: out std_logic;
+        lock:    out std_logic;
+        clkin:   in  std_logic
     );
 end Gowin_rPLL;
 
 architecture Behavioral of Gowin_rPLL is
 
-    signal clkoutp_o: std_logic;
     signal clkoutd_o: std_logic;
     signal clkoutd3_o: std_logic;
     signal gw_gnd: std_logic;
+    signal gw_vcc : std_logic;
     signal FBDSEL_i: std_logic_vector(5 downto 0);
     signal IDSEL_i: std_logic_vector(5 downto 0);
     signal ODSEL_i: std_logic_vector(5 downto 0);
@@ -79,26 +80,27 @@ architecture Behavioral of Gowin_rPLL is
 
 begin
     gw_gnd <= '0';
-
+    gw_vcc <= '1';
+    
     FBDSEL_i <= gw_gnd & gw_gnd & gw_gnd & gw_gnd & gw_gnd & gw_gnd;
     IDSEL_i <= gw_gnd & gw_gnd & gw_gnd & gw_gnd & gw_gnd & gw_gnd;
     ODSEL_i <= gw_gnd & gw_gnd & gw_gnd & gw_gnd & gw_gnd & gw_gnd;
     PSDA_i <= gw_gnd & gw_gnd & gw_gnd & gw_gnd;
     DUTYDA_i <= gw_gnd & gw_gnd & gw_gnd & gw_gnd;
-    FDLY_i <= gw_gnd & gw_gnd & gw_gnd & gw_gnd;
+    FDLY_i <= gw_vcc & gw_vcc & gw_vcc & gw_vcc;
 
     rpll_inst: rPLL
         generic map (
             FCLKIN => "27",
             DEVICE => "GW2AR-18C",
             DYN_IDIV_SEL => "false",
-            IDIV_SEL => 0,
+            IDIV_SEL => 1,
             DYN_FBDIV_SEL => "false",
-            FBDIV_SEL => 3,
+            FBDIV_SEL => 2,
             DYN_ODIV_SEL => "false",
-            ODIV_SEL => 8,
-            PSDA_SEL => "0000",
-            DYN_DA_EN => "true",
+            ODIV_SEL => 16,
+            PSDA_SEL => "0001",
+            DYN_DA_EN => "false",
             DUTYDA_SEL => "1000",
             CLKOUT_FT_DIR => '1',
             CLKOUTP_FT_DIR => '1',
@@ -115,7 +117,7 @@ begin
         port map (
             CLKOUT => clkout,
             LOCK => lock,
-            CLKOUTP => clkoutp_o,
+            CLKOUTP => clkoutp,
             CLKOUTD => clkoutd_o,
             CLKOUTD3 => clkoutd3_o,
             RESET => gw_gnd,
