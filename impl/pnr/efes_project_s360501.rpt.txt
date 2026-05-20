@@ -12,25 +12,25 @@
   <Part Number>: GW2AR-LV18QN88C8/I7
   <Device>: GW2AR-18
   <Device Version>: C
-  <Created Time>:Wed May 20 12:00:56 2026
+  <Created Time>:Wed May 20 23:06:02 2026
 
 
 2. PnR Details
 
   Running placement:
-    Placement Phase 0: CPU time = 0h 0m 0.115s, Elapsed time = 0h 0m 0.114s
-    Placement Phase 1: CPU time = 0h 0m 0.094s, Elapsed time = 0h 0m 0.108s
-    Placement Phase 2: CPU time = 0h 0m 0.195s, Elapsed time = 0h 0m 0.194s
-    Placement Phase 3: CPU time = 0h 0m 0.415s, Elapsed time = 0h 0m 0.461s
-    Total Placement: CPU time = 0h 0m 0.819s, Elapsed time = 0h 0m 0.877s
+    Placement Phase 0: CPU time = 0h 0m 0.137s, Elapsed time = 0h 0m 0.135s
+    Placement Phase 1: CPU time = 0h 0m 0.104s, Elapsed time = 0h 0m 0.109s
+    Placement Phase 2: CPU time = 0h 0m 0.248s, Elapsed time = 0h 0m 0.226s
+    Placement Phase 3: CPU time = 0h 0m 0.503s, Elapsed time = 0h 0m 0.53s
+    Total Placement: CPU time = 0h 0m 0.992s, Elapsed time = 0h 0m 1s
  Running routing:
-    Routing Phase 0: CPU time = 0h 0m 0s, Elapsed time = 0h 0m 0s
-    Routing Phase 1: CPU time = 0h 0m 0.058s, Elapsed time = 0h 0m 0.059s
-    Routing Phase 2: CPU time = 0h 0m 0.974s, Elapsed time = 0h 0m 0.966s
+    Routing Phase 0: CPU time = 0h 0m 0.001s, Elapsed time = 0h 0m 0.001s
+    Routing Phase 1: CPU time = 0h 0m 0.065s, Elapsed time = 0h 0m 0.074s
+    Routing Phase 2: CPU time = 0h 0m 1s, Elapsed time = 0h 0m 1s
     Routing Phase 3: CPU time = 0h 0m 0s, Elapsed time = 0h 0m 0s
     Total Routing: CPU time = 0h 0m 1s, Elapsed time = 0h 0m 1s
  Generate output files:
-    CPU time = 0h 0m 0.844s, Elapsed time = 0h 0m 0.89s
+    CPU time = 0h 0m 0.895s, Elapsed time = 0h 0m 0.878s
 
  Total Time and Memory Usage: CPU time = 0h 0m 3s, Elapsed time = 0h 0m 3s, Peak memory usage = 692MB
 
@@ -40,18 +40,18 @@
   --------------------------------------------------------------------------------
   Resources                   | Usage                               | Utilization
   --------------------------------------------------------------------------------
-  Logic                       | 3924/20736                          |  19%
-    --LUT,ALU,ROM16           | 2388(2191 LUT, 197 ALU, 0 ROM16)    | -
+  Logic                       | 4290/20736                          |  21%
+    --LUT,ALU,ROM16           | 2754(2486 LUT, 268 ALU, 0 ROM16)    | -
     --SSRAM(RAM16)            | 256                                 | -
-  Register                    | 978/15915                           |  7%
+  Register                    | 1020/15915                          |  7%
     --Logic Register as Latch | 0/15552                             |  0%
-    --Logic Register as FF    | 895/15552                           |  6%
+    --Logic Register as FF    | 934/15552                           |  6%
     --I/O Register as Latch   | 0/363                               |  0%
-    --I/O Register as FF      | 83/363                              |  23%
-  CLS                         | 2160/10368                          |  21%
+    --I/O Register as FF      | 86/363                              |  24%
+  CLS                         | 2342/10368                          |  23%
   I/O Port                    | 17/66                               |  26%
-  I/O Buf                     | 14                                  | -
-    --Input Buf               | 2                                   | -
+  I/O Buf                     | 15                                  | -
+    --Input Buf               | 3                                   | -
     --Output Buf              | 12                                  | -
     --Inout Buf               | 0                                   | -
   BSRAM                       | 8/46                                | 18%
@@ -59,8 +59,9 @@
     --SDPX9B                  | 1
     --DPB                     | 4
     --pROM                    | 1
-  DSP                         | 2.25/24                             | 10%
+  DSP                         | 4.25/24                             | 18%
     --MULT9X9                 | 1
+    --MULTALU36X18            | 2
     --MULTADDALU18X18         | 2
   ================================================================================
 
@@ -99,7 +100,7 @@
   -------------------------------------------
   Signal         | Global Clock   | Location
   -------------------------------------------
-  clk_i_d        | PRIMARY        |  TR BL
+  clk_i_d        | PRIMARY        |  TR TL BR BL
   clk_sdram      | PRIMARY        |  TR TL BR BL
   O_sdram_clk_d  | PRIMARY        |  TR
   irq_led_o_d    | LW             |  -

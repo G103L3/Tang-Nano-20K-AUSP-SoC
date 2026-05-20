@@ -113,11 +113,25 @@ architecture behavioral of top_system is
     end component;
 
     component pwm_generic
-        generic ( nbit : integer := 10 );
+        generic (
+            CLK_HZ        : integer := 27_000_000;
+            NBIT          : integer := 8;
+            PHASE_NBITS   : integer := 24;
+            F1_DEFAULT_HZ : integer := 0;
+            F2_DEFAULT_HZ : integer := 0;
+            AUTO_START    : boolean := false
+        );
         port (
-            clk_i : in std_logic; rst_i : in std_logic; cyc_i : in std_logic; stb_i : in std_logic;
-            we_i  : in std_logic; adr_i : in std_logic_vector(7 downto 0); dat_i : in std_logic_vector(31 downto 0);
-            dat_o : out std_logic_vector(31 downto 0); ack_o : out std_logic; pwm_o : out std_logic
+            clk_i : in  std_logic;
+            rst_i : in  std_logic;
+            cyc_i : in  std_logic;
+            stb_i : in  std_logic;
+            we_i  : in  std_logic;
+            adr_i : in  std_logic_vector(7 downto 0);
+            dat_i : in  std_logic_vector(31 downto 0);
+            dat_o : out std_logic_vector(31 downto 0);
+            ack_o : out std_logic;
+            pwm_o : out std_logic
         );
     end component;
 
@@ -260,8 +274,6 @@ architecture behavioral of top_system is
     signal spi_data_ready_s : std_logic;
     signal gpio_in_v, gpio_out_v : std_logic_vector(0 downto 0);
     signal pwm10_s, pwm4_s : std_logic;
-    signal tone4k_cnt : unsigned(11 downto 0) := (others => '0');
-    signal tone4k_out : std_logic := '0';
 
     signal adc_nonzero : std_logic := '0';
     signal ausp_cyc  : std_logic := '0';
@@ -321,8 +333,6 @@ architecture behavioral of top_system is
     signal sig_max_u     : unsigned(14 downto 0) := (others => '0');
     signal carr_max_u    : unsigned(14 downto 0) := (others => '0');
     constant C_DETECT_THR     : unsigned(14 downto 0) := to_unsigned(3, 15);
-    signal carr_cnt  : unsigned(10 downto 0) := (others => '0');
-    signal carr_out  : std_logic := '0';
     signal dma_irq_prev   : std_logic := '0';
 
     type boot_tx_st_t is (BTX_START, BTX_DATA, BTX_STOP, BTX_NEXT, BTX_DONE);
@@ -472,15 +482,39 @@ begin
         data_ready_o => spi_data_ready_s, dbg_cap_o => spi_dbg_cap, mosi => mosi_p, miso => miso_p, sck => sck_p, cs => cs_p
     );
 
-    u_pwm10: pwm_generic generic map (nbit => 15) port map (
-        clk_i => clk_i, rst_i => rst_i, cyc_i => s2_cyc, stb_i => s2_stb, we_i => s2_we,
-        adr_i => s2_adr(7 downto 0), dat_i => s2_wdata, dat_o => s2_rdata, ack_o => s2_ack, pwm_o => pwm10_s
-    );
+    u_pwm10: pwm_generic
+        generic map (
+            CLK_HZ        => 27_000_000,
+            NBIT          => 8,
+            PHASE_NBITS   => 24,
+            F1_DEFAULT_HZ => 4200,
+            F2_DEFAULT_HZ => 8200,
+            AUTO_START    => true
+        )
+        port map (
+            clk_i => clk_i, rst_i => rst_i,
+            cyc_i => s2_cyc, stb_i => s2_stb, we_i => s2_we,
+            adr_i => s2_adr(7 downto 0),
+            dat_i => s2_wdata, dat_o => s2_rdata, ack_o => s2_ack,
+            pwm_o => pwm10_s
+        );
 
-    u_pwm4: pwm_generic generic map (nbit => 4) port map (
-        clk_i => clk_i, rst_i => rst_i, cyc_i => s3_cyc, stb_i => s3_stb, we_i => s3_we,
-        adr_i => s3_adr(7 downto 0), dat_i => s3_wdata, dat_o => s3_rdata, ack_o => s3_ack, pwm_o => pwm4_s
-    );
+    u_pwm4: pwm_generic
+        generic map (
+            CLK_HZ        => 27_000_000,
+            NBIT          => 8,
+            PHASE_NBITS   => 24,
+            F1_DEFAULT_HZ => 0,
+            F2_DEFAULT_HZ => 0,
+            AUTO_START    => false
+        )
+        port map (
+            clk_i => clk_i, rst_i => rst_i,
+            cyc_i => s3_cyc, stb_i => s3_stb, we_i => s3_we,
+            adr_i => s3_adr(7 downto 0),
+            dat_i => s3_wdata, dat_o => s3_rdata, ack_o => s3_ack,
+            pwm_o => pwm4_s
+        );
 
     u_gpio1: gpio_generic generic map (nbit => 1) port map (
         clk_i => clk_i, rst_i => rst_i, cyc_i => s4_cyc, stb_i => s4_stb, we_i => s4_we,
@@ -507,24 +541,8 @@ begin
     irq_led_o <= pll_lock;  
     fft_trig_led_o <= wr_ack_seen_s;
 
-    process(clk_i)
-    begin
-        if rising_edge(clk_i) then
-            if tone4k_cnt >= to_unsigned(3214 - 1, 12) then tone4k_cnt <= (others => '0'); tone4k_out <= not tone4k_out;
-            else tone4k_cnt <= tone4k_cnt + 1; end if;
-        end if;
-    end process;
-
-    process(clk_i)
-    begin
-        if rising_edge(clk_i) then
-            if carr_cnt >= to_unsigned(1646 - 1, 11) then carr_cnt <= (others => '0'); carr_out <= not carr_out;
-            else carr_cnt <= carr_cnt + 1; end if;
-        end if;
-    end process;
-
-    pwm_10_o <= tone4k_out;  
-    pwm_4_o  <= carr_out;    
+    pwm_10_o <= pwm10_s;
+    pwm_4_o  <= pwm4_s;
     uart_ext_tx  <= boot_tx_pin and rtx_pin and test_uart_s; 
     ausp_dbg_o <= spi_dbg_cap;
     sdram_nz_o <= rd_ack_seen_s;  
