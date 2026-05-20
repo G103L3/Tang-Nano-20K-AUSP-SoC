@@ -404,7 +404,10 @@ begin
                         sdr_own  <= '1';
                         sdr_wr_n <= '1';
                         sdr_widx <= 0;
+                        -- [PRODUZIONE FFT] sorgente = output FFT (xk_re salvato)
                         sdr_data <= x"0000" & fft_result_buf(buf_idx(sdr_burst, 0));
+                        -- [DIAGNOSTICO SPI] (commentato): campioni ADC grezzi
+                        -- sdr_data <= x"0000" & spi_raw_buf(buf_idx(sdr_burst, 0));
                         if sdr_busy_n_i = '1' then
                             sdr_wr_n <= '0';
                             if sdr_warm = '1' then
@@ -428,8 +431,12 @@ begin
                         -- allineamento: il SIP scarta il valore presentato in WW
                         -- e scrive dal 1o presentato in W -> indice = sdr_widx
                         -- (non +1) cosi' il 1o scritto/letto e' fft_result_buf[0]=bin0.
+                        -- [PRODUZIONE FFT] sorgente = output FFT (xk_re salvato)
                         sdr_data <= x"0000"
                                   & fft_result_buf(buf_idx(sdr_burst, sdr_widx));
+                        -- [DIAGNOSTICO SPI] (commentato): campioni ADC grezzi
+                        -- sdr_data <= x"0000"
+                        --           & spi_raw_buf(buf_idx(sdr_burst, sdr_widx));
                         sdr_timeout <= sdr_timeout + 1;
                         if sdr_timeout = 28 then
                             sdr_timeout <= 0;

@@ -1069,6 +1069,132 @@ dal 1° presentato in `*_W` (nel test mascherato: dati = contatore, base=0
 I `0000FFFx` osservati erano i bin 1…511 ≈ 0 (rumore). Fix: in `FS_SDR_W`
 indice dato = `buf_idx(burst, sdr_widx)` invece di `sdr_widx+1` → il 1°
 valore scritto/letto è `fft_result_buf[0]`.
+
+### 2° build Fasi 2-3 (con fix off-by-one): output IDENTICO al 1° build
+
+Tutti i 520 valori ancora `≈ 0000FFFC` (-4), il fix bin0 **non ha avuto
+alcun effetto**. Questo è diagnostico: la catena SDRAM (write-DMA +
+read-top) è corretta (il test 520 lo aveva già confermato), quindi il
+problema è a monte → **`fft_result_buf` è esso stesso degenere** (tutto
+≈ -4, nessun bin0 enorme atteso per input ADC ≈ costante).
+Causa più probabile: l'IP FFT Gowin (caratterizzato per ~27 MHz) **non
+chiude il timing a 40.5 MHz** → output costante. Era il rischio segnalato.
+
+### 2026-05-20 — Test diagnostico SPI
+
+Per isolare la causa (FFT vs SPI a 40.5 MHz), prima del refactor dual-clock:
+sostituita la sorgente write SDRAM nel DMA da `fft_result_buf` a
+`spi_raw_buf` (campioni ADC grezzi a 12 bit, formato `0x0XXX`).
+Le righe `fft_result_buf` sono **commentate**, non cancellate, per
+ripristino immediato (backup `dma.vhd.bak_fft_to_sdram_20260520`).
+- Se UART mostra ≈ `00000FFF` ovunque → SPI/ADC funziona a 40.5 MHz, la
+  colpa è certamente l'IP FFT → procedere col dual-clock domain.
+- Se mostra garbage/costante diversa → SPI ha problemi a 40.5 MHz → fix SPI.
+
+**Esito diagnostico SPI**: UART = 520 valori tutti ≈ `000007FF` (=2047,
+mid-scale ADC a 12 bit), con qualche LSB di rumore (`7FE`, `7FD`).
+L'ADC misura una tensione analogica intermedia (V_ref/2, non MISO logico
+"tutto 1" come ipotizzato dall'utente). **SPI/ADC OK a 40.5 MHz**. La
+colpa dei `0000FFFC` precedenti è confermata: **l'IP FFT non chiude il
+timing a 40.5 MHz** → output degenere costante.
+
+### Fase 4 — Dual-clock domain
+
+Architettura corretta (riferimento Gowin): FFT IP nel suo dominio dove
+funziona, SDRAM nel suo dominio dove funziona, frontiera handshake-CDC.
+
+- **`clk_i` (27 MHz)**: `dma_proc` (SPI), `fft_proc` (FFT IP + riempimento
+  `fft_result_buf`). `spi_master.vhd` PRESCALER torna a 36; `u_spi`
+  nel top torna a `clk_i`.
+- **`clk_sdram` (40.5 MHz)**: nuovo `sdr_proc` con FSM SDRAM
+  (`SS_IDLE/SETTLE/WW/W/DONE`) + SIP + FSM `tst_st` (read on irq).
+- **Frontiera**: `fft_result_buf` (BSRAM 512×16) scritto da `fft_proc`,
+  letto da `sdr_proc`. L'handshake garantisce ordine (write completa
+  prima della read).
+- **Handshake CDC**:
+  - `sdr_req` (clk_i src, alzato da `fft_proc` fine `FS_COLLECT`) → 2-FF
+    sync in clk_sdram → `sdr_req_s2` triggera `sdr_proc` da `SS_IDLE`.
+  - `sdr_ack` (clk_sdram src, alzato in `SS_W` ultimo burst) → 2-FF sync
+    in clk_i → `sdr_ack_s2` sblocca `fft_proc` da `FS_WAIT_SDR` →
+    `FS_SERIAL`.
+  - `sdr_proc SS_DONE`: aspetta `sdr_req_s2='0'` per chiudere `sdr_ack`
+    e tornare `SS_IDLE` (handshake completo).
+- **IRQ**: generato in `sdr_proc` (clk_sdram), `irq_int` pulse 1 ciclo
+  in `SS_W` ultimo burst. `irq_o <= irq_int` concorrente; la FSM `tst_st`
+  nel top (stesso dominio clk_sdram) lo coglie senza CDC.
+- **Limitazione 1-shot**: `sdr_done` (latch clk_sdram in `SS_W` ultimo
+  burst) blocca `SS_IDLE` dal ripartire → 1 solo ciclo SDRAM-write
+  (evita conflitto sul SIP DMA-write vs top-read). Loop continuo con
+  handshake DMA↔top da aggiungere dopo la verifica funzionale.
+- File: `dma.vhd` (entity con `clk_sdram_i`, nuovo `sdr_proc`),
+  `top.vhd` (`u_spi clk_i`, component+port map `u_dma`),
+  `spi_master.vhd` (PRESCALER 36).
+
+### Esito test Fase 4 e diagnostici approfonditi
+- Build dual-clock: pipeline DMA→SDRAM→UART funziona, ma output ancora
+  `0000FFFC` ovunque → nessun bin0 alto.
+- Test pattern noto in `fft_result_buf` (idx_s esteso): UART mostra
+  `00000000 00000001 … 000001FF` perfetto → **BRAM cross-clock OK** e
+  handshake CDC OK.
+- Preambolo allargato a 1024 spazi: primo burst integro, ma bin0 ancora
+  `0xFFFA`.
+- Cattura `xn_re_s` (input FFT) in fft_result_buf: UART mostra `000007FF`
+  ovunque → **input all'FFT è OK** (mid-scale costante DC).
+- Inversione reset polarity FFT (`rst => '1'`): solo `FPGA ON` → FFT in
+  reset perpetuo → `rst` è active-HIGH, `'0'` è no-reset (corretto).
+- Delay 1-ciclo su opd/idx per cattura `xk_re_s`: stesso `0xFFFC` (+ 9
+  zeri finali per side-effect dello state machine) → **`xk_re_s` è davvero
+  costante**, non un disallineamento di timing.
+
+**Conclusione**: il problema è interno all'IP FFT Gowin (`fft.v`
+pragma-protect, opaco). Dato un input DC costante l'IP produce
+`xk_re ≈ -4` su ogni bin, invece del pattern atteso (bin0 grande,
+resto ≈ 0). Cause possibili senza poter rigenerare l'IP: parametri di
+configurazione, formato dati signed/unsigned, segnali di handshake/reset
+non rispettati. Non risolvibile da fuori.
+
+### Rollback alla versione monoclock 40.5 MHz (richiesto utente)
+Ripristinati `dma.vhd`, `top.vhd`, `spi_master.vhd` dai backup
+`*.bak_preDualClock_20260520`. Stato attuale:
+- Tutto su `clk_sdram` (40.5 MHz): SPI, DMA, FFT, FSM write SDRAM, SIP.
+- `spi_master` PRESCALER = 54.
+- `dma.vhd` entity monoclock, FSM SDRAM `FS_SDR_*` con scrittura
+  `fft_result_buf` (off-by-one fix applicato).
+- Output atteso da UART: `0000FFFC` ovunque (i risultati dell'IP FFT).
+
+Da qui si può procedere in più direzioni: investigare l'IP FFT (file
+`.ipc`, rigenerazione da IP Generator Gowin), oppure usare un percorso
+applicativo che bypassa l'FFT, oppure accettare i dati così e procedere
+col loop continuo + handshake DMA↔top.
+
+### 2026-05-20 — **VERIFICA FINALE: l'FFT funziona** ✅
+
+Errore di ripristino corretto: il backup `_preDualClock_20260520` conteneva
+ancora la sostituzione diagnostica `spi_raw_buf` invece di `fft_result_buf`
+in `sdr_data` (FS_SDR_WW/W). Riattivate le righe di produzione
+(`sdr_data <= x"0000" & fft_result_buf(buf_idx(...))`), le righe
+`spi_raw_buf` commentate (preservate per futuri diagnostici).
+
+**Test con segnali reali (4200 Hz e 8200 Hz applicati all'ADC):**
+- Sample rate ≈ 46.875 kHz, FFT 512 punti ⇒ bin width ≈ 91.55 Hz.
+- **bin 46 (≈ 4209 Hz)**: `0000FFB8` (−72) → **picco confermato per 4200 Hz**.
+- **bin 90 (≈ 8240 Hz)**: `0000FFF1` (−15) → **picco confermato per 8200 Hz**.
+- Bin restanti: rumore −1…−6 (normale).
+
+**Conclusione**: il `0000FFFC` ovunque osservato nei test precedenti era
+l'FFT del **silenzio** (ADC fermo a V_ref/2, segnale DC costante → nessuna
+energia nei bin AC). L'IP FFT Gowin ha sempre funzionato correttamente.
+Senza un segnale AC sull'ADC non si poteva distinguere "FFT broken" da
+"input degenere". **Pipeline completa SPI → DMA → FFT → SDRAM → UART
+verificata funzionante**. Tutte le diagnosi tecniche precedenti
+(BRAM cross-clock, handshake CDC, mux SIP, preambolo, ecc.) restano
+valide ma il refactor dual-clock (Fase 4) non era necessario.
+
+**Stato attuale**: versione monoclock 40.5 MHz, tutto su `clk_sdram`,
+write 1-shot della FFT su SDRAM, lettura su irq + UART. Per evolvere:
+loop continuo con handshake DMA↔top (per ripetere l'analisi spettrale
+in tempo reale invece di una sola volta), e/o post-processing AUSP per
+identificare le frequenze.
 - Timing core invariato (29 cicli `TS_WRITE`, 200 `TS_READ`, cattura raw,
   PLL 40.5 MHz, baud 351): aggiunto solo il loop di burst e l'indirizzo
   dinamico in `TS_WRITE_WAIT`/`TS_READ_WAIT`, con ritorno burst da
