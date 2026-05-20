@@ -12,25 +12,25 @@
   <Part Number>: GW2AR-LV18QN88C8/I7
   <Device>: GW2AR-18
   <Device Version>: C
-  <Created Time>:Wed May 20 23:06:02 2026
+  <Created Time>:Wed May 20 23:22:21 2026
 
 
 2. PnR Details
 
   Running placement:
-    Placement Phase 0: CPU time = 0h 0m 0.137s, Elapsed time = 0h 0m 0.135s
-    Placement Phase 1: CPU time = 0h 0m 0.104s, Elapsed time = 0h 0m 0.109s
-    Placement Phase 2: CPU time = 0h 0m 0.248s, Elapsed time = 0h 0m 0.226s
-    Placement Phase 3: CPU time = 0h 0m 0.503s, Elapsed time = 0h 0m 0.53s
-    Total Placement: CPU time = 0h 0m 0.992s, Elapsed time = 0h 0m 1s
+    Placement Phase 0: CPU time = 0h 0m 0.134s, Elapsed time = 0h 0m 0.14s
+    Placement Phase 1: CPU time = 0h 0m 0.099s, Elapsed time = 0h 0m 0.101s
+    Placement Phase 2: CPU time = 0h 0m 0.251s, Elapsed time = 0h 0m 0.244s
+    Placement Phase 3: CPU time = 0h 0m 0.527s, Elapsed time = 0h 0m 0.547s
+    Total Placement: CPU time = 0h 0m 1s, Elapsed time = 0h 0m 1s
  Running routing:
     Routing Phase 0: CPU time = 0h 0m 0.001s, Elapsed time = 0h 0m 0.001s
-    Routing Phase 1: CPU time = 0h 0m 0.065s, Elapsed time = 0h 0m 0.074s
+    Routing Phase 1: CPU time = 0h 0m 0.066s, Elapsed time = 0h 0m 0.068s
     Routing Phase 2: CPU time = 0h 0m 1s, Elapsed time = 0h 0m 1s
     Routing Phase 3: CPU time = 0h 0m 0s, Elapsed time = 0h 0m 0s
     Total Routing: CPU time = 0h 0m 1s, Elapsed time = 0h 0m 1s
  Generate output files:
-    CPU time = 0h 0m 0.895s, Elapsed time = 0h 0m 0.878s
+    CPU time = 0h 0m 0.89s, Elapsed time = 0h 0m 0.883s
 
  Total Time and Memory Usage: CPU time = 0h 0m 3s, Elapsed time = 0h 0m 3s, Peak memory usage = 692MB
 
@@ -40,18 +40,18 @@
   --------------------------------------------------------------------------------
   Resources                   | Usage                               | Utilization
   --------------------------------------------------------------------------------
-  Logic                       | 4290/20736                          |  21%
-    --LUT,ALU,ROM16           | 2754(2486 LUT, 268 ALU, 0 ROM16)    | -
+  Logic                       | 4291/20736                          |  21%
+    --LUT,ALU,ROM16           | 2755(2487 LUT, 268 ALU, 0 ROM16)    | -
     --SSRAM(RAM16)            | 256                                 | -
   Register                    | 1020/15915                          |  7%
     --Logic Register as Latch | 0/15552                             |  0%
-    --Logic Register as FF    | 934/15552                           |  6%
+    --Logic Register as FF    | 935/15552                           |  7%
     --I/O Register as Latch   | 0/363                               |  0%
-    --I/O Register as FF      | 86/363                              |  24%
-  CLS                         | 2342/10368                          |  23%
+    --I/O Register as FF      | 85/363                              |  24%
+  CLS                         | 2350/10368                          |  23%
   I/O Port                    | 17/66                               |  26%
-  I/O Buf                     | 15                                  | -
-    --Input Buf               | 3                                   | -
+  I/O Buf                     | 14                                  | -
+    --Input Buf               | 2                                   | -
     --Output Buf              | 12                                  | -
     --Inout Buf               | 0                                   | -
   BSRAM                       | 8/46                                | 18%
@@ -89,7 +89,7 @@
   Clock Resource| Usage         | Utilization 
   ------------------------------------------
   PRIMARY       | 3/8           | 38%
-  LW            | 2/8           | 25%
+  LW            | 3/8           | 38%
   GCLK_PIN      | 2/5           | 40%
   rPLL          | 1/2           | 50%
   ==========================================
@@ -100,10 +100,11 @@
   -------------------------------------------
   Signal         | Global Clock   | Location
   -------------------------------------------
-  clk_i_d        | PRIMARY        |  TR TL BR BL
+  clk_i_d        | PRIMARY        |  TR TL BL
   clk_sdram      | PRIMARY        |  TR TL BR BL
   O_sdram_clk_d  | PRIMARY        |  TR
   irq_led_o_d    | LW             |  -
+  n316_6_9       | LW             |  -
   u_sdram_direct/sdrc_top_inst/U0/Ctrl_wr_data_valid| LW             |  -
   ===========================================
 

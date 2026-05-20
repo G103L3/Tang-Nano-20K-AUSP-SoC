@@ -274,6 +274,10 @@ architecture behavioral of top_system is
     signal spi_data_ready_s : std_logic;
     signal gpio_in_v, gpio_out_v : std_logic_vector(0 downto 0);
     signal pwm10_s, pwm4_s : std_logic;
+    -- Reset locale per le PWM: alto brevemente al power-on (PLL non agganciata)
+    -- per caricare gli AUTO_START defaults, poi basso per sempre.
+    -- Le PWM cosi' non vedono mai il bottone rst_i del top.
+    signal pwm_rst_s : std_logic;
 
     signal adc_nonzero : std_logic := '0';
     signal ausp_cyc  : std_logic := '0';
@@ -482,6 +486,8 @@ begin
         data_ready_o => spi_data_ready_s, dbg_cap_o => spi_dbg_cap, mosi => mosi_p, miso => miso_p, sck => sck_p, cs => cs_p
     );
 
+    pwm_rst_s <= not pll_lock;
+
     u_pwm10: pwm_generic
         generic map (
             CLK_HZ        => 27_000_000,
@@ -492,7 +498,7 @@ begin
             AUTO_START    => true
         )
         port map (
-            clk_i => clk_i, rst_i => rst_i,
+            clk_i => clk_i, rst_i => pwm_rst_s,
             cyc_i => s2_cyc, stb_i => s2_stb, we_i => s2_we,
             adr_i => s2_adr(7 downto 0),
             dat_i => s2_wdata, dat_o => s2_rdata, ack_o => s2_ack,
@@ -509,7 +515,7 @@ begin
             AUTO_START    => false
         )
         port map (
-            clk_i => clk_i, rst_i => rst_i,
+            clk_i => clk_i, rst_i => pwm_rst_s,
             cyc_i => s3_cyc, stb_i => s3_stb, we_i => s3_we,
             adr_i => s3_adr(7 downto 0),
             dat_i => s3_wdata, dat_o => s3_rdata, ack_o => s3_ack,
