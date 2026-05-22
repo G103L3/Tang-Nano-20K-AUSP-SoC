@@ -135,6 +135,54 @@ architecture behavioral of top_system is
         );
     end component;
 
+    component audio_decoder
+        generic (
+            DEBUG_MODE  : boolean := false;
+            THRESHOLD   : integer := 6;
+            N_BINS      : integer := 256
+        );
+        port (
+            clk_i      : in  std_logic;
+            rst_i      : in  std_logic;
+            start_i    : in  std_logic;
+            mem_addr_o : out std_logic_vector(8 downto 0);
+            mem_data_i : in  std_logic_vector(15 downto 0);
+            busy_i     : in  std_logic;
+            char_o     : out std_logic_vector(7 downto 0);
+            char_stb_o : out std_logic;
+            busy_o     : out std_logic
+        );
+    end component;
+
+    component uart_tx_char
+        generic (
+            CLK_HZ : integer := 27_000_000;
+            BAUD   : integer := 115200
+        );
+        port (
+            clk_i  : in  std_logic;
+            rst_i  : in  std_logic;
+            char_i : in  std_logic_vector(7 downto 0);
+            stb_i  : in  std_logic;
+            tx_o   : out std_logic;
+            busy_o : out std_logic
+        );
+    end component;
+
+    component uart_rx_char
+        generic (
+            CLK_HZ : integer := 27_000_000;
+            BAUD   : integer := 115200
+        );
+        port (
+            clk_i   : in  std_logic;
+            rst_i   : in  std_logic;
+            rx_i    : in  std_logic;
+            data_o  : out std_logic_vector(7 downto 0);
+            valid_o : out std_logic
+        );
+    end component;
+
     component gpio_generic
         generic ( nbit : integer := 8 );
         port (
@@ -293,6 +341,52 @@ architecture behavioral of top_system is
     signal hm_rdat  : std_logic_vector(31 downto 0);
     signal hm_ack   : std_logic;
 
+    -- Path TX FPGA: UART RX (da ESP32) -> decodifica char -> pilota u_pwm10
+    -- via Wishbone (master host hm_*) per emettere carrier+tono.
+    signal rx_char_s  : std_logic_vector(7 downto 0);
+    signal rx_valid_s : std_logic;
+    constant TONE_CYCLES : integer := 810_000;    -- ~30 ms @ 27 MHz
+    constant SIL_CYCLES  : integer := 1_620_000;  -- ~60 ms @ 27 MHz
+    type tx_st_t is (TXS_IDLE, TXS_START, TXS_TONE, TXS_STOP, TXS_SIL);
+    signal tx_st     : tx_st_t := TXS_IDLE;
+    signal tx_timer  : integer range 0 to SIL_CYCLES := 0;
+    signal tx_wbdata : std_logic_vector(31 downto 0) := (others => '0');
+
+    -- FIFO TX: i char arrivano dall'UART RX in raffica (il bridge ESP32 li
+    -- inoltra di colpo) ma la FSM emette 1 tono ogni ~90ms. La FIFO li
+    -- bufferizza e la FSM li emette in sequenza.
+    constant TXF_DEPTH : integer := 32;
+    type txf_arr_t is array(0 to TXF_DEPTH - 1) of std_logic_vector(7 downto 0);
+    signal txf    : txf_arr_t;
+    signal txf_wr : integer range 0 to TXF_DEPTH - 1 := 0;
+    signal txf_rd : integer range 0 to TXF_DEPTH - 1 := 0;
+
+    -- char -> dato Wishbone per u_pwm10: [15:0]=carrier, [31:16]=tono signal.
+    -- master = minuscole (carrier 2000), config = MAIUSCOLE (carrier 2400).
+    -- Ritorna 0 se char non valido (da ignorare).
+    function char_to_wbdata(c : std_logic_vector(7 downto 0)) return std_logic_vector is
+        variable ch      : integer;
+        variable letter  : integer;
+        variable carrier : integer := 0;
+        variable sig     : integer := 0;
+    begin
+        ch := to_integer(unsigned(c));
+        if    ch >= 65 and ch <= 90 then letter := ch - 65; carrier := 2400;  -- A-Z
+        elsif ch >= 97 and ch <= 122 then letter := ch - 97; carrier := 2000;  -- a-z
+        else  letter := -1; end if;
+        case letter is
+            when 0  => sig := 3200;  -- Z1 (1 zero)
+            when 1  => sig := 4000;  -- Z2 (2 zeri)
+            when 2  => sig := 4800;  -- Z4 (4 zeri)
+            when 8  => sig := 2800;  -- EOP
+            when 9  => sig := 3600;  -- O1 (1 uno)
+            when 10 => sig := 4400;  -- O2 (2 uni)
+            when 11 => sig := 5200;  -- O4 (4 uni)
+            when others => sig := 0; carrier := 0;  -- non valido
+        end case;
+        return std_logic_vector(to_unsigned(sig, 16)) & std_logic_vector(to_unsigned(carrier, 16));
+    end function;
+
     type mag_array_t is array(0 to 511) of unsigned(14 downto 0);
     signal mag : mag_array_t := (others => (others => '0'));
 
@@ -378,6 +472,29 @@ architecture behavioral of top_system is
     signal clk_sdram   : std_logic;
     signal clk_sdram_p : std_logic;
     signal pll_lock    : std_logic;
+
+    -- Audio decoder + UART TX char (dominio clk_sdram)
+    signal dec_char_o     : std_logic_vector(7 downto 0);
+    signal dec_char_stb   : std_logic;
+    signal dec_busy_o     : std_logic;
+    signal dma_irq_prev2  : std_logic := '0';
+    signal uart_char_tx_s : std_logic;
+    signal uart_char_busy : std_logic;
+
+    -- Buffer BSRAM per un frame FFT: la FSM tst_* scarica qui i word letti
+    -- dalla SDRAM (veloce, niente piu' dump hex), il decoder legge da qui.
+    type fft_bsram_t is array(0 to 511) of std_logic_vector(15 downto 0);
+    signal fft_bsram   : fft_bsram_t;
+    signal bsram_widx  : unsigned(9 downto 0) := (others => '0');
+    signal bsram_rdata : std_logic_vector(15 downto 0) := (others => '0');
+    signal dec_mem_addr : std_logic_vector(8 downto 0);
+
+    -- Decimazione: 1 frame decodificato/stampato ogni FRAME_DIV catture
+    -- (campione ~11 ms -> ~550 ms tra una riga di debug e l'altra).
+    constant FRAME_DIV     : integer := 1;
+    signal frame_cnt       : integer range 0 to FRAME_DIV - 1 := 0;
+    signal decode_frame_s  : std_logic := '0';  -- pulse: questo frame va letto+decodificato
+    signal frame_ready_s   : std_logic := '0';  -- pulse: BSRAM pronta -> start decoder
 
 begin
 
@@ -493,9 +610,9 @@ begin
             CLK_HZ        => 27_000_000,
             NBIT          => 8,
             PHASE_NBITS   => 24,
-            F1_DEFAULT_HZ => 4200,
-            F2_DEFAULT_HZ => 8200,
-            AUTO_START    => true
+            F1_DEFAULT_HZ => 0,
+            F2_DEFAULT_HZ => 0,
+            AUTO_START    => false   -- emette solo su comando WB della FSM TX
         )
         port map (
             clk_i => clk_i, rst_i => pwm_rst_s,
@@ -527,6 +644,71 @@ begin
         adr_i => s4_adr(7 downto 0), dat_i => s4_wdata, dat_o => s4_rdata, ack_o => s4_ack, gpio_i => gpio_in_v, gpio_o => gpio_out_v
     );
 
+    -- Divisore frame: la FFT/DMA produce un frame ogni ~11 ms; decimiamo a 1
+    -- ogni FRAME_DIV (decode_frame_s pulsa, fa partire la lettura SDRAM->BSRAM).
+    process(clk_sdram)
+    begin
+        if rising_edge(clk_sdram) then
+            dma_irq_prev2  <= dma_irq;
+            decode_frame_s <= '0';
+            if dma_irq_prev2 = '0' and dma_irq = '1' then
+                if frame_cnt = FRAME_DIV - 1 then
+                    frame_cnt      <= 0;
+                    decode_frame_s <= '1';
+                else
+                    frame_cnt <= frame_cnt + 1;
+                end if;
+            end if;
+        end if;
+    end process;
+
+    -- BSRAM: write port (scarico dalla SDRAM via tst_rd_valid_s),
+    --         read port registrato (decoder). Index azzerato a inizio frame.
+    process(clk_sdram)
+    begin
+        if rising_edge(clk_sdram) then
+            if decode_frame_s = '1' then
+                bsram_widx <= (others => '0');
+            elsif tst_rd_valid_s = '1' and bsram_widx < 512 then
+                fft_bsram(to_integer(bsram_widx)) <= tst_rd_data(15 downto 0);
+                bsram_widx <= bsram_widx + 1;
+            end if;
+            bsram_rdata <= fft_bsram(to_integer(unsigned(dec_mem_addr)));
+        end if;
+    end process;
+
+    u_decoder: audio_decoder
+        generic map (
+            DEBUG_MODE  => false,  -- char mode: emette il char riconosciuto
+            THRESHOLD   => 6,      -- soglia ASSOLUTA sul magnitude interpolato (parabolica)
+            N_BINS      => 256
+        )
+        port map (
+            clk_i      => clk_sdram,
+            rst_i      => pll_lock,
+            start_i    => frame_ready_s,
+            mem_addr_o => dec_mem_addr,
+            mem_data_i => bsram_rdata,
+            busy_i     => uart_char_busy,
+            char_o     => dec_char_o,
+            char_stb_o => dec_char_stb,
+            busy_o     => dec_busy_o
+        );
+
+    u_uart_tx_char: uart_tx_char
+        generic map (
+            CLK_HZ => 40_500_000,
+            BAUD   => 115200
+        )
+        port map (
+            clk_i  => clk_sdram,
+            rst_i  => pll_lock,
+            char_i => dec_char_o,
+            stb_i  => dec_char_stb,
+            tx_o   => uart_char_tx_s,
+            busy_o => uart_char_busy
+        );
+
     process(clk_i)
     begin
         if rising_edge(clk_i) then
@@ -549,11 +731,107 @@ begin
 
     pwm_10_o <= pwm10_s;
     pwm_4_o  <= pwm4_s;
-    uart_ext_tx  <= boot_tx_pin and rtx_pin and test_uart_s; 
+    -- UART verso ESP32: boot banner + nuovo char dal decoder.
+    -- Il vecchio path rtx_pin (ASCII digits) e test_uart_s (hex dump) NON sono
+    -- piu' instradati: i loro FSM continuano a girare internamente ma le loro
+    -- linee TX sono ignorate. La FSM tst_* serve ancora per leggere la SDRAM,
+    -- ma il suo output UART e' bypassato dal decoder.
+    uart_ext_tx <= boot_tx_pin and uart_char_tx_s;
     ausp_dbg_o <= spi_dbg_cap;
-    sdram_nz_o <= rd_ack_seen_s;  
-    hm_cyc <= '0';
-    hm_stb <= '0';
+    sdram_nz_o <= rd_ack_seen_s;
+
+    -- ── Path TX FPGA: UART RX (da ESP32) -> emissione carrier+tono via PWM ──
+    u_uart_rx: uart_rx_char
+        generic map (CLK_HZ => 27_000_000, BAUD => 115200)
+        port map (
+            clk_i   => clk_i,
+            rst_i   => pll_lock,
+            rx_i    => uart_ext_rx,
+            data_o  => rx_char_s,
+            valid_o => rx_valid_s
+        );
+
+    -- FIFO write: bufferizza i char ricevuti dall'UART (push se non piena)
+    process(clk_i)
+    begin
+        if rising_edge(clk_i) then
+            if pll_lock = '0' then
+                txf_wr <= 0;
+            elsif rx_valid_s = '1' then
+                if ((txf_wr + 1) mod TXF_DEPTH) /= txf_rd then
+                    txf(txf_wr) <= rx_char_s;
+                    txf_wr <= (txf_wr + 1) mod TXF_DEPTH;
+                end if;
+            end if;
+        end if;
+    end process;
+
+    -- FSM TX: estrae un char dalla FIFO, decodifica (carrier,tono), scrive su
+    -- u_pwm10 via Wishbone host master (hm_*): 0x50000004 = carica freq + start,
+    -- 0x50000008 = stop. Tono per TONE_CYCLES, poi silenzio per SIL_CYCLES.
+    process(clk_i)
+    begin
+        if rising_edge(clk_i) then
+            if pll_lock = '0' then
+                tx_st  <= TXS_IDLE;
+                txf_rd <= 0;
+                hm_cyc <= '0'; hm_stb <= '0'; hm_we <= '0';
+            else
+                case tx_st is
+                    when TXS_IDLE =>
+                        hm_cyc <= '0'; hm_stb <= '0'; hm_we <= '0';
+                        if txf_wr /= txf_rd then          -- FIFO non vuota
+                            tx_wbdata <= char_to_wbdata(txf(txf_rd));
+                            txf_rd    <= (txf_rd + 1) mod TXF_DEPTH;
+                            tx_st     <= TXS_START;
+                        end if;
+
+                    when TXS_START =>
+                        if tx_wbdata = x"00000000" then
+                            tx_st <= TXS_IDLE;          -- char non valido
+                        else
+                            hm_adr  <= x"50000004";
+                            hm_wdat <= tx_wbdata;
+                            hm_we   <= '1';
+                            hm_stb  <= '1';
+                            hm_cyc  <= '1';
+                            if hm_ack = '1' then
+                                hm_stb <= '0'; hm_cyc <= '0'; hm_we <= '0';
+                                tx_timer <= 0;
+                                tx_st    <= TXS_TONE;
+                            end if;
+                        end if;
+
+                    when TXS_TONE =>
+                        hm_cyc <= '0'; hm_stb <= '0';
+                        if tx_timer = TONE_CYCLES - 1 then
+                            tx_st <= TXS_STOP;
+                        else
+                            tx_timer <= tx_timer + 1;
+                        end if;
+
+                    when TXS_STOP =>
+                        hm_adr <= x"50000008";
+                        hm_we  <= '1';
+                        hm_stb <= '1';
+                        hm_cyc <= '1';
+                        if hm_ack = '1' then
+                            hm_stb <= '0'; hm_cyc <= '0'; hm_we <= '0';
+                            tx_timer <= 0;
+                            tx_st    <= TXS_SIL;
+                        end if;
+
+                    when TXS_SIL =>
+                        hm_cyc <= '0'; hm_stb <= '0';
+                        if tx_timer = SIL_CYCLES - 1 then
+                            tx_st <= TXS_IDLE;
+                        else
+                            tx_timer <= tx_timer + 1;
+                        end if;
+                end case;
+            end if;
+        end if;
+    end process;
 
     -- Standalone UART TX
     process(clk_i)
@@ -731,6 +1009,7 @@ begin
         if rising_edge(clk_sdram) then
             tst_tx_load   <= '0';
             tst_irq_prev  <= dma_irq;
+            frame_ready_s <= '0';   -- default: pulse di 1 colpo
 
             -- Cattura lettura SDRAM (stessa modalità del test): ogni rd_valid
             -- nella finestra di READ campiona O_sdrc_data.
@@ -745,12 +1024,14 @@ begin
                 -- Attende l'IRQ del DMA (scrittura SDRAM dei 512 FFT completata).
                 when TS_INIT =>
                     tst_rd_n <= '1';
-                    if dma_irq = '1' and tst_irq_prev = '0' then
+                    -- Parte solo 1 frame ogni FRAME_DIV (decimazione): legge
+                    -- la SDRAM e scarica in BSRAM, niente piu' dump hex.
+                    if decode_frame_s = '1' then
                         tst_wrd_cnt <= 0;
                         tst_idx     <= 0;
                         tst_timeout <= 0;
                         tst_burst   <= 0;
-                        tst_st      <= TS_PREAMBLE;
+                        tst_st      <= TS_READ_WAIT;
                     end if;
 
                 when TS_PREAMBLE =>
@@ -790,10 +1071,16 @@ begin
                     tst_rd_n    <= '1';
                     tst_timeout <= tst_timeout + 1;
                     if tst_timeout = 200 then
-                        tst_timeout    <= 0;
-                        tst_word_idx   <= 0;
-                        tst_nibble_idx <= 0;
-                        tst_st         <= TS_TX_WORD;
+                        tst_timeout <= 0;
+                        -- niente dump hex: passa al burst successivo, oppure
+                        -- se era l'ultimo segnala frame pronto al decoder.
+                        if tst_burst = TST_NBURST - 1 then
+                            frame_ready_s <= '1';
+                            tst_st        <= TS_PAUSE;
+                        else
+                            tst_burst <= tst_burst + 1;
+                            tst_st    <= TS_READ_WAIT;
+                        end if;
                     end if;
 
                 when TS_TX_WORD =>

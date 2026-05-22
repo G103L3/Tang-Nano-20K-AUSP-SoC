@@ -1199,3 +1199,187 @@ identificare le frequenze.
   PLL 40.5 MHz, baud 351): aggiunto solo il loop di burst e l'indirizzo
   dinamico in `TS_WRITE_WAIT`/`TS_READ_WAIT`, con ritorno burst da
   `TS_WRITE` (write successivo) e da `TS_TX_CRLF` (read successivo).
+
+---
+
+## 2026-05-22 — Sample rate REALE + mappa frequenze "giocattolo" (run-length 1-7)
+
+**Contesto:** il progetto è per *Electronics for Embedded Systems*: il valore
+è nel datapath hardware (SPI ADC → DMA → SDRAM → FFT → decode → UART → ESP32 →
+PWM), non nell'efficienza del protocollo (quella era la tesi). Quindi si adotta
+una mappatura frequenze "giocattolo" robusta invece di quella ottimizzata per
+il bitrate.
+
+### Sample rate reale ≈ 45 750 Hz (NON 46.875 kHz)
+
+La stima precedente (46.875 kHz) assumeva SPI a 27 MHz con 576 clk/sample
+(commento in `spi_master.vhd`). Ma la misura empirica col decoder in
+DEBUG_MODE dice altro. Toni noti applicati all'ADC e bin del picco osservato:
+
+| Tono emesso | Bin del picco (misurato) |
+|-------------|--------------------------|
+| 4200 Hz     | **47** (0x2F)            |
+| 8200 Hz     | **92–93** (0x5C–0x5D)    |
+
+La relazione bin↔frequenza della FFT è:
+
+```
+f_k = k · Fs / N          (N = 512, k = indice bin)
+⇒   Fs = f_k · N / k
+```
+
+Ricavo Fs dai due ancoraggi:
+
+```
+da 4200 Hz @ bin 47:  Fs = 4200 · 512 / 47 = 2 150 400 / 47 ≈ 45 753 Hz
+da 8200 Hz @ bin 92:  Fs = 8200 · 512 / 92 = 4 198 400 / 92 ≈ 45 635 Hz
+```
+
+I due valori concordano entro lo 0.3% → **Fs ≈ 45 750 Hz**, da cui:
+
+```
+bin width  Δf = Fs / N = 45 750 / 512 ≈ 89.36 Hz
+```
+
+**Perché 46.875 kHz era sbagliato:** a 46.875 kHz sarebbe Δf = 91.55 Hz e
+4200 Hz cadrebbe a bin 45.9 (≈46); empiricamente è a 47. Il timing effettivo
+dell'SPI master (su `clk_sdram` 40.5 MHz, prescaler reale) dà ~888 clk/sample
+→ 40.5e6/888 ≈ 45 600 Hz, coerente con la misura. La stima "576 clk @ 27 MHz"
+del commento non corrisponde a clock/divisore reali.
+
+**Conseguenza pratica:** TUTTI i bin vanno ricalcolati con Δf = 89.36 Hz (non
+91.55). La vecchia finestra master del decoder (bin 86–88) *mancava* il carrier
+8200 (che cade a bin 92) → nessun rilevamento.
+
+### SNR osservato (calo volume progressivo dal laptop)
+
+| Tono | Mag picco (volume comodo) | Noise floor | SNR |
+|------|---------------------------|-------------|-----|
+| 4200 Hz | 8–31 (media ~20) | ~4 | ~5× |
+| 8200 Hz | 5–14 (media ~9)  | ~4 | ~2× |
+
+Le **basse frequenze si catturano molto più forti** delle alte (roll-off acuti
+di speaker+microfono). Da qui: **carrier alle frequenze più basse** (il tono
+più critico diventa il più forte) e banda utile ≤ 7500 Hz. Picchi di rumore:
+media ~4, picchi singoli fino a ~7 (bin bassi 4–9, DC).
+
+### Nuova mappa frequenze giocattolo (run-length 1-7)
+
+Fs = 45 750 Hz, Δf = 89.36 Hz. Spaziatura 400 Hz (~4.5 bin). Carrier+EOP in
+fondo (più forti); codici **interlacciati per lunghezza** (run corti = comuni =
+bassi/forti; run lunghi = rari = alti/deboli). Master = minuscole, Config =
+MAIUSCOLE.
+
+| Freq (Hz) | Bin | Codice | Significato          | Char M / C |
+|-----------|-----|--------|----------------------|------------|
+| 1100 | 12 | —  | **MASTER carrier**   | —   |
+| 1500 | 17 | —  | **CONFIG carrier**   | —   |
+| 1900 | 21 | 8  | EOP (fine pacchetto) | i / I |
+| 2300 | 26 | 0  | 1 zero               | a / A |
+| 2700 | 30 | 10 | 1 uno                | j / J |
+| 3100 | 35 | 1  | 2 zeri               | b / B |
+| 3500 | 39 | 11 | 2 uni                | k / K |
+| 3900 | 44 | 2  | 3 zeri               | c / C |
+| 4300 | 48 | 12 | 3 uni                | l / L |
+| 4700 | 53 | 3  | 4 zeri               | d / D |
+| 5100 | 57 | 13 | 4 uni                | m / M |
+| 5500 | 62 | 4  | 5 zeri               | e / E |
+| 5900 | 66 | 14 | 5 uni                | n / N |
+| 6300 | 71 | 5  | 6 zeri               | f / F |
+| 6700 | 75 | 15 | 6 uni                | o / O |
+| 7100 | 79 | 6  | 7 zeri               | g / G |
+| 7500 | 84 | 16 | 7 uni                | p / P |
+
+Codifica char: code 0–8 → 'a'+code; code 10–16 → 'a'+code−1 (idem maiuscole per
+config). Differenze dal protocollo tesi: tolti i run-length lunghi (14×, 21×),
+tolto slave channel e codice "free" (9), EOP come tono dedicato a 1900 Hz
+(non più "21 zeri").
+
+### Finestre decoder (audio_decoder.vhd), bin a Δf = 89.36 Hz
+
+- **Master carrier:** bin 10–14 (centro 12)
+- **Config carrier:** bin 15–19 (centro 17)
+- **Signal/dati:** bin 20–87 (EOP a 21, codici da 26 a 84)
+- `bin_to_code`: soglie ai midpoint tra toni adiacenti (≤23→EOP, ≤28→c0,
+  ≤32→c10, ≤37→c1, ≤41→c11, ≤46→c2, ≤50→c12, ≤55→c3, ≤59→c13, ≤64→c4,
+  ≤68→c14, ≤73→c5, ≤77→c15, ≤81→c6, else→c16).
+
+### TODO collegati
+- Finestra di **Hann** nel feed DMA→FFT (LUT precalcolata) per ridurre lo
+  scalloping (swing 8–31 osservato) e i sidelobe.
+- Path TX FPGA (UART RX → code → coppia frequenze → PWM) con la stessa mappa.
+- Pre-enfasi/gain sugli acuti se il carrier resta debole.
+
+---
+
+## 2026-05-22 — Sweep risposta speaker + schema BINARIO {1,2,4} (definitivo)
+
+### Sweep: curva di risposta reale dello speaker (laptop)
+
+Tono singolo, stesso volume, mag di picco osservata (DEBUG_MODE):
+
+| Freq | Bin | Mag picco | Note |
+|------|-----|-----------|------|
+| 2000 Hz | 22 | **86** | fortissima |
+| 3000 Hz | 34 | 48 | forte |
+| 3500 Hz | 39 | 45 | forte |
+| 4200 Hz | 47 | 56 | forte |
+| 5000 Hz | 57 | 52 | forte |
+| 6000 Hz | 67 | **10** | crollo |
+
+**Scoperta:** la debolezza di 1100/2300 vista prima era dovuta all'emissione a
+**due toni insieme** (volume diviso), non al rolloff bassi. In tono singolo la
+banda **2000-5000 Hz è tutta forte** (mag 45-86), poi crollo netto a 6000.
+Banda utile reale: **2000-5500 Hz** (~39 bin). Conferma Fs: 2000→22, 4200→47,
+6000→67 → Fs ≈ 45 700 Hz, Δf ≈ 89.36 Hz.
+
+**Conseguenza:** run-length 1-7 (17 freq) NON ci sta nella banda forte
+(spaziatura ~2.5 bin, troppo stretta). Servono ≤ ~9 frequenze affidabili.
+
+### Schema BINARIO {1,2,4} + EOP (motivazione)
+
+Il protocollo non ha sync né marker di fine bit → il run-length serve perché
+ogni tono dichiara un **conteggio esplicito**. Invece dei 7 codici per i run
+1-7, si usano solo i **pesi binari {1,2,4}**: ogni run N = somma binaria
+(3=2+1, 5=4+1, 6=4+2, 7=4+2+1). Run > 7 (cross-char): si ripete il peso
+(8=4+4), separato dal **silenzio** tra codici → niente ambiguità. Risparmio:
+3 codici/bit invece di 7 → entra in 9 frequenze. Il "21×" dell'originale
+diventa un **codice EOP dedicato** (più pulito di un run di 21 zeri).
+
+### Mappa frequenze definitiva (9 freq, banda 2000-5200 Hz)
+
+Codici 1× (comuni) in basso = forti; 4× (rari) in alto. Master = minuscole,
+Config = MAIUSCOLE.
+
+| Freq (Hz) | Bin | Code | Significato      | Char M/C |
+|-----------|-----|------|------------------|----------|
+| 2000 | 22 | —  | **MASTER carrier** | —   |
+| 2400 | 27 | —  | **CONFIG carrier** | —   |
+| 2800 | 31 | 8  | EOP                | i / I |
+| 3200 | 36 | 0  | 1 zero (peso 1)    | a / A |
+| 3600 | 40 | 10 | 1 uno  (peso 1)    | j / J |
+| 4000 | 45 | 1  | 2 zeri (peso 2)    | b / B |
+| 4400 | 49 | 11 | 2 uni  (peso 2)    | k / K |
+| 4800 | 54 | 2  | 4 zeri (peso 4)    | c / C |
+| 5200 | 58 | 12 | 4 uni  (peso 4)    | l / L |
+
+### Implementazione
+
+**FPGA `audio_decoder.vhd`:** finestre master bin 20-24, config 25-29, signal
+30-60. `bin_to_code`: ≤33→EOP(8), ≤38→Z1(0), ≤42→O1(10), ≤47→Z2(1), ≤51→O2(11),
+≤56→Z4(2), else→O4(12).
+
+**ESP32 `bit_input_packer.cpp` (decode):** `add_bit` reinterpretato — code 8 =
+EOP/flush; bit = (code<10)?0:1; weight = 1<<(code%10) → append `weight` bit.
+Run consecutivi dello stesso bit si sommano per accumulo (separati da silenzio
+lato emissione → noise_flag riarmato dal timeout di `fpga_uart_link`).
+
+**ESP32 `bit_output_packer.cpp` (encode):** testo → 7 bit/char (MSB first) →
+run-length → `emit_run` greedy con pesi {4,2,1} → sequenza di code + EOP.
+Channel-agnostic (il canale si applica in `fpga_uart_code_to_char(code, role)`).
+
+### TODO
+- Finestra di Hann (riduce lo swing dei picchi).
+- FPGA UART RX → emissione coppia carrier+tono via PWM (path TX), stessa mappa.
+- Porting layer protocollo ESP32 (char_packet_router, protocol, command_dict).
+- Test end-to-end con DEBUG_MODE=false (char veri) usando le nuove frequenze.

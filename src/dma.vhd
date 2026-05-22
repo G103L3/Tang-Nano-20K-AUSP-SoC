@@ -471,6 +471,7 @@ begin
                         if ser_bit_cnt = 15 then
                             ser_bit_cnt <= (others => '0');
                             if ser_word_cnt = 511 then
+                                sdr_done  <= '0';   -- re-arm: consenti il prossimo frame (cattura continua)
                                 fft_state <= FS_IDLE;
                             else
                                 ser_word_cnt <= ser_word_cnt + 1;
