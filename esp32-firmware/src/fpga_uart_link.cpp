@@ -15,6 +15,12 @@
 #define FPGA_UART_TX_PIN 14
 #endif
 
+/* Echo su USB di ogni char di protocollo decodificato dalla FPGA (visibilita'
+ * durante il bring-up). Mettere a 0 quando il protocollo e' a regime. */
+#ifndef FPGA_RX_ECHO
+#define FPGA_RX_ECHO 0
+#endif
+
 /* Timeout di silenzio: se dopo questo tempo non sono arrivati nuovi char,
  * inviamo a process_tone_bits un evento di "silenzio totale" per resettare
  * i noise_flag e armare il prossimo tono. Valore scelto: > durata di un
@@ -72,10 +78,11 @@ void fpga_uart_send_char(char c) {
     Serial2.write((uint8_t)c);
 }
 
-/* Tempo di un tono (FPGA TONE_CYCLES ~30 ms) + silenzio (SIL_CYCLES ~60 ms)
- * = ~90 ms; aggiungo margine. Cosi' la FPGA finisce di emettere un tono prima
- * che arrivi il char successivo (altrimenti la FSM TX, occupata, lo scarta). */
-static const unsigned long EMIT_PACE_MS = 100;
+/* Allineato all'originale: la FPGA emette ogni code per TONE_CYCLES (~72 ms) +
+ * SIL_CYCLES (~80 ms) = ~152 ms. Mando un char ogni ~155 ms (>=152) cosi' la
+ * FSM TX FPGA finisce di emettere prima del char successivo e la FIFO TX (32)
+ * non va in overflow sui messaggi lunghi. */
+static const unsigned long EMIT_PACE_MS = 155;
 
 void fpga_uart_emit_codes(const uint8_t *codes, size_t count, int role) {
     for (size_t i = 0; i < count; i++) {
@@ -95,6 +102,9 @@ void fpga_uart_tick(void) {
         bool is_config;
 
         if (fpga_uart_char_to_code(c, &code, &is_config)) {
+#if FPGA_RX_ECHO
+            Serial.write((uint8_t)c);   /* bring-up: vedi cosa decodifica la FPGA */
+#endif
             last_rx_ms     = millis();
             silence_fired  = false;
 
@@ -102,8 +112,13 @@ void fpga_uart_tick(void) {
             tb.master        = -1;
             tb.slave         = -1;
             tb.configuration = -1;
-            if (is_config) tb.configuration = code;
-            else           tb.master        = code;
+            /* TOY (nodo MASTER): il carrier "alto" (bin27, char MAIUSCOLI) e' lo
+             * SLAVE -> le sue trasmissioni (REQ/OK/risposte). Il carrier "basso"
+             * (bin22, minuscoli) e' il TX del master stesso visto in loopback
+             * acustico: lo accumuliamo come master ma il protocollo master lo
+             * ignora (non processa CHANNEL_MASTER quando e' hotspot). */
+            if (is_config) tb.slave  = code;
+            else           tb.master = code;
             (void)process_tone_bits(tb);
         } else {
             /* Char fuori protocollo: probabilmente boot banner della FPGA

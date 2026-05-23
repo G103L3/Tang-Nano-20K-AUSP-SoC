@@ -62,14 +62,17 @@ static unsigned long send_codes(const char *msg, int role){
     bit_output_packer_init(&packer);
     unsigned long duration = 0;
     if(bit_output_packer_compress(&packer, msg)){
-        duration = (unsigned long)packer.count * 100UL;   /* ~100 ms / code */
+        duration = (unsigned long)packer.count * 155UL;   /* ~155 ms / code (EMIT_PACE_MS) */
         fpga_uart_emit_codes(packer.codes, packer.count, role);
     }
     return duration;
 }
 static unsigned long send_master(const char *msg){ return send_codes(msg, 0); }
 static unsigned long send_slave (const char *msg){ return send_codes(msg, 1); }
-static unsigned long send_config(const char *msg){ return send_codes(msg, 2); }
+/* TOY: niente config carrier dedicato (con 2 soli dispositivi non c'e' contesa).
+ * La registrazione viaggia sul carrier del mittente:
+ *   master -> master carrier (role 0),  slave -> slave carrier (role 1). */
+static unsigned long send_config(const char *msg){ return send_codes(msg, hotspot ? 0 : 1); }
 
 static void register_device(const char *id){
     for(size_t i=0;i<known_count;i++){
@@ -271,6 +274,14 @@ void protocol_handle_message(ChannelType ch, const char *msg){
     }
 
     if(ch == CHANNEL_SLAVE && hotspot){
+        /* TOY: il master riceve TUTTO dallo slave su questo carrier, inclusa la
+         * registrazione che prima passava in config. */
+        if(strncmp(msg, "{REQ}l{", 7) == 0){
+            char pid[4] = {0};
+            sscanf(msg, "{REQ}l{%3[^}]}", pid);
+            assign_new_id(pid);
+            return;
+        }
         if(strncmp(msg, "ID:", 3) != 0) return;
         char dest[5] = {0};
         const char *dest_start = msg + 3;

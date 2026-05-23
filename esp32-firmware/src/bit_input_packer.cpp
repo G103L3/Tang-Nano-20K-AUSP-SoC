@@ -124,6 +124,16 @@ bool flush_and_convert_to_ascii(BitPacker* packer, const char* label) {
     }
     temp[buf_idx] = '\0';
 
+    /* DEBUG bring-up: byte grezzi ricostruiti (hex + printable) PRIMA del filtro. */
+    Serial.printf("\n[FLUSH %s %u byte] hex:", label, (unsigned)buf_idx);
+    for (size_t i = 0; i < buf_idx; i++) Serial.printf(" %02X", (unsigned char)temp[i]);
+    Serial.print("  txt:\"");
+    for (size_t i = 0; i < buf_idx; i++) {
+        char c = temp[i];
+        Serial.write((c >= 32 && c < 127) ? c : '.');
+    }
+    Serial.println("\"");
+
     if (temp[0] && !is_clean_ascii(temp)) {
         BIP_LOG("%s: flush scartato (caratteri non ammessi).\n", label);
         packer->array_index = 0;
@@ -228,6 +238,7 @@ bool process_tone_bits(struct_tone_bits input) {
     uint64_t tnow = now_ms();
 
     if (has_tone_master && noise_flag_master) {
+        Serial.printf("[M %d]", input.master);   /* code accettato (deduplicato) */
         if (input.master == 8) {
             if (add_bit(&master_packer, input.master, "MASTER")) packet_ready = true;
             timeout_armed_master = false;
@@ -240,6 +251,7 @@ bool process_tone_bits(struct_tone_bits input) {
     }
 
     if (has_tone_slave && noise_flag_slave) {
+        Serial.printf("[S %d]", input.slave);    /* code accettato (deduplicato) */
         if (input.slave == 8) {
             if (add_bit(&slave_packer, input.slave, "SLAVE")) packet_ready = true;
             timeout_armed_slave = false;
@@ -252,6 +264,7 @@ bool process_tone_bits(struct_tone_bits input) {
     }
 
     if (has_tone_config && noise_flag_config) {
+        Serial.printf("[C %d]", input.configuration);  /* code accettato (deduplicato) */
         if (input.configuration == 8) {
             if (add_bit(&config_packer, input.configuration, "CONFIG")) packet_ready = true;
             timeout_armed_config = false;

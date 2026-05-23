@@ -345,8 +345,8 @@ architecture behavioral of top_system is
     -- via Wishbone (master host hm_*) per emettere carrier+tono.
     signal rx_char_s  : std_logic_vector(7 downto 0);
     signal rx_valid_s : std_logic;
-    constant TONE_CYCLES : integer := 810_000;    -- ~30 ms @ 27 MHz
-    constant SIL_CYCLES  : integer := 1_620_000;  -- ~60 ms @ 27 MHz
+    constant TONE_CYCLES : integer := 1_944_000;  -- ~72 ms @ 27 MHz (come originale: 3x24 ms)
+    constant SIL_CYCLES  : integer := 2_160_000;  -- ~80 ms @ 27 MHz (come originale: silent 80 ms)
     type tx_st_t is (TXS_IDLE, TXS_START, TXS_TONE, TXS_STOP, TXS_SIL);
     signal tx_st     : tx_st_t := TXS_IDLE;
     signal tx_timer  : integer range 0 to SIL_CYCLES := 0;
