@@ -30,7 +30,10 @@
  * compromesso: piu' lungo della finestra FFT, piu' corto del gap silenzio
  * inter-pacchetto (80 ms).
  */
-static const unsigned long SILENCE_TIMEOUT_MS = 35;
+/* Deve stare TRA il buco max intra-tono (frame FFT persi durante un tono di
+ * 72 ms) e il silenzio inter-code (80 ms). 55 ms: tollera ~4 frame persi senza
+ * spezzare un tono in due code, ma rileva ancora gli 80 ms di gap tra code. */
+static const unsigned long SILENCE_TIMEOUT_MS = 55;
 
 static unsigned long last_rx_ms = 0;
 static bool          silence_fired = true;

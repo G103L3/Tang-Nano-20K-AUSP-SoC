@@ -12,9 +12,11 @@ void bit_output_packer_init(BitOutputPacker* p) {
  * nei pesi {4,2,1}. weight 4 -> indice 2, 2 -> 1, 1 -> 0.
  *   code zeri = indice (0,1,2);  code uni = 10 + indice (10,11,12). */
 static void emit_run(BitOutputPacker* p, int bit, int n) {
-    static const int weights[3] = {4, 2, 1};
-    static const int widx[3]    = {2, 1, 0};
-    for (int k = 0; k < 3; k++) {
+    /* Pesi {2,1}: NIENTE peso 4 -> non si usano mai Z4(4800)/O4(5200), troppo
+     * alti per lo speaker/mic. Tono massimo = O2 4400 Hz (banda forte). */
+    static const int weights[2] = {2, 1};
+    static const int widx[2]    = {1, 0};
+    for (int k = 0; k < 2; k++) {
         int w = weights[k];
         while (n >= w) {
             int code = (bit == 0) ? widx[k] : (10 + widx[k]);

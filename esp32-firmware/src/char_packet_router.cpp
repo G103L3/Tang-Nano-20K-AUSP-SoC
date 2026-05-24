@@ -25,13 +25,11 @@ static CharPacket *output_for(ChannelType ch){
 }
 
 void char_packet_router_route(ChannelType ch, const char *msg){
-    if(strchr(msg, '5') != NULL){
-        char_packet_printer_print(msg);
-    } else {
-        CharPacket *out = output_for(ch);
-        char_packet_push(out, msg);
-        protocol_handle_message(ch, msg);
-    }
+    /* (Rimosso il dirottamento "se contiene '5'": gli ID sono cifre e contengono
+     * spesso '5', spediva i messaggi al printer invece che al protocollo.) */
+    CharPacket *out = output_for(ch);
+    char_packet_push(out, msg);
+    protocol_handle_message(ch, msg);
 }
 
 CharPacket *char_packet_router_get_output(ChannelType ch){
