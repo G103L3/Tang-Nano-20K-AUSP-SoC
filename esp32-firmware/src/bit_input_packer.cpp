@@ -196,6 +196,13 @@ bool add_bit(BitPacker* packer, uint8_t signal_code, const char* label) {
     size_t array_index_ = packer->array_index;
     size_t bit_index = packer->bit_position;
 
+    // Sicurezza: scarta codici fuori mappa (misread). Senza questo un code 5
+    // farebbe 1<<5 = 32 bit di spazzatura.
+    if (signal_code != 8 && signal_code != 0 && signal_code != 1 && signal_code != 2 &&
+        signal_code != 10 && signal_code != 11 && signal_code != 12) {
+        return false;
+    }
+
     if (signal_code == 8) {                 // EOP
         BIP_LOG("%s: EOP. Auto flush.\n", label);
         return flush_and_convert_to_ascii(packer, label);

@@ -30,6 +30,13 @@ bool bit_output_packer_compress(BitOutputPacker* p, const char* text) {
     if (!p || !text) return false;
     p->count = 0;
 
+    /* EOP di TESTA: fa fare un FLUSH al ricevitore prima del messaggio (scarta
+     * bit residui di un pacchetto precedente non terminato -> niente "merge").
+     * Ne metto due: il master non ha preambolo carrier-only, quindi il primo
+     * tono (spesso perso) e' un EOP throwaway e il secondo fa il flush vero. */
+    if (p->count < BOP_MAX_CODES) p->codes[p->count++] = 8;
+    if (p->count < BOP_MAX_CODES) p->codes[p->count++] = 8;
+
     int last_bit = -1;
     int run = 0;
 

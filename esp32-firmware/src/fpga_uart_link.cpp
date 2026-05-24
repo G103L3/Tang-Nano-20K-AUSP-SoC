@@ -21,6 +21,21 @@
 #define FPGA_RX_ECHO 0
 #endif
 
+/* Carrier-sense: prima di trasmettere si aspetta che il carrier slave sia
+ * silenzioso per CHANNEL_GUARD_MS (i gap interni a un messaggio slave sono
+ * <= 80 ms, quindi 1 s = "lo slave ha finito"). Tetto massimo di attesa. */
+#ifndef CHANNEL_GUARD_MS
+#define CHANNEL_GUARD_MS 1000UL
+#endif
+#define CSMA_MAX_WAIT_MS 15000UL
+
+/* Codici validi della mappa giocattolo {1,2}+EOP. Gli altri (3..7, 9, ecc.)
+ * sono misread acustici e vanno scartati: add_bit farebbe 1<<(code%10) bit. */
+static inline bool code_is_valid(int code) {
+    return code == 0 || code == 1 || code == 2 || code == 8 ||
+           code == 10 || code == 11 || code == 12;
+}
+
 /* Timeout di silenzio: se dopo questo tempo non sono arrivati nuovi char,
  * inviamo a process_tone_bits un evento di "silenzio totale" per resettare
  * i noise_flag e armare il prossimo tono. Valore scelto: > durata di un
@@ -88,6 +103,16 @@ void fpga_uart_send_char(char c) {
 static const unsigned long EMIT_PACE_MS = 155;
 
 void fpga_uart_emit_codes(const uint8_t *codes, size_t count, int role) {
+    /* CARRIER-SENSE: non trasmettere mentre lo slave sta parlando. Aspetta che
+     * non arrivi nulla dal carrier slave per CHANNEL_GUARD_MS, continuando a
+     * ricevere (fpga_uart_tick aggiorna last_rx_ms). Tetto: CSMA_MAX_WAIT_MS. */
+    unsigned long start = millis();
+    while ((millis() - last_rx_ms) < CHANNEL_GUARD_MS) {
+        fpga_uart_tick();
+        if (millis() - start > CSMA_MAX_WAIT_MS) break;
+        delay(2);
+    }
+
     for (size_t i = 0; i < count; i++) {
         char c = fpga_uart_code_to_char((int)codes[i], role);
         if (c != '\0') {
@@ -105,6 +130,12 @@ void fpga_uart_tick(void) {
         bool is_config;
 
         if (fpga_uart_char_to_code(c, &code, &is_config)) {
+            /* Il carrier "basso" (minuscoli) e' il carrier MASTER = TX del master
+             * stesso in loopback acustico: ignoralo del tutto (non e' RX vero,
+             * e non deve contare per il carrier-sense). */
+            if (!is_config) continue;
+            /* Scarta i misread: solo codici della mappa {1,2}+EOP. */
+            if (!code_is_valid(code)) continue;
 #if FPGA_RX_ECHO
             Serial.write((uint8_t)c);   /* bring-up: vedi cosa decodifica la FPGA */
 #endif
@@ -113,15 +144,8 @@ void fpga_uart_tick(void) {
 
             struct_tone_bits tb;
             tb.master        = -1;
-            tb.slave         = -1;
+            tb.slave         = code;    /* carrier slave (MAIUSCOLI) */
             tb.configuration = -1;
-            /* TOY (nodo MASTER): il carrier "alto" (bin27, char MAIUSCOLI) e' lo
-             * SLAVE -> le sue trasmissioni (REQ/OK/risposte). Il carrier "basso"
-             * (bin22, minuscoli) e' il TX del master stesso visto in loopback
-             * acustico: lo accumuliamo come master ma il protocollo master lo
-             * ignora (non processa CHANNEL_MASTER quando e' hotspot). */
-            if (is_config) tb.slave  = code;
-            else           tb.master = code;
             (void)process_tone_bits(tb);
         } else {
             /* Char fuori protocollo: probabilmente boot banner della FPGA

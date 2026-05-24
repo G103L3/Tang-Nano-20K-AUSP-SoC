@@ -23,7 +23,10 @@ static char provisional_id[4] = "";
 static unsigned int id_counter = 1;
 
 #define MAX_DEVICES 16
-#define RETRY_MS 20000
+/* Un giro completo sul canale acustico (~9s a messaggio: REQ+SET+OK) e' ~27s.
+ * Il retry deve superarlo, con jitter per non incastrarsi in lock-step col
+ * partner. Il carrier-sense (fpga_uart_emit_codes) evita comunque le collisioni. */
+#define RETRY_MS ((unsigned long)random(30000, 40000))
 
 static char known_ids[MAX_DEVICES][5];
 static size_t known_count = 0;
@@ -277,9 +280,16 @@ void protocol_handle_message(ChannelType ch, const char *msg){
         /* TOY: il master riceve TUTTO dallo slave su questo carrier, inclusa la
          * registrazione che prima passava in config. */
         if(strncmp(msg, "{REQ}l{", 7) == 0){
-            char pid[4] = {0};
-            sscanf(msg, "{REQ}l{%3[^}]}", pid);
-            assign_new_id(pid);
+            /* Se sto gia' registrando qualcuno (awaiting_ack), NON ri-assegnare:
+             * il canale master->slave e' lossy, quindi il SET viene ritrasmesso
+             * UGUALE (stesso ID) finche' lo slave non ne decodifica uno pulito.
+             * Senza questo, ogni {REQ} darebbe un ID nuovo e lo slave non
+             * combacerebbe mai col pending del master. */
+            if(!awaiting_ack){
+                char pid[4] = {0};
+                sscanf(msg, "{REQ}l{%3[^}]}", pid);
+                assign_new_id(pid);
+            }
             return;
         }
         if(strncmp(msg, "ID:", 3) != 0) return;
