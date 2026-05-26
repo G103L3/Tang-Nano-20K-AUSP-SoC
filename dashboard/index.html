@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EFES — Master Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">📡</span>
+      <div>
+        <h1>EFES — Master</h1>
+        <p class="subtitle">Comunicazione acustica FPGA ⇄ Slave</p>
+      </div>
+    </div>
+    <div class="conn">
+      <span id="serverDot" class="dot dot--off"></span>
+      <span id="serverText">Server: …</span>
+    </div>
+  </header>
+
+  <main class="grid">
+    <!-- Stato aggancio -->
+    <section class="card">
+      <h2>Stato aggancio</h2>
+      <div class="pairing">
+        <span id="pairBadge" class="badge badge--off">Non agganciato</span>
+        <p id="pairDetail" class="muted">Nessuno slave registrato.</p>
+      </div>
+      <div class="device-line">
+        <span id="deviceDot" class="dot dot--off"></span>
+        <span id="deviceText" class="muted">Master non connesso al server</span>
+      </div>
+    </section>
+
+    <!-- Presenza -->
+    <section class="card card--presence">
+      <h2>Presenza</h2>
+      <div class="bulb-wrap">
+        <!-- lampadina: la classe su #bulb cambia in is-on / is-off / is-unknown -->
+        <svg id="bulb" class="bulb is-unknown" viewBox="0 0 120 160" aria-hidden="true">
+          <g class="bulb-glass">
+            <path d="M60 8 C32 8 14 30 14 56 c0 18 10 31 21 41 6 5 9 10 9 17 h32
+                     c0-7 3-12 9-17 11-10 21-23 21-41 C106 30 88 8 60 8 Z"/>
+          </g>
+          <line class="filament" x1="46" y1="64" x2="54" y2="48"/>
+          <line class="filament" x1="54" y1="48" x2="66" y2="48"/>
+          <line class="filament" x1="66" y1="48" x2="74" y2="64"/>
+          <rect class="bulb-base" x="44" y="120" width="32" height="10" rx="2"/>
+          <rect class="bulb-base" x="46" y="132" width="28" height="9"  rx="2"/>
+          <rect class="bulb-base" x="48" y="143" width="24" height="9"  rx="2"/>
+        </svg>
+        <p id="presenceText" class="presence-text">In attesa…</p>
+      </div>
+      <button id="askBtn" class="btn" disabled>Chiedi presenza</button>
+    </section>
+
+    <!-- Log -->
+    <section class="card card--log">
+      <div class="log-head">
+        <h2>Traffico</h2>
+        <button id="clearBtn" class="btn btn--ghost">Pulisci</button>
+      </div>
+      <ul id="log" class="log"></ul>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

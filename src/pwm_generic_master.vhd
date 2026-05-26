@@ -117,6 +117,26 @@ architecture PWM_GENERIC_BEHAVIORAL of PWM_GENERIC is
     signal pwm_cnt_s  : unsigned(NBIT - 1 downto 0) := (others => '0');
     signal pwm_int_s  : std_logic := '0';
 
+    -- Inviluppo (attacco/rilascio) anti "key click": l'ampiezza AC del tono sale
+    -- da 0 e scende a 0 in ~RAMP_MS invece di partire/fermarsi di colpo. Reagisce
+    -- a start_r: salita su start=1, discesa su start=0 (il DDS continua a oscillare
+    -- durante la discesa, poi silenzio). env_q in [0..AMP_MAX]; la AC viene
+    -- scalata per env_q/256.
+    --
+    -- AMP_MAX = ampiezza A REGIME (su 256). 128 = META' ampiezza: il duty oscilla
+    -- 128 +/- 63 invece di +/- 127, meno THD/intermodulazione -> suono piu' pulito.
+    -- Tunabile: 96/64 = piu' pulito ma piu' debole; 255 = piena ampiezza (com'era).
+    constant RAMP_MS    : integer := 4;
+    constant AMP_MAX    : integer := 255;
+    constant RAMP_TICK  : integer := (CLK_HZ / 1000 * RAMP_MS) / AMP_MAX; -- clk/step
+    type env_state_t is (E_IDLE, E_ATTACK, E_ON, E_RELEASE);
+    signal env_state  : env_state_t := E_IDLE;
+    signal env_q      : unsigned(NBIT - 1 downto 0) := (others => '0'); -- 0..AMP_MAX
+    signal env_div    : integer range 0 to RAMP_TICK - 1 := 0;
+    signal ac_s       : signed(NBIT downto 0);        -- (duty_s - 128)
+    signal prod_s     : signed(2*NBIT + 1 downto 0);  -- ac_s * env_q
+    signal duty_env_s : unsigned(NBIT - 1 downto 0);
+
 begin
     dat_o <= (others => '0');
 
@@ -168,17 +188,63 @@ begin
         shift_right(mul_2 + to_unsigned(2**(FRAC_BITS - 1), mul_2'length), FRAC_BITS),
         PHASE_NBITS);
 
-    -- Phase accumulators: corrono solo se start = '1', altrimenti a 0
-    -- (sin(0) = mid -> duty 50% -> nessun AC dopo RC)
+    -- Phase accumulators: oscillano in attacco/on/rilascio; fermi (a 0) solo da
+    -- IDLE (silenzio). Cosi' durante il rilascio il tono continua mentre svanisce.
     process(clk_i)
     begin
         if rising_edge(clk_i) then
-            if rst_i = '1' or start_r = '0' then
+            if rst_i = '1' or env_state = E_IDLE then
                 phase_1 <= (others => '0');
                 phase_2 <= (others => '0');
             else
                 phase_1 <= phase_1 + phase_inc_1;
                 phase_2 <= phase_2 + phase_inc_2;
+            end if;
+        end if;
+    end process;
+
+    -- Macchina a stati dell'inviluppo, pilotata da start_r. In ATTACK env_q sale
+    -- 0->AMP_MAX, in RELEASE scende AMP_MAX->0 (uno step ogni RAMP_TICK clk).
+    env_proc: process(clk_i)
+    begin
+        if rising_edge(clk_i) then
+            if rst_i = '1' then
+                env_state <= E_IDLE; env_q <= (others => '0'); env_div <= 0;
+            else
+                case env_state is
+                    when E_IDLE =>
+                        env_q <= (others => '0'); env_div <= 0;
+                        if start_r = '1' then env_state <= E_ATTACK; end if;
+                    when E_ATTACK =>
+                        if start_r = '0' then
+                            env_state <= E_RELEASE; env_div <= 0;
+                        elsif env_div = RAMP_TICK - 1 then
+                            env_div <= 0;
+                            if env_q >= to_unsigned(AMP_MAX, env_q'length) then
+                                env_state <= E_ON;
+                            else
+                                env_q <= env_q + 1;
+                            end if;
+                        else
+                            env_div <= env_div + 1;
+                        end if;
+                    when E_ON =>
+                        env_q <= to_unsigned(AMP_MAX, env_q'length); env_div <= 0;
+                        if start_r = '0' then env_state <= E_RELEASE; end if;
+                    when E_RELEASE =>
+                        if start_r = '1' then
+                            env_state <= E_ATTACK; env_div <= 0;
+                        elsif env_div = RAMP_TICK - 1 then
+                            env_div <= 0;
+                            if env_q = 0 then
+                                env_state <= E_IDLE;
+                            else
+                                env_q <= env_q - 1;
+                            end if;
+                        else
+                            env_div <= env_div + 1;
+                        end if;
+                end case;
             end if;
         end if;
     end process;
@@ -189,6 +255,12 @@ begin
     duty_sum_s <= ('0' & sin_1_s) + ('0' & sin_2_s);
     duty_s     <= duty_sum_s(NBIT downto 1);
 
+    -- Inviluppo: scala la componente AC (centrata a 128) per env_q/256, poi
+    -- ricentra. env_q=0 -> duty=128 (50% = silenzio); env_q=255 -> ~piena ampiezza.
+    ac_s       <= to_signed(to_integer(duty_s) - 128, ac_s'length);
+    prod_s     <= ac_s * signed('0' & env_q);
+    duty_env_s <= to_unsigned(128 + to_integer(shift_right(prod_s, NBIT)), NBIT);
+
     -- Comparatore PWM free-running -> carrier = CLK_HZ / 2^NBIT
     process(clk_i)
     begin
@@ -198,7 +270,7 @@ begin
                 pwm_int_s <= '0';
             else
                 pwm_cnt_s <= pwm_cnt_s + 1;
-                if pwm_cnt_s < duty_s then
+                if pwm_cnt_s < duty_env_s then
                     pwm_int_s <= '1';
                 else
                     pwm_int_s <= '0';

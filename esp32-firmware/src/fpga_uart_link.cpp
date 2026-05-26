@@ -1,9 +1,9 @@
 /*! \file fpga_uart_link.cpp
- * \brief Implementazione driver UART verso FPGA.
+ * \brief Link layer a CODEBOOK ALTERNATO verso la FPGA (master). Vedi fpga_uart_link.h.
  */
 #include <Arduino.h>
 #include "fpga_uart_link.h"
-#include "bit_input_packer.h"
+#include "protocol.h"
 
 #ifndef FPGA_UART_BAUD
 #define FPGA_UART_BAUD   115200
@@ -15,97 +15,102 @@
 #define FPGA_UART_TX_PIN 14
 #endif
 
-/* Echo su USB di ogni char di protocollo decodificato dalla FPGA (visibilita'
- * durante il bring-up). Mettere a 0 quando il protocollo e' a regime. */
+/* Echo diagnostico dei simboli decodificati dalla FPGA. */
 #ifndef FPGA_RX_ECHO
-#define FPGA_RX_ECHO 0
+#define FPGA_RX_ECHO 1
 #endif
 
-/* Carrier-sense: prima di trasmettere si aspetta che il carrier slave sia
- * silenzioso per CHANNEL_GUARD_MS (i gap interni a un messaggio slave sono
- * <= 80 ms, quindi 1 s = "lo slave ha finito"). Tetto massimo di attesa. */
-#ifndef CHANNEL_GUARD_MS
-#define CHANNEL_GUARD_MS 1000UL
-#endif
-#define CSMA_MAX_WAIT_MS 15000UL
+/* La FPGA emette ogni simbolo ~72 ms tono + ~350 ms silenzio = ~422 ms.
+ * Mando un char ogni ~430 ms cosi' il ritmo dell'ESP32 segue quello della FPGA
+ * e la FIFO TX (32) non si riempie. (Adegua se cambi SIL_CYCLES in top.vhd.) */
+static const unsigned long EMIT_PACE_MS = 430;
 
-/* Codici validi della mappa giocattolo {1,2}+EOP. Gli altri (3..7, 9, ecc.)
- * sono misread acustici e vanno scartati: add_bit farebbe 1<<(code%10) bit. */
-static inline bool code_is_valid(int code) {
-    return code == 0 || code == 1 || code == 2 || code == 8 ||
-           code == 10 || code == 11 || code == 12;
-}
+/* Carrier-sense: non trasmettere mentre lo slave parla (carrier slave attivo). */
+static const unsigned long CHANNEL_GUARD_MS = 1000;
+static const unsigned long CSMA_MAX_WAIT_MS = 15000;
 
-/* Timeout di silenzio: se dopo questo tempo non sono arrivati nuovi char,
- * inviamo a process_tone_bits un evento di "silenzio totale" per resettare
- * i noise_flag e armare il prossimo tono. Valore scelto: > durata di un
- * burst di 3 char ripetuti dall'output packer (~72 ms a 24 ms/char) NON
- * va bene, ma il decoder FPGA fa scattare il char solo 1-2 volte per tono
- * (FFT window 10.7 ms su 24 ms di tono). Mettiamo 35 ms come buon
- * compromesso: piu' lungo della finestra FFT, piu' corto del gap silenzio
- * inter-pacchetto (80 ms).
- */
-/* Deve stare TRA il buco max intra-tono (frame FFT persi durante un tono di
- * 72 ms) e il silenzio inter-code (80 ms). 55 ms: tollera ~4 frame persi senza
- * spezzare un tono in due code, ma rileva ancora gli 80 ms di gap tra code. */
-static const unsigned long SILENCE_TIMEOUT_MS = 55;
+/* Reset di un frame parziale se non arrivano simboli per un po'. */
+static const unsigned long FRAME_TIMEOUT_MS = 2000;
 
-static unsigned long last_rx_ms = 0;
-static bool          silence_fired = true;
+static const int EOF_BURST = 4;        /* EOF di testa/coda (ridondanza) */
+
+static unsigned long last_rx_ms = 0;   /* ultimo char dal carrier SLAVE (carrier-sense) */
+
+/* ---- RX: rilevazione per CAMBIO di simbolo (codebook alternato) ----
+ * Un simbolo nuovo = il char e' DIVERSO dall'ultimo accettato. Un char ripetuto
+ * (ripetizioni della FPGA o riverbero che tiene su lo stesso tono) si ignora.
+ * Cosi' la raffica di EOF si collassa in un solo evento EOF, e ogni bit dati
+ * (che nel codebook alterna sempre) e' un evento distinto. */
+static char last_sym  = 0;             /* ultimo char accettato (0 = nessuno)   */
+static int  rx_first  = -1;            /* primo bit del pattern in corso        */
+static int  rx_len    = 0;             /* lunghezza (n. simboli dati)           */
+static int  rx_last   = -1;            /* ultimo bit dati (per check alternanza)*/
+static bool rx_alt    = true;          /* il pattern e' strettamente alternato? */
+static unsigned long rx_last_sym_ms = 0;
 
 void fpga_uart_init(void) {
     Serial2.begin(FPGA_UART_BAUD, SERIAL_8N1, FPGA_UART_RX_PIN, FPGA_UART_TX_PIN);
 }
 
-bool fpga_uart_char_to_code(char c, int *code, bool *is_config) {
-    if (!code || !is_config) return false;
+static void rx_reset(void) { rx_first = -1; rx_len = 0; rx_last = -1; rx_alt = true; }
 
-    /* master: 'a'..'h' = 0..7, 'i' = 8 (EOP), 'j'..'q' = 10..17 */
-    if (c >= 'a' && c <= 'q') {
-        int off = c - 'a';
-        if (off <= 8)      *code = off;        /* a..i  -> 0..8  */
-        else               *code = off + 1;    /* j..q  -> 10..17 */
-        *is_config = false;
-        return true;
+/* EOF -> chiude il pattern accumulato e lo passa al protocollo */
+static void rx_finish_pattern(void) {
+    if (rx_len > 0) {
+#if FPGA_RX_ECHO
+        Serial.printf("\n[PATTERN slave] first=%d len=%d %s\n",
+                      rx_first, rx_len, rx_alt ? "alt" : "NON-alt");
+#endif
+        protocol_on_pattern(CH_SLAVE, rx_first, rx_len, rx_alt);
     }
-    /* config: idem ma uppercase */
-    if (c >= 'A' && c <= 'Q') {
-        int off = c - 'A';
-        if (off <= 8)      *code = off;
-        else               *code = off + 1;
-        *is_config = true;
-        return true;
+    rx_reset();
+}
+
+void fpga_uart_tick(void) {
+    while (Serial2.available()) {
+        char c = (char)Serial2.read();
+
+        /* MAIUSCOLE A/B/C = carrier SLAVE (quello che il master riceve). */
+        if (c == 'A' || c == 'B' || c == 'C') {
+            unsigned long nowc = millis();
+            last_rx_ms = nowc;                 /* slave attivo (carrier-sense) */
+
+            if (c == last_sym) continue;       /* stesso simbolo (ripetiz./riverbero) */
+            last_sym = c;
+            rx_last_sym_ms = nowc;
+#if FPGA_RX_ECHO
+            Serial.write((uint8_t)c);
+#endif
+            if (c == 'C') {                    /* EOF -> fine pattern */
+                rx_finish_pattern();
+            } else {                           /* bit dati: A=0, B=1 */
+                int bit = (c == 'B') ? 1 : 0;
+                if (rx_len == 0)            rx_first = bit;
+                else if (bit == rx_last)    rx_alt   = false;  /* due uguali di fila */
+                rx_last = bit;
+                if (rx_len < 16) rx_len++;
+            }
+        }
+        /* minuscole a/b/c = carrier master = loopback del proprio TX -> ignora.
+         * Altri byte (boot banner, ecc.) -> inoltro su USB per debug. */
+        else if (c != 'a' && c != 'b' && c != 'c') {
+            Serial.write((uint8_t)c);
+        }
     }
-    return false;
+
+    /* timeout: scarta un pattern parziale rimasto a meta' (silenzio prolungato).
+     * Azzero anche last_sym cosi' il prossimo tono e' sempre un simbolo nuovo. */
+    if (rx_len > 0 && (millis() - rx_last_sym_ms) > FRAME_TIMEOUT_MS) {
+        rx_reset();
+        last_sym = 0;
+    }
 }
 
-char fpga_uart_code_to_char(int code, int role) {
-    /* role: 0 = master, 2 = config (1 = slave non supportato) */
-    if (code < 0 || code > 17 || code == 9) return '\0';
-    char base;
-    if      (role == 0) base = CHAR_MASTER_BASE;
-    else if (role == 2) base = CHAR_CONFIG_BASE;
-    else                return '\0';
-
-    /* code 0..8 -> base..base+8 ; code 10..17 -> base+9..base+16 */
-    if (code <= 8) return (char)(base + code);
-    else           return (char)(base + code - 1);
-}
-
-void fpga_uart_send_char(char c) {
-    Serial2.write((uint8_t)c);
-}
-
-/* Allineato all'originale: la FPGA emette ogni code per TONE_CYCLES (~72 ms) +
- * SIL_CYCLES (~80 ms) = ~152 ms. Mando un char ogni ~155 ms (>=152) cosi' la
- * FSM TX FPGA finisce di emettere prima del char successivo e la FIFO TX (32)
- * non va in overflow sui messaggi lunghi. */
-static const unsigned long EMIT_PACE_MS = 155;
-
-void fpga_uart_emit_codes(const uint8_t *codes, size_t count, int role) {
-    /* CARRIER-SENSE: non trasmettere mentre lo slave sta parlando. Aspetta che
-     * non arrivi nulla dal carrier slave per CHANNEL_GUARD_MS, continuando a
-     * ricevere (fpga_uart_tick aggiorna last_rx_ms). Tetto: CSMA_MAX_WAIT_MS. */
+/* TX: emette un pattern alternato. Il master trasmette sempre sul carrier master
+ * => char minuscoli (a=bit0, b=bit1, c=EOF). Il bit i-esimo del pattern e'
+ * first_bit XOR (i & 1): garantisce alternanza stretta. */
+void fpga_uart_send_pattern(int first_bit, int length) {
+    /* Carrier-sense: aspetta che lo slave abbia finito di parlare. */
     unsigned long start = millis();
     while ((millis() - last_rx_ms) < CHANNEL_GUARD_MS) {
         fpga_uart_tick();
@@ -113,57 +118,16 @@ void fpga_uart_emit_codes(const uint8_t *codes, size_t count, int role) {
         delay(2);
     }
 
-    for (size_t i = 0; i < count; i++) {
-        char c = fpga_uart_code_to_char((int)codes[i], role);
-        if (c != '\0') {
-            fpga_uart_send_char(c);
-            delay(EMIT_PACE_MS);
-        }
-    }
-}
+    /* EOF di TESTA: warmup + flush del ricevitore. */
+    for (int k = 0; k < EOF_BURST; k++) { Serial2.write((uint8_t)'c'); delay(EMIT_PACE_MS); }
 
-void fpga_uart_tick(void) {
-    /* Drain RX buffer */
-    while (Serial2.available()) {
-        char c = (char)Serial2.read();
-        int  code;
-        bool is_config;
-
-        if (fpga_uart_char_to_code(c, &code, &is_config)) {
-            /* Il carrier "basso" (minuscoli) e' il carrier MASTER = TX del master
-             * stesso in loopback acustico: ignoralo del tutto (non e' RX vero,
-             * e non deve contare per il carrier-sense). */
-            if (!is_config) continue;
-            /* Scarta i misread: solo codici della mappa {1,2}+EOP. */
-            if (!code_is_valid(code)) continue;
-#if FPGA_RX_ECHO
-            Serial.write((uint8_t)c);   /* bring-up: vedi cosa decodifica la FPGA */
-#endif
-            last_rx_ms     = millis();
-            silence_fired  = false;
-
-            struct_tone_bits tb;
-            tb.master        = -1;
-            tb.slave         = code;    /* carrier slave (MAIUSCOLI) */
-            tb.configuration = -1;
-            (void)process_tone_bits(tb);
-        } else {
-            /* Char fuori protocollo: probabilmente boot banner della FPGA
-             * o garbage. Lo inoltro su USB per debug, non rovino lo stato
-             * del packer. */
-            Serial.write((uint8_t)c);
-        }
+    /* bit alternati del pattern */
+    for (int i = 0; i < length; i++) {
+        int bit = first_bit ^ (i & 1);
+        Serial2.write((uint8_t)(bit ? 'b' : 'a'));
+        delay(EMIT_PACE_MS);
     }
 
-    /* Timeout silenzio: faccio scattare process_tone_bits con tutto a -1
-     * per resettare i noise_flag (permette al prossimo char di non essere
-     * considerato duplicato del precedente). */
-    if (!silence_fired && (millis() - last_rx_ms) > SILENCE_TIMEOUT_MS) {
-        struct_tone_bits silent;
-        silent.master        = -1;
-        silent.slave         = -1;
-        silent.configuration = -1;
-        (void)process_tone_bits(silent);
-        silence_fired = true;
-    }
+    /* EOF di CODA: chiude il pattern (ridondante, robusto). */
+    for (int k = 0; k < EOF_BURST; k++) { Serial2.write((uint8_t)'c'); delay(EMIT_PACE_MS); }
 }

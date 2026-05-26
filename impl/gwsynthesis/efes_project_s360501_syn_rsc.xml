@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Module name="top_system" Register="132" Alu="14" Lut="255" Bsram="1" Ssram="4" T_Register="1184(132)" T_Alu="430(14)" T_Lut="2886(255)" T_MULT9X9="1(0)" T_MULT18X18="1(0)" T_MULTALU36X18="2(0)" T_MULTADDALU18X18="3(0)" T_Bsram="8(1)" T_Ssram="260(4)">
+<Module name="top_system" Register="128" Alu="14" Lut="244" Bsram="1" Ssram="4" T_Register="1320(128)" T_Alu="478(14)" T_Lut="3119(244)" T_MULT9X9="3(0)" T_MULT18X18="1(0)" T_MULTALU36X18="4(0)" T_MULTADDALU18X18="3(0)" T_Bsram="8(1)" T_Ssram="260(4)">
  <SubModule name="u_pll"/>
- <SubModule name="u_bus" Lut="26" T_Lut="26(26)"/>
+ <SubModule name="u_bus" Lut="23" T_Lut="23(23)"/>
  <SubModule name="u_sdram_direct" Register="400" Alu="50" Lut="396" Bsram="1" T_Register="400(400)" T_Alu="50(50)" T_Lut="396(396)" T_Bsram="1(1)"/>
- <SubModule name="u_dma" Register="326" Alu="96" Lut="1367" MULT9X9="1" MULTADDALU18X18="2" Bsram="6" Ssram="256" T_Register="326(326)" T_Alu="96(96)" T_Lut="1367(1367)" T_MULT9X9="1(1)" T_MULTADDALU18X18="2(2)" T_Bsram="6(6)" T_Ssram="256(256)"/>
- <SubModule name="u_spi" Register="40" Lut="50" T_Register="40(40)" T_Lut="50(50)"/>
- <SubModule name="u_pwm10" Register="60" Alu="70" Lut="298" MULTALU36X18="2" T_Register="60(60)" T_Alu="70(70)" T_Lut="298(298)" T_MULTALU36X18="2(2)"/>
- <SubModule name="u_pwm4" Register="8" Alu="22" Lut="241" T_Register="8(8)" T_Alu="22(22)" T_Lut="241(241)"/>
- <SubModule name="u_decoder" Register="164" Alu="178" Lut="186" MULT18X18="1" MULTADDALU18X18="1" T_Register="164(164)" T_Alu="178(178)" T_Lut="186(186)" T_MULT18X18="1(1)" T_MULTADDALU18X18="1(1)"/>
+ <SubModule name="u_dma" Register="326" Alu="96" Lut="1352" MULT9X9="1" MULTADDALU18X18="2" Bsram="6" Ssram="256" T_Register="326(326)" T_Alu="96(96)" T_Lut="1352(1352)" T_MULT9X9="1(1)" T_MULTADDALU18X18="2(2)" T_Bsram="6(6)" T_Ssram="256(256)"/>
+ <SubModule name="u_spi" Register="40" Lut="48" T_Register="40(40)" T_Lut="48(48)"/>
+ <SubModule name="u_pwm10" Register="79" Alu="70" Lut="349" MULT9X9="1" MULTALU36X18="2" T_Register="79(79)" T_Alu="70(70)" T_Lut="349(349)" T_MULT9X9="1(1)" T_MULTALU36X18="2(2)"/>
+ <SubModule name="u_pwm4" Register="74" Alu="70" Lut="327" MULT9X9="1" MULTALU36X18="2" T_Register="74(74)" T_Alu="70(70)" T_Lut="327(327)" T_MULT9X9="1(1)" T_MULTALU36X18="2(2)"/>
+ <SubModule name="u_decoder" Register="219" Alu="178" Lut="313" MULT18X18="1" MULTADDALU18X18="1" T_Register="219(219)" T_Alu="178(178)" T_Lut="313(313)" T_MULT18X18="1(1)" T_MULTADDALU18X18="1(1)"/>
  <SubModule name="u_uart_tx_char" Register="22" Lut="35" T_Register="22(22)" T_Lut="35(35)"/>
  <SubModule name="u_uart_rx" Register="32" Lut="32" T_Register="32(32)" T_Lut="32(32)"/>
 </Module>

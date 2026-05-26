@@ -345,8 +345,12 @@ architecture behavioral of top_system is
     -- via Wishbone (master host hm_*) per emettere carrier+tono.
     signal rx_char_s  : std_logic_vector(7 downto 0);
     signal rx_valid_s : std_logic;
-    constant TONE_CYCLES : integer := 1_944_000;  -- ~72 ms @ 27 MHz (come originale: 3x24 ms)
-    constant SIL_CYCLES  : integer := 2_160_000;  -- ~80 ms @ 27 MHz (come originale: silent 80 ms)
+    constant TONE_CYCLES : integer := 1_944_000;  -- ~72 ms @ 27 MHz
+    -- Silenzio inter-simbolo LUNGO (~350 ms): e' il separatore tra simboli; se
+    -- corto, due bit uguali di fila si fondono in ricezione (coda/riverbero del
+    -- tono) e all'orecchio sembra un tono continuo. Lungo -> gap ben percepibile
+    -- e bit separati. (Se cambi qui, adegua EMIT_PACE_MS in fpga_uart_link.cpp.)
+    constant SIL_CYCLES  : integer := 9_450_000;  -- ~350 ms @ 27 MHz
     type tx_st_t is (TXS_IDLE, TXS_START, TXS_TONE, TXS_STOP, TXS_SIL);
     signal tx_st     : tx_st_t := TXS_IDLE;
     signal tx_timer  : integer range 0 to SIL_CYCLES := 0;
@@ -371,17 +375,16 @@ architecture behavioral of top_system is
         variable sig     : integer := 0;
     begin
         ch := to_integer(unsigned(c));
-        if    ch >= 65 and ch <= 90 then letter := ch - 65; carrier := 2400;  -- A-Z
-        elsif ch >= 97 and ch <= 122 then letter := ch - 97; carrier := 2000;  -- a-z
+        -- Protocollo compatto a opcode (DIARIO 2026-05-24): minuscole = carrier
+        -- master 2000, MAIUSCOLE = carrier slave 2400. a/A=bit0, b/B=bit1, c/C=EOF.
+        -- bit0/bit1 distanti 1000 Hz (3500/4500) per non confonderli.
+        if    ch >= 65 and ch <= 90 then letter := ch - 65; carrier := 2400;  -- A-Z = slave
+        elsif ch >= 97 and ch <= 122 then letter := ch - 97; carrier := 2000;  -- a-z = master
         else  letter := -1; end if;
         case letter is
-            when 0  => sig := 3200;  -- Z1 (1 zero)
-            when 1  => sig := 4000;  -- Z2 (2 zeri)
-            when 2  => sig := 4800;  -- Z4 (4 zeri)
-            when 8  => sig := 2800;  -- EOP
-            when 9  => sig := 3600;  -- O1 (1 uno)
-            when 10 => sig := 4400;  -- O2 (2 uni)
-            when 11 => sig := 5200;  -- O4 (4 uni)
+            when 0  => sig := 3500;  -- bit 0
+            when 1  => sig := 4500;  -- bit 1
+            when 2  => sig := 2900;  -- EOF
             when others => sig := 0; carrier := 0;  -- non valido
         end case;
         return std_logic_vector(to_unsigned(sig, 16)) & std_logic_vector(to_unsigned(carrier, 16));

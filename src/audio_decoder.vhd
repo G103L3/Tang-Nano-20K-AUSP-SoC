@@ -2,42 +2,34 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- Audio Decoder (memory-read) — porting fedele del decoder C di riferimento
--- (firmware/src/decoder.c: check_active_frequencies + interpolate_peak_frequency).
+-- Audio Decoder (memory-read) — protocollo COMPATTO a opcode (vedi DIARIO
+-- 2026-05-24). Niente run-length: 1 tono = 1 simbolo. Solo 5 frequenze, con
+-- bit0/bit1 distanti 1000 Hz (poco confondibili):
+--   carrier MASTER 2000 Hz (bin 22), carrier SLAVE 2400 Hz (bin 27),
+--   EOF 2900 (bin 32), bit0 3500 (bin 39), bit1 4500 (bin 50).
 --
--- Per ogni FREQUENZA ATTESA (i bin della mappa giocattolo) NON si prende il max
--- di una finestra larga: si guarda il bin esatto, si verifica che sia un MASSIMO
--- LOCALE rispetto ai vicini (±WINR), e si stima il magnitude PRECISO con
--- interpolazione parabolica sui 3 punti alpha/beta/gamma. Si confronta con una
--- soglia ASSOLUTA (generic THRESHOLD).
+-- Ogni simbolo emesso e' una coppia carrier + tono-dato. Il decoder, per ogni
+-- frame, trova il carrier (master/slave) + il tono-dato (bit0/bit1/EOF) e emette
+-- UN char:
+--   carrier master -> minuscole 'a'/'b'/'c' (bit0/bit1/EOF)
+--   carrier slave   -> MAIUSCOLE 'A'/'B'/'C'
 --
--- Interpolazione (come in C):
---   alpha=|bin-1|, beta=|bin|, gamma=|bin+1|
---   p   = 0.5*(alpha-gamma)/(alpha-2*beta+gamma)
---   amp = beta - 0.25*(alpha-gamma)*p
--- Posto D = 2*beta-alpha-gamma (>0 a un picco), amp = beta + (alpha-gamma)^2/(8*D),
--- quindi il test  amp > T  equivale (moltiplicando per 8*D>0) a
---   8*D*(beta-T) + (alpha-gamma)^2 > 0     -- solo interi, nessun divisore HW.
---
--- Interfaccia memoria: mem_addr_o presenta l'indirizzo (combinatorio da rd_addr),
--- mem_data_i e' valido 1 ciclo dopo (BSRAM sincrona).
---
--- Mappa giocattolo binaria {1,2,4}+EOP, Fs ≈ 45 750 Hz, Δf ≈ 89.36 Hz:
---   master carrier 2000 Hz → bin 22, config carrier 2400 Hz → bin 27,
---   EOP 2800 (bin 31), dati 3200..5200 Hz (bin 36/40/45/49/54/58).
+-- Algoritmo di rilevamento invariato: per ogni bin atteso, massimo locale ±3 +
+-- interpolazione parabolica + soglia assoluta (generic THRESHOLD). Test senza
+-- divisore: 8*D*(beta-T)+(alpha-gamma)^2 > 0 con D=2*beta-alpha-gamma.
 entity audio_decoder is
     Generic (
         DEBUG_MODE : boolean := false;
-        THRESHOLD  : integer := 6;     -- soglia ASSOLUTA sul magnitude interpolato
-        N_BINS     : integer := 256    -- (compat: non piu' usato, le freq sono puntuali)
+        THRESHOLD  : integer := 6;
+        N_BINS     : integer := 256
     );
     Port (
         clk_i      : in  std_logic;
         rst_i      : in  std_logic;     -- reset attivo basso
-        start_i    : in  std_logic;     -- pulse 1 colpo: un frame e' pronto in BSRAM
+        start_i    : in  std_logic;
         mem_addr_o : out std_logic_vector(8 downto 0);
-        mem_data_i : in  std_logic_vector(15 downto 0);  -- 16-bit signed
-        busy_i     : in  std_logic;     -- UART TX busy (handshake debug)
+        mem_data_i : in  std_logic_vector(15 downto 0);
+        busy_i     : in  std_logic;
         char_o     : out std_logic_vector(7 downto 0);
         char_stb_o : out std_logic;
         busy_o     : out std_logic
@@ -46,17 +38,19 @@ end audio_decoder;
 
 architecture behavioral of audio_decoder is
 
-    -- Tabella dei bin attesi. ROLE: 0=master carrier, 1=config carrier, 2=signal.
-    -- CODE valido solo per i signal (carriers non emettono un codice dati).
-    --   bin 31=EOP(8), 36=Z1(0), 40=O1(10), 45=Z2(1), 49=O2(11), 54=Z4(2), 58=O4(12)
-    constant NCAND : integer := 9;
-    constant WINR  : integer := 3;     -- raggio finestra massimo-locale (±3)
+    -- Candidati: 0=carrier master, 1=carrier slave, 2=bit0, 3=bit1, 4=EOF
+    constant NCAND : integer := 5;
+    constant WINR  : integer := 3;
     type icand_t is array(0 to NCAND-1) of integer;
-    constant CAND_BIN  : icand_t := (22, 27, 31, 36, 40, 45, 49, 54, 58);
-    constant CAND_ROLE : icand_t := ( 0,  1,  2,  2,  2,  2,  2,  2,  2);
-    constant CAND_CODE : icand_t := ( 0,  0,  8,  0, 10,  1, 11,  2, 12);
+    -- ordine: master(2000/22), slave(2400/27), bit0(3500/39), bit1(4500/50), EOF(2900/32)
+    constant CAND_BIN : icand_t := (22, 27, 39, 50, 32);
+    constant IDX_CM   : integer := 0;  -- carrier master 2000
+    constant IDX_CS   : integer := 1;  -- carrier slave  2400
+    constant IDX_B0   : integer := 2;  -- bit0 3500
+    constant IDX_B1   : integer := 3;  -- bit1 4500
+    constant IDX_EOF  : integer := 4;  -- EOF  2900
 
-    constant DBG_LEN : integer := 19;
+    constant DBG_LEN : integer := 21;
 
     type state_t is (ST_IDLE, ST_LAT, ST_CAP, ST_EVAL, ST_DECIDE, ST_EMIT,
                      ST_DBG_WAIT, ST_DBG_SENT, ST_DBG_DRAIN);
@@ -69,12 +63,11 @@ architecture behavioral of audio_decoder is
     type win_t is array(0 to 2*WINR) of unsigned(14 downto 0);
     signal win : win_t := (others => (others => '0'));
 
-    -- accumulatori per-frame
-    signal m_det, c_det, s_det : std_logic := '0';
-    signal m_beta, c_beta      : unsigned(14 downto 0) := (others => '0');
-    signal best_s_beta         : unsigned(14 downto 0) := (others => '0');
-    signal best_s_bin          : integer range 0 to 511 := 0;
-    signal best_s_code         : integer range 0 to 15  := 0;
+    -- per-candidato: rilevato + magnitudine centrale (beta)
+    type det_t  is array(0 to NCAND-1) of std_logic;
+    type beta_t is array(0 to NCAND-1) of unsigned(14 downto 0);
+    signal det  : det_t  := (others => '0');
+    signal beta : beta_t := (others => (others => '0'));
 
     signal char_r     : std_logic_vector(7 downto 0) := (others => '0');
     signal char_stb_r : std_logic := '0';
@@ -88,8 +81,7 @@ architecture behavioral of audio_decoder is
         variable u : unsigned(15 downto 0);
     begin
         s := signed(v);
-        if s(15) = '0' then
-            u := unsigned(v);
+        if s(15) = '0' then u := unsigned(v);
         else
             if v = x"8000" then u := x"7FFF";
             else u := unsigned(std_logic_vector(-s)); end if;
@@ -98,27 +90,15 @@ architecture behavioral of audio_decoder is
     end function;
 
     function hexc(n : unsigned(3 downto 0)) return std_logic_vector is
-        variable v : integer;
+        variable vv : integer;
     begin
-        v := to_integer(n);
-        if v < 10 then return std_logic_vector(to_unsigned(48 + v, 8));
-        else           return std_logic_vector(to_unsigned(55 + v, 8)); end if;
-    end function;
-
-    function code_to_char(is_config : boolean; code : integer) return std_logic_vector is
-        variable base : integer;
-        variable c    : integer;
-    begin
-        if is_config then base := 65; else base := 97; end if;
-        if code <= 8 then c := base + code;
-        else              c := base + code - 1;
-        end if;
-        return std_logic_vector(to_unsigned(c, 8));
+        vv := to_integer(n);
+        if vv < 10 then return std_logic_vector(to_unsigned(48 + vv, 8));
+        else            return std_logic_vector(to_unsigned(55 + vv, 8)); end if;
     end function;
 
 begin
 
-    -- indirizzo combinatorio: la BSRAM (registrata) restituisce il dato 1 ciclo dopo
     mem_addr_o <= std_logic_vector(to_unsigned(rd_addr, 9));
     char_o     <= char_r;
     char_stb_o <= char_stb_r;
@@ -134,44 +114,38 @@ begin
         variable term1_s       : signed(47 downto 0);
         variable test_s        : signed(47 downto 0);
         variable localmax      : boolean;
-        variable det           : boolean;
-        variable sbin, sbeta   : unsigned(7 downto 0);
+        variable detected      : boolean;
+        variable use_master    : boolean;
+        variable car_base      : integer;
+        variable data_sym      : integer;   -- 0=bit0,1=bit1,2=EOF
+        variable data_beta     : unsigned(14 downto 0);
+        variable have_data     : boolean;
         variable flags         : unsigned(3 downto 0);
     begin
         if rising_edge(clk_i) then
             if rst_i = '0' then
-                state       <= ST_IDLE;
-                cand_idx    <= 0;
-                off         <= 0;
-                rd_addr     <= 0;
-                m_det <= '0'; c_det <= '0'; s_det <= '0';
-                m_beta <= (others => '0'); c_beta <= (others => '0');
-                best_s_beta <= (others => '0'); best_s_bin <= 0; best_s_code <= 0;
-                char_r      <= (others => '0');
-                char_stb_r  <= '0';
-                dbg_idx     <= 0;
+                state    <= ST_IDLE;
+                cand_idx <= 0; off <= 0; rd_addr <= 0;
+                det  <= (others => '0');
+                beta <= (others => (others => '0'));
+                char_r <= (others => '0'); char_stb_r <= '0';
+                dbg_idx <= 0;
             else
                 char_stb_r <= '0';
-
                 case state is
 
                     when ST_IDLE =>
                         if start_i = '1' then
-                            cand_idx    <= 0;
-                            off         <= 0;
-                            rd_addr     <= CAND_BIN(0) - WINR;
-                            m_det <= '0'; c_det <= '0'; s_det <= '0';
-                            m_beta <= (others => '0'); c_beta <= (others => '0');
-                            best_s_beta <= (others => '0');
-                            best_s_bin  <= 0; best_s_code <= 0;
-                            state       <= ST_LAT;
+                            cand_idx <= 0; off <= 0;
+                            rd_addr  <= CAND_BIN(0) - WINR;
+                            det  <= (others => '0');
+                            beta <= (others => (others => '0'));
+                            state <= ST_LAT;
                         end if;
 
-                    -- indirizzo presentato in rd_addr: 1 ciclo per la latenza BSRAM
                     when ST_LAT =>
                         state <= ST_CAP;
 
-                    -- mem_data_i valido = BSRAM[rd_addr]; lo metto in win(off)
                     when ST_CAP =>
                         win(off) <= abs_mag(mem_data_i);
                         if off = 2*WINR then
@@ -182,43 +156,26 @@ begin
                             state   <= ST_LAT;
                         end if;
 
-                    -- finestra completa win(0..2*WINR): centro = win(WINR)
                     when ST_EVAL =>
-                        a_s := to_signed(to_integer(win(WINR-1)), 17);  -- alpha
-                        b_s := to_signed(to_integer(win(WINR)),   17);  -- beta (centro)
-                        g_s := to_signed(to_integer(win(WINR+1)), 17);  -- gamma
-
-                        -- massimo locale su tutta la finestra ±WINR
+                        a_s := to_signed(to_integer(win(WINR-1)), 17);
+                        b_s := to_signed(to_integer(win(WINR)),   17);
+                        g_s := to_signed(to_integer(win(WINR+1)), 17);
                         localmax := (win(WINR) >= win(0)) and (win(WINR) >= win(1))
                                 and (win(WINR) >= win(2)) and (win(WINR) >= win(4))
                                 and (win(WINR) >= win(5)) and (win(WINR) >= win(6));
-
                         d_s      := resize(b_s,19) + resize(b_s,19)
-                                    - resize(a_s,19) - resize(g_s,19);   -- 2b-a-g
-                        diff_s   := resize(a_s,18) - resize(g_s,18);      -- alpha-gamma
+                                    - resize(a_s,19) - resize(g_s,19);
+                        diff_s   := resize(a_s,18) - resize(g_s,18);
                         diffsq_s := diff_s * diff_s;
                         bmt_s    := to_signed(to_integer(b_s) - THRESHOLD, 18);
                         dm_s     := d_s * bmt_s;
-                        term1_s  := shift_left(resize(dm_s, 48), 3);      -- *8
+                        term1_s  := shift_left(resize(dm_s, 48), 3);
                         test_s   := term1_s + resize(diffsq_s, 48);
+                        detected := localmax and (d_s > 0) and (test_s > 0);
 
-                        -- amp_interp > THRESHOLD  <=>  8*D*(beta-T)+(alpha-gamma)^2 > 0
-                        det := localmax and (d_s > 0) and (test_s > 0);
-
-                        if CAND_ROLE(cand_idx) = 0 then          -- master carrier
-                            m_beta <= win(WINR);
-                            if det then m_det <= '1'; end if;
-                        elsif CAND_ROLE(cand_idx) = 1 then       -- config carrier
-                            c_beta <= win(WINR);
-                            if det then c_det <= '1'; end if;
-                        else                                      -- signal: tieni il piu' forte
-                            if win(WINR) > best_s_beta then
-                                best_s_beta <= win(WINR);
-                                best_s_bin  <= CAND_BIN(cand_idx);
-                                best_s_code <= CAND_CODE(cand_idx);
-                                if det then s_det <= '1'; else s_det <= '0'; end if;
-                            end if;
-                        end if;
+                        if detected then det(cand_idx) <= '1';
+                        else             det(cand_idx) <= '0'; end if;
+                        beta(cand_idx) <= win(WINR);
 
                         if cand_idx = NCAND-1 then
                             state <= ST_DECIDE;
@@ -231,38 +188,59 @@ begin
 
                     when ST_DECIDE =>
                         if DEBUG_MODE then
-                            sbin  := to_unsigned(best_s_bin, 8);
-                            sbeta := best_s_beta(7 downto 0);
+                            -- "M<cm> S<cs> 0<b0> 1<b1> E<eof> F<flags>\r\n"
                             flags := (others => '0');
-                            flags(0) := m_det; flags(1) := c_det; flags(2) := s_det;
-
+                            flags(0) := det(IDX_CM);  flags(1) := det(IDX_CS);
+                            flags(2) := det(IDX_B0) or det(IDX_B1) or det(IDX_EOF);
                             dbg_buf(0)  <= x"4D";                       -- 'M'
-                            dbg_buf(1)  <= hexc(m_beta(7 downto 4));
-                            dbg_buf(2)  <= hexc(m_beta(3 downto 0));
+                            dbg_buf(1)  <= hexc(beta(IDX_CM)(7 downto 4));
+                            dbg_buf(2)  <= hexc(beta(IDX_CM)(3 downto 0));
                             dbg_buf(3)  <= x"20";
-                            dbg_buf(4)  <= x"43";                       -- 'C'
-                            dbg_buf(5)  <= hexc(c_beta(7 downto 4));
-                            dbg_buf(6)  <= hexc(c_beta(3 downto 0));
+                            dbg_buf(4)  <= x"53";                       -- 'S'
+                            dbg_buf(5)  <= hexc(beta(IDX_CS)(7 downto 4));
+                            dbg_buf(6)  <= hexc(beta(IDX_CS)(3 downto 0));
                             dbg_buf(7)  <= x"20";
-                            dbg_buf(8)  <= x"53";                       -- 'S'
-                            dbg_buf(9)  <= hexc(sbin(7 downto 4));
-                            dbg_buf(10) <= hexc(sbin(3 downto 0));
-                            dbg_buf(11) <= x"3A";                       -- ':'
-                            dbg_buf(12) <= hexc(sbeta(7 downto 4));
-                            dbg_buf(13) <= hexc(sbeta(3 downto 0));
-                            dbg_buf(14) <= x"20";
-                            dbg_buf(15) <= x"46";                       -- 'F'
-                            dbg_buf(16) <= hexc(flags);
-                            dbg_buf(17) <= x"0D";
-                            dbg_buf(18) <= x"0A";
+                            dbg_buf(8)  <= x"30";                       -- '0'
+                            dbg_buf(9)  <= hexc(beta(IDX_B0)(7 downto 4));
+                            dbg_buf(10) <= hexc(beta(IDX_B0)(3 downto 0));
+                            dbg_buf(11) <= x"31";                       -- '1'
+                            dbg_buf(12) <= hexc(beta(IDX_B1)(7 downto 4));
+                            dbg_buf(13) <= hexc(beta(IDX_B1)(3 downto 0));
+                            dbg_buf(14) <= x"45";                       -- 'E'
+                            dbg_buf(15) <= hexc(beta(IDX_EOF)(7 downto 4));
+                            dbg_buf(16) <= hexc(beta(IDX_EOF)(3 downto 0));
+                            dbg_buf(17) <= x"46";                       -- 'F'
+                            dbg_buf(18) <= hexc(flags);
+                            dbg_buf(19) <= x"0D";
+                            dbg_buf(20) <= x"0A";
                             dbg_idx <= 0;
                             state   <= ST_DBG_WAIT;
                         else
-                            if (s_det = '1') and (m_det = '1') and (c_det = '0') then
-                                char_r <= code_to_char(false, best_s_code);
-                                state  <= ST_EMIT;
-                            elsif (s_det = '1') and (c_det = '1') and (m_det = '0') then
-                                char_r <= code_to_char(true, best_s_code);
+                            -- dato piu' forte tra bit0/bit1/EOF (solo se rilevato)
+                            have_data := false; data_beta := (others => '0'); data_sym := 0;
+                            if det(IDX_B0) = '1' and beta(IDX_B0) > data_beta then
+                                data_beta := beta(IDX_B0); data_sym := 0; have_data := true;
+                            end if;
+                            if det(IDX_B1) = '1' and beta(IDX_B1) > data_beta then
+                                data_beta := beta(IDX_B1); data_sym := 1; have_data := true;
+                            end if;
+                            if det(IDX_EOF) = '1' and beta(IDX_EOF) > data_beta then
+                                data_beta := beta(IDX_EOF); data_sym := 2; have_data := true;
+                            end if;
+
+                            -- carrier: master XOR slave (se entrambi, il piu' forte)
+                            use_master := false;
+                            if det(IDX_CM) = '1' and det(IDX_CS) = '0' then
+                                use_master := true;
+                            elsif det(IDX_CS) = '1' and det(IDX_CM) = '0' then
+                                use_master := false;
+                            elsif det(IDX_CM) = '1' and det(IDX_CS) = '1' then
+                                use_master := beta(IDX_CM) >= beta(IDX_CS);
+                            end if;
+
+                            if have_data and (det(IDX_CM) = '1' or det(IDX_CS) = '1') then
+                                if use_master then car_base := 97; else car_base := 65; end if;
+                                char_r <= std_logic_vector(to_unsigned(car_base + data_sym, 8));
                                 state  <= ST_EMIT;
                             else
                                 state <= ST_IDLE;
@@ -281,9 +259,7 @@ begin
                         end if;
 
                     when ST_DBG_SENT =>
-                        if busy_i = '1' then
-                            state <= ST_DBG_DRAIN;
-                        end if;
+                        if busy_i = '1' then state <= ST_DBG_DRAIN; end if;
 
                     when ST_DBG_DRAIN =>
                         if busy_i = '0' then

@@ -1,394 +1,217 @@
 /*! \file protocol.cpp
- * \brief Link layer del protocollo. Porting dal reference C, con due differenze:
- *   1) niente movement sensor (su questa board non c'e'): i comandi applicativi
- *      vengono solo ACKati con OK.
- *   2) emissione: comprime in signal code binari e li manda alla FPGA via UART
- *      (fpga_uart_emit_codes) invece di suonare frequenze in I2S.
+ * \brief Protocollo a CODEBOOK ALTERNATO — lato MASTER (hotspot). Vedi protocol.h / DIARIO.
  */
 #include <Arduino.h>
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
 
 #include "protocol.h"
-#include "command_dict.h"
-#include "bit_output_packer.h"
 #include "fpga_uart_link.h"
 
-static unsigned long now_ms(void){ return millis(); }
+/* ---------------- codebook a (primo_bit, lunghezza), max len 3 --------------
+ * Il carrier identifica la direzione, quindi master->slave e slave->master
+ * RIUSANO gli stessi (first,len). I messaggi RIPETUTI (richiesta/risposta
+ * presenza) hanno len 2 = i piu' robusti. Le tabelle DEVONO combaciare con lo
+ * slave (Project01Giunta/src/protocol.c): master TX = slave RX, e viceversa.
+ *
+ *   master -> slave (qui: TX)        slave -> master (qui: RX)
+ *     REQ_PRESENCE = (0,2) "01"        PRESENCE_YES = (0,2) "01"
+ *     SET          = (1,2) "10"        PRESENCE_NO  = (1,2) "10"
+ *     ABORT        = (0,3) "010"       REQ          = (0,3) "010"
+ *                                      OK           = (1,3) "101"
+ */
+typedef enum {
+    MSG_NONE = -1,
+    MSG_REQ,
+    MSG_SET,
+    MSG_OK,
+    MSG_REQ_PRESENCE,
+    MSG_PRESENCE_NO,
+    MSG_PRESENCE_YES,
+    MSG_ABORT
+} msg_t;
+
+/* msg -> pattern. Solo i messaggi che il MASTER trasmette (master->slave). */
+static bool msg_to_pattern(msg_t m, int *first, int *len) {
+    switch (m) {
+        case MSG_REQ_PRESENCE: *first = 0; *len = 2; return true;
+        case MSG_SET:          *first = 1; *len = 2; return true;
+        case MSG_ABORT:        *first = 0; *len = 3; return true;
+        default:                                     return false;
+    }
+}
+
+/* pattern -> msg. Solo i messaggi che il MASTER riceve (slave->master). */
+static msg_t pattern_to_msg(int first, int len, bool alt) {
+    if (!alt) return MSG_NONE;
+    switch (len) {
+        case 2: return first ? MSG_PRESENCE_NO : MSG_PRESENCE_YES;
+        case 3: return first ? MSG_OK          : MSG_REQ;
+        default: return MSG_NONE;
+    }
+}
+
+/* --------------------------------------------------------------------------- */
 
 static bool hotspot = false;
 static char my_id[5] = "0000";
-static char provisional_id[4] = "";
-static unsigned int id_counter = 1;
 
-#define MAX_DEVICES 16
-/* Un giro completo sul canale acustico (~9s a messaggio: REQ+SET+OK) e' ~27s.
- * Il retry deve superarlo, con jitter per non incastrarsi in lock-step col
- * partner. Il carrier-sense (fpga_uart_emit_codes) evita comunque le collisioni. */
-#define RETRY_MS ((unsigned long)random(30000, 40000))
+/* registrazione (giocattolo: 1 solo slave, id sempre 1) */
+static int  slave_id    = -1;
+static bool slave_known = false;
 
-static char known_ids[MAX_DEVICES][5];
-static size_t known_count = 0;
-
-static char pending_cmd[64];
-static char pending_dest[5];
-typedef enum { PEND_NONE, PEND_CONFIG, PEND_MASTER, PEND_SLAVE } PendingType;
-static PendingType pending_type = PEND_NONE;
-static bool awaiting_ack = false;
-static bool awaiting_response = false;
-static unsigned long retry_interval = RETRY_MS;
+/* retry del SET (canale master->slave lossy: ritrasmetto finche' arriva OK) */
+static bool          awaiting_ack = false;
 static unsigned long retry_at = 0;
 
-static ProtocolMessageCallback msg_cb = NULL;
+/* retry della richiesta presenza (idem: ritrasmetto REQ_PRESENCE finche' non
+ * arriva una risposta presenza, con un tetto di tentativi) */
+static bool          awaiting_presence = false;
+static unsigned long presence_retry_at = 0;
+static int           presence_tries    = 0;
+#define PRESENCE_RETRY_MS   8000UL
+#define PRESENCE_MAX_TRIES  6
 
-static void log_recv(const char *msg){
-    if(hotspot && msg_cb){
-        char buf[128];
-        snprintf(buf, sizeof(buf), "Segnale ricevuto: %s\n", msg);
-        msg_cb(buf);
-    }
-}
-static void log_send(const char *msg){
-    if(hotspot && msg_cb){
-        char buf[128];
-        snprintf(buf, sizeof(buf), "Invio: %s\n", msg);
-        msg_cb(buf);
-    }
-}
+static ProtocolMessageCallback  msg_cb      = NULL;
+static ProtocolEventCallback    event_cb    = NULL;
+static ProtocolStatusCallback   status_cb   = NULL;
+static ProtocolPresenceCallback presence_cb = NULL;
+static int                      last_present = -1;   /* -1 = sconosciuta */
 
-/* --- Emissione: testo -> signal code binari -> char alla FPGA --------------
- * role: 0=master, 1=slave, 2=config. Ritorna durata stimata (ms). */
-static unsigned long send_codes(const char *msg, int role){
-    log_send(msg);
-    BitOutputPacker packer;
-    bit_output_packer_init(&packer);
-    unsigned long duration = 0;
-    if(bit_output_packer_compress(&packer, msg)){
-        duration = (unsigned long)packer.count * 155UL;   /* ~155 ms / code (EMIT_PACE_MS) */
-        fpga_uart_emit_codes(packer.codes, packer.count, role);
-    }
-    return duration;
-}
-static unsigned long send_master(const char *msg){ return send_codes(msg, 0); }
-static unsigned long send_slave (const char *msg){ return send_codes(msg, 1); }
-/* TOY: niente config carrier dedicato (con 2 soli dispositivi non c'e' contesa).
- * La registrazione viaggia sul carrier del mittente:
- *   master -> master carrier (role 0),  slave -> slave carrier (role 1). */
-static unsigned long send_config(const char *msg){ return send_codes(msg, hotspot ? 0 : 1); }
+static unsigned long retry_ms(void){ return 30000UL + (unsigned long)random(0, 10000); }
 
-static void register_device(const char *id){
-    for(size_t i=0;i<known_count;i++){
-        if(strcmp(known_ids[i], id) == 0) return;
-    }
-    if(known_count < MAX_DEVICES){
-        strncpy(known_ids[known_count], id, 4);
-        known_ids[known_count][4] = '\0';
-        known_count++;
-    }
+/* notifiche verso la dashboard (no-op se nessun callback registrato) */
+static void emit_event(const char *dir, const char *msg){ if (event_cb) event_cb(dir, msg); }
+static void emit_status(void){ if (status_cb) status_cb(slave_known, slave_id); }
+static void emit_presence(int present){ last_present = present; if (presence_cb) presence_cb(present != 0); }
+
+static void logf(const char *fmt, ...) {
+    char buf[160];
+    va_list ap; va_start(ap, fmt); vsnprintf(buf, sizeof(buf), fmt, ap); va_end(ap);
+    Serial.print(buf);
+    if (msg_cb) msg_cb(buf);
 }
 
-static void assign_new_id(const char *pid){
-    char new_id[5];
-    snprintf(new_id, sizeof(new_id), "%04X", id_counter++ & 0xFFFF);
-    char resp[64];
-    snprintf(resp, sizeof(resp), "ID:%s{SET:%s}k{0000}", pid, new_id);
-    unsigned long dur = send_config(resp);
-    strncpy(pending_cmd, resp, sizeof(pending_cmd)-1);
-    pending_cmd[sizeof(pending_cmd)-1] = '\0';
-    strncpy(pending_dest, new_id, sizeof(pending_dest));
-    pending_type = PEND_CONFIG;
-    awaiting_ack = true;
-    awaiting_response = false;
-    retry_interval = dur + RETRY_MS;
-    retry_at = now_ms() + retry_interval;
+static void send_msg(msg_t m) {
+    int f, l;
+    if (msg_to_pattern(m, &f, &l)) fpga_uart_send_pattern(f, l);
 }
 
 void protocol_init(bool is_hotspot){
     hotspot = is_hotspot;
-    if(hotspot){
-        strcpy(my_id, "0000");
-    } else {
-        unsigned long r = now_ms();
-        srand((unsigned)r);
-        int rid = rand()%900 + 100;
-        snprintf(provisional_id, sizeof(provisional_id), "%03d", rid);
-        char req[32];
-        snprintf(req, sizeof(req), "{REQ}l{%s}", provisional_id);
-        send_config(req);
-    }
+    strcpy(my_id, "0000");          /* il master e' 0000 */
+    awaiting_ack = false;
+    slave_known = false; slave_id = -1;
 }
 
 const char* protocol_device_id(void){ return my_id; }
+void protocol_set_message_callback(ProtocolMessageCallback cb){ msg_cb = cb; }
 
-static void handle_set(const char *dest, const char *value){
-    if(!hotspot && strcmp(dest, provisional_id)==0){
-        strncpy(my_id, value, sizeof(my_id));
-        my_id[4] = '\0';
-        char ack[64];
-        snprintf(ack, sizeof(ack), "ID:0000{OK}k{%s}", my_id);
-        send_config(ack);
-    }
+/* invia il SET (id sempre 1, implicito nel messaggio) e arma il retry */
+static void send_set(void){
+    awaiting_ack = true;
+    retry_at = millis() + retry_ms();
+    logf("Invio SET (id=1)\n");
+    emit_event("tx", "SET");
+    send_msg(MSG_SET);
 }
 
-static void handle_ok(const char *src){
-    if(hotspot){
-        register_device(src);
-        if(awaiting_ack && strcmp(src, pending_dest) == 0){
-            awaiting_ack = false;
-            PendingType prev = pending_type;
-            pending_dest[0] = '\0';
-            if(!awaiting_response) pending_type = PEND_NONE;
-            if(prev == PEND_CONFIG){
-                char buffer[128];
-                snprintf(buffer, sizeof(buffer),
-                         "Nuovo dispositivo registrato con successo, ID: %s", src);
-                log_send(buffer);
+void protocol_on_pattern(int channel, int first_bit, int length, bool alternating){
+    /* sul master arriva tutto dal carrier slave */
+    if (channel != CH_SLAVE) return;
+
+    msg_t m = pattern_to_msg(first_bit, length, alternating);
+    switch (m) {
+        case MSG_REQ:
+            emit_event("rx", "REQ");
+            /* idempotente: se sto gia' registrando, NON ri-assegnare (ritrasmetto
+             * lo stesso SET finche' arriva l'OK). */
+            if (!awaiting_ack) {
+                logf("REQ ricevuto -> registro id=1\n");
+                send_set();
             }
-        }
-    } else {
-        if(awaiting_ack && strcmp(src, pending_dest) == 0){
-            awaiting_ack = false;
-            pending_type = PEND_NONE;
-            pending_dest[0] = '\0';
-        }
+            break;
+
+        case MSG_OK:
+            emit_event("rx", "OK");
+            if (awaiting_ack) {
+                awaiting_ack = false;
+                slave_id = 1; slave_known = true;
+                logf("Nuovo dispositivo registrato con successo, id=%d\n", slave_id);
+                emit_status();
+            }
+            break;
+
+        case MSG_PRESENCE_NO:
+            logf("Presenza dallo slave: NO\n");
+            emit_event("rx", "PRESENCE_NO");
+            awaiting_presence = false;     /* risposta arrivata: stop retry */
+            emit_presence(0);
+            break;
+        case MSG_PRESENCE_YES:
+            logf("Presenza dallo slave: SI\n");
+            emit_event("rx", "PRESENCE_YES");
+            awaiting_presence = false;     /* risposta arrivata: stop retry */
+            emit_presence(1);
+            break;
+
+        default:
+            break;
     }
 }
 
 void protocol_tick(void){
-    unsigned long now = now_ms();
-    if(awaiting_ack && now > retry_at){
-        unsigned long dur = 0;
-        switch(pending_type){
-            case PEND_CONFIG: dur = send_config(pending_cmd); break;
-            case PEND_MASTER: dur = send_master(pending_cmd); break;
-            case PEND_SLAVE:  dur = send_slave(pending_cmd);  break;
-            default: break;
+    if (awaiting_ack && (long)(millis() - retry_at) > 0) {
+        logf("Retry SET (id=1)\n");
+        send_msg(MSG_SET);
+        retry_at = millis() + retry_ms();
+    }
+
+    /* ritrasmetto REQ_PRESENCE finche' non arriva la risposta (o esaurisco i
+     * tentativi): il canale master->slave perde simboli, una sola richiesta
+     * spesso non passa. */
+    if (awaiting_presence && (long)(millis() - presence_retry_at) > 0) {
+        if (presence_tries >= PRESENCE_MAX_TRIES) {
+            awaiting_presence = false;
+            logf("Presenza: nessuna risposta dopo %d tentativi\n", PRESENCE_MAX_TRIES);
+        } else {
+            presence_tries++;
+            logf("Retry REQ_PRESENCE (%d/%d)\n", presence_tries, PRESENCE_MAX_TRIES);
+            emit_event("tx", "REQ_PRESENCE");
+            send_msg(MSG_REQ_PRESENCE);
+            presence_retry_at = millis() + PRESENCE_RETRY_MS;
         }
-        retry_interval = dur + RETRY_MS;
-        retry_at = now + retry_interval;
-    } else if(awaiting_response && now > retry_at){
-        unsigned long dur = send_master(pending_cmd);
-        retry_interval = dur + RETRY_MS;
-        retry_at = now + retry_interval;
     }
 }
 
-void protocol_handle_message(ChannelType ch, const char *msg){
-    if(!msg) return;
-    log_recv(msg);
-
-    if(ch == CHANNEL_CONFIG){
-        if(strncmp(msg, "{REQ}l{", 7) == 0){
-            if(hotspot){
-                char pid[4] = {0};
-                sscanf(msg, "{REQ}l{%3[^}]}", pid);
-                assign_new_id(pid);
-            }
-            return;
-        }
-        if(strncmp(msg, "ID:", 3) != 0) return;
-
-        char dest[5] = {0};
-        const char *dest_start = msg + 3;
-        const char *dest_end = strchr(dest_start, '{');
-        size_t dest_len = dest_end ? (size_t)(dest_end - dest_start) : 4;
-        if(dest_len >= sizeof(dest)) dest_len = sizeof(dest) - 1;
-        strncpy(dest, dest_start, dest_len);
-        dest[dest_len] = '\0';
-
-        const char *op_start = strchr(msg, '{');
-        const char *op_end = op_start ? strchr(op_start+1, '}') : NULL;
-        if(!op_start) return;
-        if(!op_end) op_end = msg + strlen(msg);
-        char op_buf[32];
-        size_t op_len = (size_t)(op_end - op_start - 1);
-        if(op_len >= sizeof(op_buf)) op_len = sizeof(op_buf)-1;
-        strncpy(op_buf, op_start+1, op_len);
-        op_buf[op_len] = '\0';
-
-        const char *src_start = strchr(op_end+1, '{');
-        const char *src_end = src_start ? strchr(src_start+1, '}') : NULL;
-        char src[5] = {0};
-        if(src_start){
-            size_t src_len = src_end ? (size_t)(src_end - src_start -1) : strlen(src_start+1);
-            if(src_len >= sizeof(src)) src_len = sizeof(src)-1;
-            strncpy(src, src_start+1, src_len);
-            src[src_len] = '\0';
-        }
-
-        char *colon = strchr(op_buf, ':');
-        char value[32] = {0};
-        if(colon){ *colon = '\0'; strncpy(value, colon+1, sizeof(value)-1); }
-
-        Command cmd = command_from_string(op_buf);
-        switch(cmd){
-            case CMD_SET: handle_set(dest, value); break;
-            case CMD_OK:  handle_ok(src); break;
-            default: break;
-        }
-        return;
-    }
-
-    if(ch == CHANNEL_MASTER && !hotspot){
-        if(strncmp(msg, "ID:", 3) != 0) return;
-        char dest[5] = {0};
-        const char *dest_start = msg + 3;
-        const char *dest_end = strchr(dest_start, '{');
-        size_t dest_len = dest_end ? (size_t)(dest_end - dest_start) : 4;
-        if(dest_len >= sizeof(dest)) dest_len = sizeof(dest)-1;
-        strncpy(dest, dest_start, dest_len);
-        dest[dest_len] = '\0';
-        bool broadcast = (strcmp(dest, "1111") == 0);
-        if(strcmp(dest, my_id) != 0 && !broadcast) return;
-
-        const char *op_start = strchr(msg, '{');
-        const char *op_end = op_start ? strchr(op_start+1, '}') : NULL;
-        if(!op_start) return;
-        if(!op_end) op_end = msg + strlen(msg);
-        char op_buf[32];
-        size_t op_len = (size_t)(op_end - op_start - 1);
-        if(op_len >= sizeof(op_buf)) op_len = sizeof(op_buf)-1;
-        strncpy(op_buf, op_start+1, op_len);
-        op_buf[op_len] = '\0';
-
-        const char *src_start = strchr(op_end+1, '{');
-        const char *src_end = src_start ? strchr(src_start+1, '}') : NULL;
-        char src[5] = {0};
-        if(src_start){
-            size_t src_len = src_end ? (size_t)(src_end - src_start -1) : strlen(src_start+1);
-            if(src_len >= sizeof(src)) src_len = sizeof(src)-1;
-            strncpy(src, src_start+1, src_len);
-            src[src_len] = '\0';
-        }
-
-        char *colon = strchr(op_buf, ':');
-        char value[32] = {0};
-        if(colon){ *colon = '\0'; strncpy(value, colon+1, sizeof(value)-1); }
-
-        Command cmd = command_from_string(op_buf);
-        if(cmd == CMD_OK){ handle_ok(src); return; }
-        if(cmd == CMD_ABORT){ printf("[Debug] Abort from %s\n", src); return; }
-
-        /* Comando applicativo generico: senza sensori, il nodo risponde OK.
-         * (Nel reation originale qui c'era la rilevazione movimento.) */
-        protocol_send_response("OK");
-        return;
-    }
-
-    if(ch == CHANNEL_SLAVE && hotspot){
-        /* TOY: il master riceve TUTTO dallo slave su questo carrier, inclusa la
-         * registrazione che prima passava in config. */
-        if(strncmp(msg, "{REQ}l{", 7) == 0){
-            /* Se sto gia' registrando qualcuno (awaiting_ack), NON ri-assegnare:
-             * il canale master->slave e' lossy, quindi il SET viene ritrasmesso
-             * UGUALE (stesso ID) finche' lo slave non ne decodifica uno pulito.
-             * Senza questo, ogni {REQ} darebbe un ID nuovo e lo slave non
-             * combacerebbe mai col pending del master. */
-            if(!awaiting_ack){
-                char pid[4] = {0};
-                sscanf(msg, "{REQ}l{%3[^}]}", pid);
-                assign_new_id(pid);
-            }
-            return;
-        }
-        if(strncmp(msg, "ID:", 3) != 0) return;
-        char dest[5] = {0};
-        const char *dest_start = msg + 3;
-        const char *dest_end = strchr(dest_start, '{');
-        size_t dest_len = dest_end ? (size_t)(dest_end - dest_start) : 4;
-        if(dest_len >= sizeof(dest)) dest_len = sizeof(dest)-1;
-        strncpy(dest, dest_start, dest_len);
-        dest[dest_len] = '\0';
-        if(strcmp(dest, "0000") != 0) return;
-
-        const char *op_start = strchr(msg, '{');
-        const char *op_end = op_start ? strchr(op_start+1, '}') : NULL;
-        if(!op_start) return;
-        if(!op_end) op_end = msg + strlen(msg);
-        char op_buf[32];
-        size_t op_len = (size_t)(op_end - op_start - 1);
-        if(op_len >= sizeof(op_buf)) op_len = sizeof(op_buf)-1;
-        strncpy(op_buf, op_start+1, op_len);
-        op_buf[op_len] = '\0';
-        char *colon = strchr(op_buf, ':');
-        char value[32] = {0};
-        if(colon){ *colon = '\0'; strncpy(value, colon+1, sizeof(value)-1); }
-
-        const char *src_start = strchr(op_end+1, '{');
-        const char *src_end = src_start ? strchr(src_start+1, '}') : NULL;
-        char src[5] = {0};
-        if(src_start){
-            size_t src_len = src_end ? (size_t)(src_end - src_start -1) : strlen(src_start+1);
-            if(src_len >= sizeof(src)) src_len = sizeof(src)-1;
-            strncpy(src, src_start+1, src_len);
-            src[src_len] = '\0';
-        }
-
-        Command cmd = command_from_string(op_buf);
-        if(cmd == CMD_OK){ handle_ok(src); return; }
-        if(awaiting_response && strcmp(src, pending_dest) == 0){
-            awaiting_response = false;
-            pending_type = PEND_NONE;
-            pending_dest[0] = '\0';
-        }
-        if(msg_cb){
-            char buf[128];
-            snprintf(buf, sizeof(buf), "Risposta da %s: %s\n", src, value);
-            msg_cb(buf);
-        }
-        return;
-    }
-}
-
-void protocol_send_command(const char *dest_id, const char *operation){
-    if(!hotspot) return;
-    snprintf(pending_cmd, sizeof(pending_cmd), "ID:%s{%s}k{0000}", dest_id, operation);
-    strncpy(pending_dest, dest_id, sizeof(pending_dest));
-    pending_dest[4] = '\0';
-    pending_type = PEND_MASTER;
-    awaiting_ack = true;
-    awaiting_response = false;
-    unsigned long dur = send_master(pending_cmd);
-    retry_interval = dur + RETRY_MS;
-    retry_at = now_ms() + retry_interval;
-}
-
-void protocol_send_response(const char *operation){
-    if(hotspot) return;
-    snprintf(pending_cmd, sizeof(pending_cmd), "ID:0000{%s}k{%s}", operation, my_id);
-    strncpy(pending_dest, "0000", sizeof(pending_dest));
-    pending_type = PEND_SLAVE;
-    awaiting_ack = true;
-    awaiting_response = false;
-    unsigned long dur = send_slave(pending_cmd);
-    retry_interval = dur + RETRY_MS;
-    retry_at = now_ms() + retry_interval;
+void protocol_request_presence(void){
+    if (!hotspot) return;
+    logf("Invio REQ_PRESENCE\n");
+    awaiting_presence = true;
+    presence_tries    = 1;
+    presence_retry_at = millis() + PRESENCE_RETRY_MS;
+    emit_event("tx", "REQ_PRESENCE");
+    send_msg(MSG_REQ_PRESENCE);
 }
 
 void protocol_send_abort(void){
-    if(!hotspot) return;
-    char msg[64];
-    snprintf(msg, sizeof(msg), "ID:1111{ABORT}k{0000}");
-    send_master(msg);
-    delay(50);
-    send_master(msg);
+    if (!hotspot) return;
+    logf("Invio ABORT\n");
+    emit_event("tx", "ABORT");
+    send_msg(MSG_ABORT);
 }
 
 void protocol_list_devices(char *buf, size_t buflen){
-    if(!buf || buflen == 0) return;
-    buf[0] = '\0';
-    if(known_count == 0){
-        strncpy(buf, "Nessun dispositivo collegato :(\n", buflen-1);
-        buf[buflen-1] = '\0';
-        return;
-    }
-    for(size_t i=0;i<known_count;i++){
-        strncat(buf, known_ids[i], buflen - strlen(buf) - 1);
-        strncat(buf, "\n", buflen - strlen(buf) - 1);
-    }
+    if (!buf || buflen == 0) return;
+    if (slave_known) snprintf(buf, buflen, "Slave registrato: id=%d\n", slave_id);
+    else             snprintf(buf, buflen, "Nessun dispositivo registrato :(\n");
 }
 
-void protocol_set_message_callback(ProtocolMessageCallback cb){
-    msg_cb = cb;
+void protocol_set_event_callback(ProtocolEventCallback cb){ event_cb = cb; }
+void protocol_set_status_callback(ProtocolStatusCallback cb){ status_cb = cb; }
+void protocol_set_presence_callback(ProtocolPresenceCallback cb){ presence_cb = cb; }
+
+void protocol_publish_state(void){
+    emit_status();
+    if (presence_cb && last_present >= 0) presence_cb(last_present != 0);
 }

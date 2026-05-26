@@ -1,32 +1,58 @@
 /*! \file protocol.h
- * \brief Link layer del protocollo (porting dal reference C, SENZA la parte
- *        movement sensor che su questa board FPGA non esiste).
+ * \brief Protocollo a CODEBOOK ALTERNATO — lato MASTER (hotspot).
+ *        Ogni messaggio = pattern di bit STRETTAMENTE alternati, identificato da
+ *        (primo_bit, lunghezza). Nessun simbolo uguale di fila => ogni simbolo e'
+ *        un cambio di frequenza, robusto al riverbero. Il canale (master/slave)
+ *        e' dato dal carrier. Vedi DIARIO.
  *
- * Emissione adattata: invece di suonare frequenze (I2S), comprime il messaggio
- * in signal code binari (bit_output_packer) e li invia come char alla FPGA
- * (fpga_uart_emit_codes), che li emette via PWM.
+ *  msg            primo_bit  lunghezza  pattern   direzione
+ *  REQ                0          2        01      slave  -> master
+ *  SET                1          2        10      master -> slave (= registrato, id=1)
+ *  OK                 0          3        010     ack
+ *  REQ_PRESENCE       1          3        101     master -> slave
+ *  PRESENCE_NO        0          4        0101    slave  -> master
+ *  PRESENCE_YES       1          4        1010    slave  -> master
+ *  ABORT              0          5        01010   master -> slave
  */
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
+#include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include "char_packet_router.h"
+
+/* canale (= carrier del mittente) */
+#define CH_MASTER 0
+#define CH_SLAVE  1
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 void protocol_init(bool is_hotspot);
-void protocol_handle_message(ChannelType ch, const char *msg);
 void protocol_tick(void);
-const char* protocol_device_id(void);
-void protocol_send_command(const char *dest_id, const char *operation);
-void protocol_send_response(const char *operation);
+
+/* chiamata dal link layer all'arrivo di un pattern completo (tra due EOF). */
+void protocol_on_pattern(int channel, int first_bit, int length, bool alternating);
+
+/* API applicative */
+void protocol_request_presence(void);   /* master -> slave: chiedi PIR */
 void protocol_send_abort(void);
 void protocol_list_devices(char *buf, size_t buflen);
+const char* protocol_device_id(void);
 
 typedef void (*ProtocolMessageCallback)(const char *msg);
 void protocol_set_message_callback(ProtocolMessageCallback cb);
+
+/* Eventi strutturati per la dashboard web (vedi web_link). */
+typedef void (*ProtocolEventCallback)(const char *dir, const char *msg); /* dir: "rx"|"tx" */
+typedef void (*ProtocolStatusCallback)(bool paired, int slave_id);
+typedef void (*ProtocolPresenceCallback)(bool present);
+void protocol_set_event_callback(ProtocolEventCallback cb);
+void protocol_set_status_callback(ProtocolStatusCallback cb);
+void protocol_set_presence_callback(ProtocolPresenceCallback cb);
+/* Re-emette stato di aggancio + ultima presenza nota (chiamata alla connessione
+ * della dashboard, cosi' la pagina si popola subito). */
+void protocol_publish_state(void);
 
 #ifdef __cplusplus
 }

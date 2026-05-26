@@ -1383,3 +1383,142 @@ Channel-agnostic (il canale si applica in `fpga_uart_code_to_char(code, role)`).
 - FPGA UART RX → emissione coppia carrier+tono via PWM (path TX), stessa mappa.
 - Porting layer protocollo ESP32 (char_packet_router, protocol, command_dict).
 - Test end-to-end con DEBUG_MODE=false (char veri) usando le nuove frequenze.
+
+---
+
+## 2026-05-24 — Protocollo compatto a OPCODE (redesign del payload)
+
+### Motivazione
+Comporre un messaggio ASCII (`"ID:545{SET:0001}k{0000}"` ~22 byte = 154 bit),
+convertirlo in bit e fare run-length è **sovradimensionato**: le operazioni di
+config sono pochissime e l'unica funzione applicativa (PIR dello slave) è
+"c'è / non c'è presenza". Il canale **master→slave** (emissione PWM-FPGA) è
+lossy: meno toni mando, più alta la probabilità che un messaggio passi pulito.
+
+Quindi: payload **binario a opcode** invece di ASCII+run-length. Pochissimi bit
+per messaggio, e **niente run-length** (1 bit = 1 tono): bastano carrier + EOF +
+`0` + `1`, frequenze poche e **ben distanziate** → meno errori, trasmissione più
+breve.
+
+### Nuova mappa frequenze (5 toni, ~600 Hz di distanza, banda forte 2000-4400)
+Ogni simbolo emesso è una **coppia** carrier + tono-dato (come ora).
+
+| ruolo            | freq (Hz) | note                          |
+|------------------|-----------|-------------------------------|
+| carrier MASTER   | 2000      | identifica TX del master      |
+| carrier SLAVE    | 2600      | identifica TX dello slave     |
+| dato **bit 0**   | 3200      |                               |
+| dato **bit 1**   | 3800      |                               |
+| **EOF**          | 4400      | fine frame                    |
+
+Distanza ~600 Hz ≈ 6.5 bin (sia a Fs≈45750 FPGA che a 48000 slave) → robusto.
+Si abbandonano Z2/O2/Z4/O4 (run-length) e i toni >4400 (deboli).
+
+### Niente run-length
+Ogni bit del payload = **un simbolo** (carrier + 3200 se 0, 3800 se 1). Fine
+frame = simbolo EOF (carrier + 4400). Il ricevitore accumula i bit fino a EOF,
+poi interpreta opcode + payload.
+
+### Calcolo bit
+- **OPCODE = 3 bit** (8 operazioni; ne servono ~6).
+- **ID = 4 bit** (16 dispositivi; il giocattolo ne ha 1-2 → basterebbero 3,
+  tengo 4 = un nibble).
+- **PRESENZA = 1 bit**.
+
+Il **canale è dato dal carrier** (master/slave), quindi l'opcode non deve
+codificare la direzione.
+
+### Tabella opcode
+| op            | opcode | direzione      | payload        | bit dati | simboli (+EOF) |
+|---------------|--------|----------------|----------------|----------|----------------|
+| REQ           | 000    | slave→master   | —              | 3        | 4              |
+| SET (id)      | 001    | master→slave   | id (4 bit)     | 7        | 8              |
+| OK (ack)      | 010    | entrambi       | id (4 bit)     | 7        | 8              |
+| PRESENCE      | 011    | slave→master   | 1 bit (0/1)    | 4        | 5              |
+| REQ_PRESENCE  | 100    | master→slave   | —              | 3        | 4              |
+| ABORT         | 101    | master→slave   | —              | 3        | 4              |
+| (riserva)     | 110/111| —              | —              | —        | —              |
+
+### Frame
+```
+[preambolo carrier-only] [opcode 3 bit][payload N bit][EOF]
+```
+Preambolo carrier-only mantenuto per il sync (perdita primo tono). Niente EOP
+di run-length: l'unico terminatore è EOF.
+
+### Guadagno
+- Messaggio più lungo (SET/OK) = **7 bit + EOF = 8 simboli ≈ 1.2 s** (a 152 ms/simbolo),
+  contro ~60 simboli / ~9 s del vecchio ASCII+run-length → **~7× più corto e veloce**.
+- 5 frequenze ben distanziate invece di 9 fitte → molti meno misread.
+
+### Impatto implementazione (da fare, richiede risintesi FPGA)
+- **FPGA**: `audio_decoder.vhd` (5 bin: 2 carrier + 0 + 1 + EOF) e `char_to_wbdata`
+  (freq TX) sulla nuova mappa → **clean+synth+place+program**.
+- **Link layer**: si elimina la catena ASCII (`char_packet*`, `command_dict`,
+  run-length in `bit_*_packer`) e si sostituisce con un framer a opcode minimale
+  (encode: opcode+payload → bit → simboli; decode: simboli → bit fino a EOF →
+  opcode+payload).
+- **Protocollo**: `protocol.*` gestisce direttamente gli opcode invece delle
+  stringhe; registrazione e PRESENCE come da tabella.
+- Su master (esp32+FPGA) e slave (Project01Giunta) in modo speculare.
+
+## 2026-05-25 — Codebook a BIT ALTERNATI (fix riverbero) — definitivo
+
+### Sintomo
+Col protocollo a opcode (sopra), il path **master→slave** perdeva simboli sulle
+**run di bit uguali** (es. `SET id=1` = opcode 001 + 0001 → cinque `0` di fila).
+Lo spettrometro ha chiarito (etichette lette poi correttamente): master→slave è
+**forte e pulito** (≈ −24 dB), slave→master è **debole** (≈ −45 dB) ma pulito.
+Quindi **non** è un problema di ampiezza: due toni IDENTICI consecutivi si
+**fondono** perché la coda/riverbero del primo tono riempie il silenzio in mezzo,
+e il ricevitore (che riarmava solo sul silenzio) non vede il secondo.
+
+### Idea
+Eliminare *per costruzione* due simboli uguali di fila. Ogni messaggio diventa un
+**pattern di bit STRETTAMENTE alternati**, identificato da **(primo_bit, lunghezza)**.
+Così ogni simbolo è sempre un **CAMBIO di frequenza** → rilevabile anche attraverso
+il riverbero. Il payload (id, bit presenza) è *implicito* nell'identità del messaggio
+(giocattolo: 1 solo slave, id sempre 1).
+
+### Codebook
+| msg          | primo_bit | lunghezza | pattern | direzione                          |
+|--------------|-----------|-----------|---------|------------------------------------|
+| REQ          | 0         | 2         | `01`    | slave→master                       |
+| SET          | 1         | 2         | `10`    | master→slave (= registrato, id=1)  |
+| OK           | 0         | 3         | `010`   | ack                                |
+| REQ_PRESENCE | 1         | 3         | `101`   | master→slave                       |
+| PRESENCE_NO  | 0         | 4         | `0101`  | slave→master                       |
+| PRESENCE_YES | 1         | 4         | `1010`  | slave→master                       |
+| ABORT        | 0         | 5         | `01010` | master→slave                       |
+
+`(1,5)`=`10101` resta libero. Lunghezze 2..5 × primo_bit 0/1 = 8 combinazioni, ne
+uso 7. Frequenze invariate (master 2000, slave 2400, bit0 3500, bit1 4500, EOF 2900):
+**nessuna risintesi FPGA** — la FPGA continua a suonare/decodificare i toni a/b/c,
+il codebook vive interamente sui due ESP32.
+
+### Rilevazione per CAMBIO (non più per silenzio)
+Entrambi i ricevitori passano da "riarma sul silenzio" a **"nuovo simbolo = la
+frequenza è cambiata"**:
+- **Master** ([fpga_uart_link.cpp](esp32-firmware/src/fpga_uart_link.cpp)): un char
+  uguale all'ultimo accettato (ripetizioni FPGA o riverbero) si ignora; la raffica
+  di EOF collassa in **un solo** evento EOF; ogni bit dati (sempre alternato) è un
+  evento distinto.
+- **Slave** ([main.cpp](../Project01Giunta/src/main.cpp)): dedup su `last_sym`; un
+  simbolo è nuovo se `sym != last_sym`. Il silenzio (`channel<0`) azzera `last_sym`.
+
+### Framer
+Tra due EOF si raccoglie `(primo_bit, lunghezza, alternato?)`; se non-alternato o
+lunghezza sconosciuta → scartato. La raffica EOF (testa/coda, 4×) serve solo a
+garantire che almeno un EOF venga catturato come terminatore.
+
+### Interfacce
+- Link layer **agnostico** al messaggio: RX `protocol_on_pattern(channel, first, len, alt)`,
+  TX `fpga_uart_send_pattern(first, len)`.
+- La tabella msg↔pattern vive in `protocol.cpp` (master) e `protocol.c` (slave).
+
+### Limite noto
+Un simbolo **perso** cambia la lunghezza → può mappare su un altro messaggio
+(es. ABORT `01010`→`0101`=PRESENCE_NO). Accettabile per il giocattolo: la
+registrazione (REQ/SET/OK) è idempotente e ritrasmessa fino all'OK; la presenza
+è ri-interrogabile. Il silenzio lungo tra simboli (~150 ms FPGA / ~160 ms slave)
+resta per far spegnere il riverbero.

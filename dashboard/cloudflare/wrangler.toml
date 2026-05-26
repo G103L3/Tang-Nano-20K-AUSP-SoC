@@ -1,0 +1,19 @@
+# Configurazione Wrangler per il relay WebSocket (Cloudflare Worker + Durable Object).
+# Deploy:  cd dashboard/cloudflare  &&  npx wrangler login  &&  npx wrangler deploy
+# Dopo il deploy ottieni un URL tipo:  https://efes-relay.<account>.workers.dev
+# -> in app.js metti  RELAY_URL = "wss://efes-relay.<account>.workers.dev"
+# -> nell'ESP32 (web_link.cpp)  WS_HOST = "efes-relay.<account>.workers.dev",
+#    WS_PORT = 443, WS_USE_TLS = 1
+
+name = "efes-relay"
+main = "worker.js"
+compatibility_date = "2024-09-23"
+
+[[durable_objects.bindings]]
+name = "RELAY"
+class_name = "Relay"
+
+# Durable Object con storage SQLite: disponibile anche nel piano FREE.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Relay"]
