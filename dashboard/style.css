@@ -115,4 +115,100 @@ body {
 .log .time { margin-left: auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .log .empty { color: var(--muted); background: transparent; justify-content: center; }
 
-@media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+/* ---------- memoria + impostazioni ---------- */
+.card--mem, .card--settings { grid-column: 1 / -1; }
+.mem-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.head-title { display: flex; flex-direction: column; gap: 2px; }
+.head-title h2 { margin: 0 0 4px; }
+.card-sub { margin: 0; font-size: 13px; color: var(--muted); }
+.stats {
+  display: inline-block; margin-left: 6px; padding: 1px 8px;
+  border-radius: 999px; font-size: 11px; background: var(--card-2);
+  color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.stats--ok  { background: rgba(63,185,80,.16);  color: var(--green); }
+.stats--err { background: rgba(248,81,73,.16);  color: var(--red); }
+
+.hint {
+  font-size: 10.5px;
+  color: #6f7888;
+  text-transform: none;
+  letter-spacing: 0;
+  font-style: italic;
+  font-weight: 400;
+  margin-top: 2px;
+  line-height: 1.35;
+  opacity: .9;
+}
+.lbl {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  font-weight: 600;
+}
+
+.input {
+  background: #102047;
+  border: 1.5px solid #a78bfa;
+  border-radius: 10px;
+  padding: 9px 12px;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.input::placeholder { color: #6c7a9c; }
+.input:hover  { border-color: #b8a0ff; }
+.input:focus  {
+  border-color: #c4b5fd;
+  box-shadow: 0 0 0 3px rgba(167,139,250,.22);
+}
+
+.note-row { display: flex; gap: 10px; margin: 10px 0 16px; }
+.note-row .input { flex: 1; }
+
+.memlist { list-style: none; margin: 6px 0 0; padding: 0; max-height: 360px; overflow-y: auto; }
+.memlist li {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; border-radius: 10px; background: var(--card-2);
+  margin-bottom: 8px; font-size: 14px;
+  animation: pop .18s ease;
+}
+.memlist .ricon {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.05); font-size: 15px;
+}
+.memlist .seq { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 48px; }
+.memlist .recchip {
+  padding: 3px 10px; border-radius: 999px; font-weight: 700; font-size: 12px;
+  background: rgba(79,157,255,.15); color: var(--accent);
+}
+.memlist .recchip--B { background: rgba(139,151,167,.15); color: var(--muted); }
+.memlist .recchip--R { background: rgba(63,185,80,.16);  color: var(--green); }
+.memlist .recchip--Pyes { background: rgba(240,192,0,.18); color: var(--amber); }
+.memlist .recchip--Pno  { background: rgba(139,151,167,.12); color: var(--muted); }
+.memlist .recchip--N { background: rgba(79,157,255,.15); color: var(--accent); }
+.memlist .recchip--Em { background: rgba(79,157,255,.15); color: var(--accent); }
+.memlist .recchip--Es { background: rgba(63,185,80,.16);  color: var(--green); }
+.memlist .rec-text { color: var(--text); }
+.memlist .time {
+  margin-left: auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums;
+}
+.memlist .empty { color: var(--muted); background: transparent; justify-content: center; }
+
+.settings-grid {
+  display: grid; gap: 14px; grid-template-columns: repeat(3, 1fr); margin-bottom: 14px;
+}
+.settings-grid label { display: flex; flex-direction: column; gap: 6px; }
+.settings-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+@media (max-width: 760px) {
+  .grid { grid-template-columns: 1fr; }
+  .settings-grid { grid-template-columns: 1fr; }
+}

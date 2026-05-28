@@ -9,6 +9,8 @@
         <File path="src/fft/fft.v" type="file.verilog" enable="1"/>
         <File path="src/audio_decoder.vhd" type="file.vhdl" enable="1"/>
         <File path="src/dma.vhd" type="file.vhdl" enable="1"/>
+        <File path="src/flash_ctrl.vhd" type="file.vhdl" enable="1"/>
+        <File path="src/flash_spi.vhd" type="file.vhdl" enable="1"/>
         <File path="src/gowin_rpll/gowin_rpll.vhd" type="file.vhdl" enable="1"/>
         <File path="src/gpio_generic.vhd" type="file.vhdl" enable="1"/>
         <File path="src/memory_arbiter.vhd" type="file.vhdl" enable="1"/>

@@ -7,6 +7,8 @@
 
 #include "protocol.h"
 #include "fpga_uart_link.h"
+#include "flash_link.h"
+#include "web_link.h"
 
 /* ---------------- codebook a (primo_bit, lunghezza), max len 3 --------------
  * Il carrier identifica la direzione, quindi master->slave e slave->master
@@ -70,7 +72,10 @@ static bool          awaiting_presence = false;
 static unsigned long presence_retry_at = 0;
 static int           presence_tries    = 0;
 #define PRESENCE_RETRY_MS   8000UL
-#define PRESENCE_MAX_TRIES  6
+static int           presence_max_tries = 6;
+
+static uint16_t      auto_presence_s = 0;
+static unsigned long auto_at = 0;
 
 static ProtocolMessageCallback  msg_cb      = NULL;
 static ProtocolEventCallback    event_cb    = NULL;
@@ -113,6 +118,8 @@ static void send_set(void){
     retry_at = millis() + retry_ms();
     logf("Invio SET (id=1)\n");
     emit_event("tx", "SET");
+    flash_log_append(LOG_EVT, millis() / 1000, 1, "M:SET1");
+    web_link_push_flashlog();
     send_msg(MSG_SET);
 }
 
@@ -124,6 +131,8 @@ void protocol_on_pattern(int channel, int first_bit, int length, bool alternatin
     switch (m) {
         case MSG_REQ:
             emit_event("rx", "REQ");
+            flash_log_append(LOG_EVT, millis() / 1000, 0, "S:REQ");
+            web_link_push_flashlog();
             /* idempotente: se sto gia' registrando, NON ri-assegnare (ritrasmetto
              * lo stesso SET finche' arriva l'OK). */
             if (!awaiting_ack) {
@@ -139,6 +148,8 @@ void protocol_on_pattern(int channel, int first_bit, int length, bool alternatin
                 slave_id = 1; slave_known = true;
                 logf("Nuovo dispositivo registrato con successo, id=%d\n", slave_id);
                 emit_status();
+                flash_log_append(LOG_EVT, millis() / 1000, (uint8_t)slave_id, "S:OK1");
+                web_link_push_flashlog();
             }
             break;
 
@@ -147,12 +158,16 @@ void protocol_on_pattern(int channel, int first_bit, int length, bool alternatin
             emit_event("rx", "PRESENCE_NO");
             awaiting_presence = false;     /* risposta arrivata: stop retry */
             emit_presence(0);
+            flash_log_append(LOG_EVT, millis() / 1000, 0, "S:PRES0");
+            web_link_push_flashlog();
             break;
         case MSG_PRESENCE_YES:
             logf("Presenza dallo slave: SI\n");
             emit_event("rx", "PRESENCE_YES");
             awaiting_presence = false;     /* risposta arrivata: stop retry */
             emit_presence(1);
+            flash_log_append(LOG_EVT, millis() / 1000, 1, "S:PRES1");
+            web_link_push_flashlog();
             break;
 
         default:
@@ -171,18 +186,27 @@ void protocol_tick(void){
      * tentativi): il canale master->slave perde simboli, una sola richiesta
      * spesso non passa. */
     if (awaiting_presence && (long)(millis() - presence_retry_at) > 0) {
-        if (presence_tries >= PRESENCE_MAX_TRIES) {
+        if (presence_tries >= presence_max_tries) {
             awaiting_presence = false;
-            logf("Presenza: nessuna risposta dopo %d tentativi\n", PRESENCE_MAX_TRIES);
+            logf("Presenza: nessuna risposta dopo %d tentativi\n", presence_max_tries);
         } else {
             presence_tries++;
-            logf("Retry REQ_PRESENCE (%d/%d)\n", presence_tries, PRESENCE_MAX_TRIES);
+            logf("Retry REQ_PRESENCE (%d/%d)\n", presence_tries, presence_max_tries);
             emit_event("tx", "REQ_PRESENCE");
             send_msg(MSG_REQ_PRESENCE);
             presence_retry_at = millis() + PRESENCE_RETRY_MS;
         }
     }
+
+    if (auto_presence_s > 0 && slave_known && !awaiting_presence &&
+        (long)(millis() - auto_at) > 0) {
+        auto_at = millis() + (unsigned long)auto_presence_s * 1000UL;
+        protocol_request_presence();
+    }
 }
+
+void protocol_set_presence_tries(int n){ if (n > 0) presence_max_tries = n; }
+void protocol_set_auto_presence(uint16_t s){ auto_presence_s = s; auto_at = millis() + (unsigned long)s * 1000UL; }
 
 void protocol_request_presence(void){
     if (!hotspot) return;
@@ -191,6 +215,8 @@ void protocol_request_presence(void){
     presence_tries    = 1;
     presence_retry_at = millis() + PRESENCE_RETRY_MS;
     emit_event("tx", "REQ_PRESENCE");
+    flash_log_append(LOG_EVT, millis() / 1000, 0, "M:PRES?");
+    web_link_push_flashlog();
     send_msg(MSG_REQ_PRESENCE);
 }
 
@@ -198,6 +224,8 @@ void protocol_send_abort(void){
     if (!hotspot) return;
     logf("Invio ABORT\n");
     emit_event("tx", "ABORT");
+    flash_log_append(LOG_EVT, millis() / 1000, 0, "M:ABORT");
+    web_link_push_flashlog();
     send_msg(MSG_ABORT);
 }
 

@@ -1,0 +1,13 @@
+v 4
+file . "src/flash_ctrl.vhd" "e6c053a6c395a7e33e46a7d6fb94489312a5597c" "20260528194447.688":
+  entity flash_ctrl at 1( 0) + 0 on 17;
+  architecture rtl of flash_ctrl at 23( 559) + 0 on 18;
+file . "src/uart_tx_char.vhd" "5c51089b36efb2e1d29138ddd93a55b13d4c3288" "20260528194447.600":
+  entity uart_tx_char at 1( 0) + 0 on 13;
+  architecture behavioral of uart_tx_char at 23( 629) + 0 on 14;
+file . "src/uart_rx_char.vhd" "e01e0d6c7ad15d5939a9a35bf64fd745516ee80c" "20260528194447.472":
+  entity uart_rx_char at 1( 0) + 0 on 11;
+  architecture behavioral of uart_rx_char at 21( 580) + 0 on 12;
+file . "src/flash_spi.vhd" "860f99cac0368482d9b44b6195819c325dcce1de" "20260528194447.642":
+  entity spi_flash at 1( 0) + 0 on 15;
+  architecture spi_flash_behavioral of spi_flash at 23( 546) + 0 on 16;

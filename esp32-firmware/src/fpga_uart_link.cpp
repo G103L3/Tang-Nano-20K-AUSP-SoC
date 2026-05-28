@@ -92,9 +92,13 @@ void fpga_uart_tick(void) {
             }
         }
         /* minuscole a/b/c = carrier master = loopback del proprio TX -> ignora.
-         * Altri byte (boot banner, ecc.) -> inoltro su USB per debug. */
+         * Altri byte (boot banner, ecc.) -> inoltro su USB solo se stampabili
+         * e solo con FPGA_RX_ECHO=1, per evitare di intasare il monitor con
+         * binario quando il decoder triggera sul rumore. */
         else if (c != 'a' && c != 'b' && c != 'c') {
-            Serial.write((uint8_t)c);
+#if FPGA_RX_ECHO
+            if (c >= 0x20 && c < 0x7F) Serial.write((uint8_t)c);
+#endif
         }
     }
 
@@ -106,28 +110,53 @@ void fpga_uart_tick(void) {
     }
 }
 
-/* TX: emette un pattern alternato. Il master trasmette sempre sul carrier master
- * => char minuscoli (a=bit0, b=bit1, c=EOF). Il bit i-esimo del pattern e'
- * first_bit XOR (i & 1): garantisce alternanza stretta. */
-void fpga_uart_send_pattern(int first_bit, int length) {
-    /* Carrier-sense: aspetta che lo slave abbia finito di parlare. */
+/* Attende che il canale sia silenzioso da CHANNEL_GUARD_MS (con max
+ * CSMA_MAX_WAIT_MS). Durante l'attesa chiama fpga_uart_tick() così last_rx_ms
+ * resta aggiornato. */
+static void cs_wait_quiet(void) {
     unsigned long start = millis();
     while ((millis() - last_rx_ms) < CHANNEL_GUARD_MS) {
         fpga_uart_tick();
         if (millis() - start > CSMA_MAX_WAIT_MS) break;
         delay(2);
     }
+}
 
-    /* EOF di TESTA: warmup + flush del ricevitore. */
-    for (int k = 0; k < EOF_BURST; k++) { Serial2.write((uint8_t)'c'); delay(EMIT_PACE_MS); }
+/* Delay attivo: continua a chiamare fpga_uart_tick() durante l'attesa per
+ * aggiornare last_rx_ms (cosi' rileviamo lo slave se inizia a parlare). */
+static void cs_pace(unsigned long ms) {
+    unsigned long t0 = millis();
+    while ((millis() - t0) < ms) {
+        fpga_uart_tick();
+        delay(2);
+    }
+}
 
-    /* bit alternati del pattern */
-    for (int i = 0; i < length; i++) {
-        int bit = first_bit ^ (i & 1);
-        Serial2.write((uint8_t)(bit ? 'b' : 'a'));
-        delay(EMIT_PACE_MS);
+/* TX: emette un pattern alternato. Il master trasmette sempre sul carrier master
+ * => char minuscoli (a=bit0, b=bit1, c=EOF). Il bit i-esimo del pattern e'
+ * first_bit XOR (i & 1): garantisce alternanza stretta.
+ *
+ * Carrier-sense: PRIMA DI OGNI byte controlla che lo slave non stia parlando.
+ * Se inizia mid-trasmissione si interrompe e aspetta che finisca, poi riprende. */
+void fpga_uart_send_pattern(int first_bit, int length) {
+    cs_wait_quiet();
+
+    for (int k = 0; k < EOF_BURST; k++) {
+        cs_wait_quiet();
+        Serial2.write((uint8_t)'c');
+        cs_pace(EMIT_PACE_MS);
     }
 
-    /* EOF di CODA: chiude il pattern (ridondante, robusto). */
-    for (int k = 0; k < EOF_BURST; k++) { Serial2.write((uint8_t)'c'); delay(EMIT_PACE_MS); }
+    for (int i = 0; i < length; i++) {
+        cs_wait_quiet();
+        int bit = first_bit ^ (i & 1);
+        Serial2.write((uint8_t)(bit ? 'b' : 'a'));
+        cs_pace(EMIT_PACE_MS);
+    }
+
+    for (int k = 0; k < EOF_BURST; k++) {
+        cs_wait_quiet();
+        Serial2.write((uint8_t)'c');
+        cs_pace(EMIT_PACE_MS);
+    }
 }

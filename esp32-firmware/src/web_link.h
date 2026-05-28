@@ -23,6 +23,7 @@ void web_link_tick(void);   /* da chiamare nel loop()                    */
 void web_link_status(bool paired, int slave_id);
 void web_link_event(const char *dir, const char *msg);
 void web_link_presence(bool present);
+void web_link_push_flashlog(void);
 
 #ifdef __cplusplus
 }

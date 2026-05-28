@@ -21,6 +21,12 @@ entity top_system is
         sdram_nz_o   : out std_logic;
         uart_ext_tx  : out std_logic;
         uart_ext_rx  : in  std_logic;
+        flash_sck_o  : out std_logic;
+        flash_cs_o   : out std_logic;
+        flash_mosi_o : out std_logic;
+        flash_miso_i : in  std_logic;
+        flash_tx_o   : out std_logic;
+        flash_rx_i   : in  std_logic;
         O_sdram_clk   : out   std_logic;
         O_sdram_cke   : out   std_logic;
         O_sdram_cs_n  : out   std_logic;
@@ -180,6 +186,24 @@ architecture behavioral of top_system is
             rx_i    : in  std_logic;
             data_o  : out std_logic_vector(7 downto 0);
             valid_o : out std_logic
+        );
+    end component;
+
+    component flash_ctrl
+        generic (
+            CLK_HZ  : integer := 27_000_000;
+            BAUD    : integer := 115200;
+            SPI_DIV : integer := 8
+        );
+        port (
+            clk_i        : in  std_logic;
+            rst_i        : in  std_logic;
+            fcmd_rx_i    : in  std_logic;
+            fresp_tx_o   : out std_logic;
+            flash_sck_o  : out std_logic;
+            flash_cs_o   : out std_logic;
+            flash_mosi_o : out std_logic;
+            flash_miso_i : in  std_logic
         );
     end component;
 
@@ -377,7 +401,7 @@ architecture behavioral of top_system is
         ch := to_integer(unsigned(c));
         -- Protocollo compatto a opcode (DIARIO 2026-05-24): minuscole = carrier
         -- master 2000, MAIUSCOLE = carrier slave 2400. a/A=bit0, b/B=bit1, c/C=EOF.
-        -- bit0/bit1 distanti 1000 Hz (3500/4500) per non confonderli.
+        -- Frequenze distanziate per local-max ±3 affidabile sul reale.
         if    ch >= 65 and ch <= 90 then letter := ch - 65; carrier := 2400;  -- A-Z = slave
         elsif ch >= 97 and ch <= 122 then letter := ch - 97; carrier := 2000;  -- a-z = master
         else  letter := -1; end if;
@@ -710,6 +734,23 @@ begin
             stb_i  => dec_char_stb,
             tx_o   => uart_char_tx_s,
             busy_o => uart_char_busy
+        );
+
+    u_flash: flash_ctrl
+        generic map (
+            CLK_HZ  => 40_500_000,
+            BAUD    => 115200,
+            SPI_DIV => 8
+        )
+        port map (
+            clk_i        => clk_sdram,
+            rst_i        => pll_lock,
+            fcmd_rx_i    => flash_rx_i,
+            fresp_tx_o   => flash_tx_o,
+            flash_sck_o  => flash_sck_o,
+            flash_cs_o   => flash_cs_o,
+            flash_mosi_o => flash_mosi_o,
+            flash_miso_i => flash_miso_i
         );
 
     process(clk_i)

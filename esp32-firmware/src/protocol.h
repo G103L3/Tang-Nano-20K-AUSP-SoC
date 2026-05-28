@@ -37,6 +37,8 @@ void protocol_on_pattern(int channel, int first_bit, int length, bool alternatin
 /* API applicative */
 void protocol_request_presence(void);   /* master -> slave: chiedi PIR */
 void protocol_send_abort(void);
+void protocol_set_presence_tries(int n);
+void protocol_set_auto_presence(uint16_t seconds);
 void protocol_list_devices(char *buf, size_t buflen);
 const char* protocol_device_id(void);
 

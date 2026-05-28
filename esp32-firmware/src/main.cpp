@@ -14,6 +14,7 @@
 #include "protocol.h"
 #include "fpga_uart_link.h"
 #include "web_link.h"
+#include "flash_link.h"
 
 #ifdef USE_BLYNK
   #ifndef BLYNK_TEMPLATE_ID
@@ -35,7 +36,8 @@
   #endif
   static void out_msg(const char *m){ Blynk.virtualWrite(V1, m); }
 #else
-  static void out_msg(const char *m){ Serial.print(m); }
+  /* logf() stampa gia' su Serial; out_msg e' no-op senza Blynk per non duplicare. */
+  static void out_msg(const char *m){ (void)m; }
 #endif
 
 static void handle_command(const char *input) {
@@ -79,6 +81,17 @@ void setup() {
     protocol_set_status_callback(web_link_status);
     protocol_set_event_callback(web_link_event);
     protocol_set_presence_callback(web_link_presence);
+
+    /* NAND flash (FSM su FPGA via Serial1): impostazioni + log eventi */
+    flash_link_init();
+    {
+        flash_settings_t fs;
+        if (flash_get_settings(&fs)) {
+            protocol_set_presence_tries(fs.presence_tries);
+            protocol_set_auto_presence(fs.auto_presence_s);
+        }
+    }
+    flash_log_append(LOG_BOOT, millis() / 1000, 0, "boot");
 #ifdef USE_BLYNK
     Blynk.begin(BLYNK_AUTH_TOKEN, WIFI_SSID, WIFI_PASS);
     out_msg("=== ESP32 MASTER (opcode + Blynk) pronto ===\n");

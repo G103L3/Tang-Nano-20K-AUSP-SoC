@@ -1522,3 +1522,301 @@ Un simbolo **perso** cambia la lunghezza → può mappare su un altro messaggio
 registrazione (REQ/SET/OK) è idempotente e ritrasmessa fino all'OK; la presenza
 è ri-interrogabile. Il silenzio lungo tra simboli (~150 ms FPGA / ~160 ms slave)
 resta per far spegnere il riverbero.
+
+## 2026-05-27 — Rimappatura frequenze nella banda forte (anti-rolloff)
+
+### Diagnosi
+Dump dei magnitudini di bin dello spettro lato slave (modulo debug in
+`decoder.c`, righe `[BINS]`) ha confermato che lo speaker e l'accoppiamento
+acustico **rotolano sopra ~3 kHz**: carrier 2000 ed EOF 2900 arrivano a
+13.000–35.000, mentre bit0 (3500) sta tra qualche centinaio e ~4.000, e bit1
+(4500) è quasi sempre <1.000 con rari picchi a 25.000. La forte varianza del
+bit1 fa perdere simboli → `[slave PATTERN SCARTATO ... NON-alt]` → registrazione
+e presenza traballano. La fix è portare TUTTI i 5 toni nella banda forte.
+
+### Nuova mappa frequenze
+| ruolo | freq | bin FPGA (Fs≈45750) | bin slave (Fs=48000) |
+|---|---|---|---|
+| FREQ_BIT0 | **1700** | 19 | 18 |
+| MASTER_CARRIER | **2000** | 22 | 21 |
+| SLAVE_CARRIER | **2300** | 26 | 25 |
+| FREQ_BIT1 | **2600** | 29 | 28 |
+| FREQ_EOF | **2900** | 32 | 31 |
+
+Spaziatura 300 Hz (≈ 3 bin). Per evitare che il max locale di un tono "rubi"
+quello adiacente la **finestra di max locale è stata stretta da ±3 a ±1**:
+`audio_decoder.vhd` (`WINR=1`, localmax `win(1)>=win(0) and win(1)>=win(2)`) e
+`decoder.c` (loop `i = j-1..j+1`).
+
+## 2026-05-27 — Memoria flash su FPGA (W25Q via FSM) + dashboard
+
+### Perché su FPGA come FSM
+Vincolo del corso: l'accesso alla NAND flash deve essere implementato
+sull'FPGA come macchina a stati. Il chip in realtà è un **Winbond W25Q
+(SPI NOR)**: indirizzamento a byte, comandi SPI (mode 0), erase a settori
+da 4 KB. Bene per un log persistente.
+
+### Cosa salviamo
+- **Impostazioni** (settore 0, 32 byte): nome dispositivo (15 byte stringa),
+  `auto_presence_s` (uint16 BE), `presence_tries` (uint8), magic `0xA5` in
+  byte 0 per distinguere "vergine" (`0xFF`).
+- **Log eventi** in un **ring FIFO** su 2 settori (settori 1 e 2 = 512 slot da
+  16 byte). Record:
+  `[seq:2 BE][tipo:1][t_sec:4 BE][val:1][testo:8]`.
+  Tipi: `B`=boot, `R`=registrazione (val=id), `P`=presenza (val=0/1),
+  `N`=nota libera dalla dashboard. La NOR cancella a settori da 4 KB, non
+  riga per riga: quando `head` entra in un settore, la FSM lo **cancella**
+  prima di scriverci (butta i 256 record più vecchi). L'UI mostra al più gli
+  ultimi 60 ordinati per `seq`.
+
+### Pin (3.3 V, Tang Nano 20K)
+| Segnale | Pin FPGA | | Segnale | Pin FPGA |
+|---|---|---|---|---|
+| `flash_clk` (CLK) | 42 | | `flash_cs` (CS) | 41 |
+| `flash_mosi` (DI) | 51 | | `flash_miso` (DO) | 48 |
+| `flash_tx` → ESP32 | 72 | | `flash_rx` ← ESP32 | 20 |
+
+ESP32 master: 2ª UART (Serial1) su **GPIO 33 (TX) / 32 (RX)**.
+
+### Cablaggio
+- W25Q → FPGA (SPI): CLK→42, DI→51, DO→48, CS→41, VCC→3V3, GND→GND.
+- FPGA ↔ ESP32 (UART flash, incrociato): FPGA 72 → ESP32 32, ESP32 33 → FPGA 52.
+- Tutto 3.3 V, niente level shifter.
+
+### Macchine a stati (FPGA)
+
+**`SPI_Flash` (byte shifter, mode 0)** — stile `spi_master.vhd`:
+```
+S_IDLE ─start→ S_RUN: per ogni bit (8 bit, MSB first)
+                pre_cnt 0..HALF-1   → SCK↑ , shift in MISO (mode 0 sample)
+                pre_cnt HALF..PRE-1 → SCK↓ , shift out next MOSI bit
+              dopo 8 bit → done='1' → S_IDLE
+```
+
+**`flash_ctrl` (storage FSM)** — usa `SPI_Flash` come primitiva, CS sotto
+il suo controllo (estende il CS attraverso tutti i byte di un comando):
+```
+BOOT
+ └→ SCAN_RD/CHK : per ogni slot s in 0..511 legge il 1° byte;
+                  primo 0xFF trovato → head = s → IDLE.
+IDLE  ──UART byte── 'L' + 16B  →  append record:
+                                   if head%256==0 → WE,ERASE(settore),POLL
+                                   WE, PROGRAM(slot,16B), POLL,
+                                   head=(head+1) mod 512, ack 'K'
+                  ── 'C'        →  clear: WE,ERASE(sect1),POLL, WE,ERASE(sect2),POLL,
+                                   head=0, ack 'K'
+                  ── 'S' + 32B  →  settings write: WE,ERASE(sett.settings),POLL,
+                                   WE,PROGRAM(0x0000,32B),POLL, ack 'K'
+                  ── 'Q'        →  settings read: READ(0x0000,32B) → TX 32B
+                  ── 'G' + slot + n →  log read: READ(slot*16,n*16) → TX n*16 B
+                  ── 'H'        →  TX head (2 byte big-endian)
+                  ── 'I'        →  JEDEC ID: READ-ID (0x9F) → TX 3 byte
+sub-FSM RF_*  : sequenza CS↓ → SHIFT n byte (tx/rx in buf) → CS↑ → ret-state.
+sub-FSM POLL_*: ripete READ-STATUS (0x05) finché bit0 (WIP) = 0.
+```
+
+### Protocollo UART flash (115200 8N1, linea dedicata)
+Tutto binario; gli "ack" delle operazioni di scrittura sono `'K'` (0x4B).
+
+| Cmd | Payload (in) | Risposta (out) |
+|---|---|---|
+| `'L'` 0x4C | 16 byte record | 1 byte ack `'K'` |
+| `'H'` 0x48 | — | 2 byte head BE |
+| `'G'` 0x47 | slotHi, slotLo, n (1..4) | n×16 byte record |
+| `'C'` 0x43 | — | 1 byte ack `'K'` |
+| `'S'` 0x53 | 32 byte settings | 1 byte ack `'K'` |
+| `'Q'` 0x51 | — | 32 byte settings |
+| `'I'` 0x49 | — | 3 byte JEDEC (mfr, type, cap) |
+
+### ESP32 (sottile) — `flash_link`
+Driver C++ su Serial1 (32/33). Espone funzioni: `flash_read_id`,
+`flash_log_head`, `flash_log_append(type,t,val,text)`, `flash_log_read`,
+`flash_log_clear`, `flash_get_settings`, `flash_set_settings`.
+
+Integrazione (`protocol.cpp` / `main.cpp`):
+- al boot: `flash_get_settings` → applica `presence_tries` e `auto_presence_s`
+  al protocollo; logga un record `B` ("boot").
+- al `MSG_OK` (registrazione completata) → log `R` (val=id).
+- alle risposte presenza → log `P` (val=0/1).
+- `protocol_tick` esegue l'**auto-presenza** periodica se `auto_presence_s>0`
+  (richiesta presenza ogni N secondi quando agganciato).
+
+### Dashboard — pannelli "Memoria" e "Impostazioni"
+- **Memoria**: lista degli ultimi ~60 record ordinati per `seq`, decodificati
+  con etichette ("Boot", "Registrato id=N", "Presenza: SÌ/NO", "Nota");
+  bottoni **Aggiorna**, **Svuota**; input nota (max 8 caratteri) + **Aggiungi
+  nota**.
+- **Impostazioni**: nome dispositivo, auto-presenza (s, 0=off), tentativi
+  presenza. Bottoni **Aggiorna** e **Salva** (la dashboard scrive in flash
+  via ESP32 e applica subito).
+
+Messaggi WebSocket aggiunti (protocollo dashboard, relay-trasparente):
+- UI → device: `{"t":"cmd","cmd":"flash_load"}`,
+  `{"t":"cmd","cmd":"flash_clear"}`,
+  `{"t":"cmd","cmd":"flash_note","text":"..."}`,
+  `{"t":"cmd","cmd":"settings_get"}`,
+  `{"t":"cmd","cmd":"settings_set","name":...,"auto":N,"tries":N}`.
+- device → UI: `{"t":"flashlog","recs":[{seq,type,t,val,text},...]}`,
+  `{"t":"settings","name":...,"auto":N,"tries":N}`,
+  `{"t":"flashok","op":...}`.
+
+### File toccati
+- FPGA: nuovi `src/flash_spi.vhd` (`SPI_Flash`), `src/flash_ctrl.vhd`;
+  `src/top.vhd` (porte + istanziazione), `src/efes_project_s360501.cst` (6 pin);
+  `src/audio_decoder.vhd` (`CAND_BIN`, `WINR=1`, localmax), `src/top.vhd`
+  `char_to_wbdata` per il remap.
+- Slave: `src/global_parameters.h` (frequenze), `src/decoder.c` (±1 + label
+  debug).
+- ESP32 master: `src/flash_link.h`/`.cpp` (driver), `src/protocol.h`/`.cpp`
+  (auto-log + setter + auto-presenza), `src/main.cpp` (init + load/apply +
+  boot log), `src/web_link.cpp` (relay flash/settings via ArduinoJson),
+  `platformio.ini` (lib_deps ArduinoJson).
+- Dashboard: `dashboard/index.html`, `style.css`, `app.js` (pannelli + render).
+
+## 2026-05-28 — Dettaglio dei campi nella NAND flash (riferimento per report)
+
+Sezione di riferimento per il report: ogni regione, ogni campo, ogni byte.
+Tutti i campi sono in **big-endian** dove a più di un byte. Indirizzi e
+dimensioni sono in byte; gli offset sono relativi all'inizio della regione.
+
+### Mappa fisica della flash W25Q
+
+| Regione | Indirizzo base | Dimensione | Granularità erase | Contenuto |
+|---|---|---|---|---|
+| Settings | `0x000000` | 4096 B (1 settore) | 4 KB | 32 B utili + 4064 B riservati |
+| Log A | `0x001000` | 4096 B (1 settore) | 4 KB | 256 slot da 16 B = 256 record |
+| Log B | `0x002000` | 4096 B (1 settore) | 4 KB | 256 slot da 16 B = 256 record |
+| (non usato) | `0x003000` → fine chip | dipende dal modello | — | libero (utile per estensioni) |
+
+Totale flash usata: **12 KB** (su almeno 4 MB / 32 Mbit del modulo W25Q minimo).
+
+### Record IMPOSTAZIONI — 32 byte, indirizzo `0x000000`
+
+| Offset (dec) | Offset (hex) | Byte | Campo | Tipo | Default | Note |
+|:---:|:---:|:---:|---|---|---|---|
+| 0 | `0x00` | 1 | `magic` | uint8 | `0xA5` | distingue settore vergine (`0xFF`) da scritto |
+| 1 | `0x01` | 15 | `name[15]` | char[15] | "Master EFES" | nome dispositivo, padded a 0; max 15 char |
+| 16 | `0x10` | 2 | `auto_presence_s` | uint16 BE | 0 | secondi tra richieste presenza (0 = off) |
+| 18 | `0x12` | 1 | `presence_tries` | uint8 | 6 | tentativi retry REQ_PRESENCE |
+| 19 | `0x13` | 13 | `reserved[13]` | — | 0 | riservato a estensioni (es. soglia PIR, ID master, …) |
+| **32** | `0x20` | **32 totali** | | | | |
+
+Il magic byte è il modo di distinguere "settings non ancora scritti" (flash
+appena cancellata = tutti `0xFF`): se `magic ≠ 0xA5` l'ESP32 carica i default.
+
+### Record di LOG — 16 byte, slot all'interno di Log A/B
+
+| Offset (dec) | Offset (hex) | Byte | Campo | Tipo | Uso |
+|:---:|:---:|:---:|---|---|---|
+| 0 | `0x00` | 2 | `seq` | uint16 BE | contatore monotono dal boot (ordinamento) |
+| 2 | `0x02` | 1 | `type` | char | `B`/`E`/`R`/`P`/`N` (tipo record) |
+| 3 | `0x03` | 4 | `t_sec` | uint32 BE | secondi dal boot del master |
+| 7 | `0x07` | 1 | `val` | uint8 | dipende dal tipo (vedi sotto) |
+| 8 | `0x08` | 8 | `text[8]` | char[8] | etichetta o nota libera (NON null-terminated; padded `0`) |
+| **16** | `0x10` | **16 totali** | | | |
+
+Lo slot N ha indirizzo:
+`addr = 0x1000 + N · 16` con `N ∈ {0, …, 511}` (Log A = 0..255, Log B = 256..511).
+
+### Tipi di record (campo `type`)
+
+| `type` | Significato | `val` | `text` tipico | Quando viene creato |
+|:---:|---|---|---|---|
+| `B` | Boot | 0 | `"boot"` | a ogni accensione del master (in `main.cpp::setup`) |
+| `E` | Evento di traffico | dipende | etichetta compatta (sotto) | a ogni RX/TX di un messaggio del protocollo |
+| `N` | Nota libera dall'utente | 0 | testo (max 8 char) | quando l'utente preme "Aggiungi nota" sulla dashboard |
+| `R` | (legacy) registrazione | id | `"reg"` | non più generato (sostituito da `E "S:OK1"`) |
+| `P` | (legacy) presenza | 0/1 | `"si"/"no"` | non più generato (sostituito da `E "S:PRES1/0"`) |
+
+### Etichette dei record `E` (traffico)
+
+Il campo `text[8]` di un record `E` codifica direzione e tipo del messaggio.
+Convenzione: `<sorgente>:<sigla>[<valore>]` — sempre ≤ 8 caratteri.
+
+| `text` | `val` | Direzione | Significato |
+|---|:---:|---|---|
+| `S:REQ` | 0 | slave → master | slave chiede di essere registrato |
+| `M:SET1` | 1 | master → slave | master assegna l'ID (sempre 1 nel giocattolo) |
+| `S:OK1` | 1 | slave → master | slave conferma registrazione (ack) |
+| `M:PRES?` | 0 | master → slave | master interroga il sensore PIR dello slave |
+| `S:PRES1` | 1 | slave → master | slave risponde "presenza rilevata" |
+| `S:PRES0` | 0 | slave → master | slave risponde "nessuna presenza" |
+| `M:ABORT` | 0 | master → slave | reset/abort del protocollo |
+
+La dashboard decodifica queste sigle in etichette leggibili ("Slave: richiesta
+ID", "Master: assegna ID = 1", …) — il *testo grezzo* nella flash è quello
+compatto qui sopra per risparmiare byte.
+
+### Organizzazione del log come ring FIFO
+
+- **Slot**: 16 byte. Settore: 4096 B → 256 slot/settore. Settori log: 2.
+- **Capacità totale**: 512 slot (= **fino a 512 record** simultanei sulla flash).
+- **Append**: si scrive allo slot indicato dal puntatore `head` (variabile RAM).
+- **Wrap**: quando `head` entra nel primo slot di un settore (slot 0 o 256),
+  la FSM **cancella prima quel settore** (la NOR non sa cancellare singoli
+  record: erase minimo = 4 KB). Vengono persi 256 record (i più vecchi).
+- **Boot scan**: all'accensione la FSM legge il primo byte di ogni slot e
+  pone `head` al primo slot con `type == 0xFF` (slot vergine). Questo
+  ricostruisce il puntatore senza salvarlo in flash (un contatore in NOR è
+  costoso da aggiornare).
+- **Visualizzazione**: la dashboard mostra gli **ultimi 60 record** in ordine
+  cronologico inverso (più recente in alto), ordinati per `seq`.
+
+### Comandi della FSM (riassunto, UART flash dedicata)
+
+| Cmd ASCII | Hex | Payload (in) | Risposta (out) | Operazione SPI W25Q |
+|:---:|:---:|---|---|---|
+| `L` | `0x4C` | 16 B (record) | 1 B ack `'K'` | WE → (se wrap) ERASE+POLL → WE → PAGE_PROGRAM → POLL |
+| `H` | `0x48` | — | 2 B `head` BE | (nessuna I/O SPI, solo lettura `head` interno) |
+| `G` | `0x47` | slotHi, slotLo, n (n ∈ 1..4) | n·16 B | READ (0x03) a `0x1000 + slot·16` |
+| `C` | `0x43` | — | 1 B ack `'K'` | WE+ERASE Log A + POLL + WE+ERASE Log B + POLL |
+| `S` | `0x53` | 32 B (settings) | 1 B ack `'K'` | WE+ERASE settore 0 + POLL + WE+PROGRAM + POLL |
+| `Q` | `0x51` | — | 32 B (settings) | READ 32 B a `0x0000` |
+| `I` | `0x49` | — | 3 B (mfr, type, cap) | READ-ID (0x9F) → 3 byte |
+
+`POLL` = lettura ciclica del registro di stato W25Q (`0x05`) finché il bit 0
+(WIP, Write In Progress) torna a 0.
+
+### Pin map (sintesi rapida per il cablaggio)
+
+| Bus | FPGA pin | Modulo W25Q | ESP32 GPIO |
+|---|---|---|---|
+| SPI: CLK | 42 | CLK | — |
+| SPI: MOSI (DI) | 51 | DI | — |
+| SPI: MISO (DO) | 48 | DO | — |
+| SPI: CS | 41 | CS | — |
+| Alim: 3V3/GND | 3V3/GND | VCC/GND | — |
+| UART flash: FPGA TX | 72 | — | 32 (Serial1 RX) |
+| UART flash: FPGA RX | 20 | — | 33 (Serial1 TX) |
+
+Tutto 3.3 V, niente level shifter, GND comune obbligatorio.
+
+### Stima di vita (wear-out)
+
+- Sector erase cycle del W25Q: tipicamente ≥ 100 000.
+- Caso pessimistico: auto-presenza ogni 30 s con 3 record per ciclo (REQ_PRESENCE,
+  PRESENCE, e una nota) → ~360 record/h → un erase ogni ~256 record ≈ ~42 min →
+  ~1.4 erase/h.
+- 100 000 cycles / 1.4 erase/h ≈ **71 000 h ≈ 8 anni** prima del wear-out.
+  Largamente sufficiente per il progetto.
+
+### Riepilogo "in colonne e righe" (per slide)
+
+```
++-------------------- W25Q (32 Mbit / 4 MB nominali) ----------------------+
+|                                                                          |
+|  Settore 0 (4 KB)         SETTINGS  ── 32 B utili (vedi tabella sopra)   |
+|  Settore 1 (4 KB)         LOG A     ── 256 slot × 16 B                   |
+|  Settore 2 (4 KB)         LOG B     ── 256 slot × 16 B                   |
+|  Settori 3..N             (liberi, riservati a espansioni)               |
+|                                                                          |
+|  Totale usato: 12 KB · Capacità log: 512 record · Record da 16 B         |
++--------------------------------------------------------------------------+
+
++----------- LOG record (16 B) ---------+   +----- SETTINGS (32 B) -------+
+| 0   1 | 2 | 3   4   5   6 | 7 | 8 ... 15 |   | 0 | 1 ............ 15 | 16 17 | 18 | 19...31 |
+| seq   |typ| t_sec (4 B)   |val| text (8 B)|   |mag|     name           |auto_s |tries|reserved |
++---------------------------------------+   +-----------------------------+
+```
+
+

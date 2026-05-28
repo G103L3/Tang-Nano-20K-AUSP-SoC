@@ -149,3 +149,33 @@ server → ui (informativo):
 
 `msg` può essere: `REQ`, `SET`, `OK`, `REQ_PRESENCE`, `PRESENCE_YES`,
 `PRESENCE_NO`, `ABORT`.
+
+## Pannelli "Memoria" e "Impostazioni"
+
+La dashboard ha due pannelli aggiuntivi che parlano con la **FSM della flash
+W25Q sull'FPGA** (via ESP32 + Serial1). Vedi `DIARIO.md` (sezione
+"Memoria flash su FPGA") per la mappa memoria, il formato dei record (16 B)
+e delle impostazioni (32 B), il protocollo UART e le pin map.
+
+Messaggi WebSocket aggiunti:
+
+ui → device:
+```json
+{"t":"cmd","cmd":"flash_load"}                              // carica gli ultimi ~60 record
+{"t":"cmd","cmd":"flash_clear"}                             // svuota la memoria
+{"t":"cmd","cmd":"flash_note","text":"max8"}                // append record tipo N
+{"t":"cmd","cmd":"settings_get"}
+{"t":"cmd","cmd":"settings_set","name":"...","auto":N,"tries":N}
+```
+
+device → ui:
+```json
+{"t":"flashlog","recs":[{"seq":N,"type":"B|R|P|N","t":N,"val":N,"text":"..."}, ...]}
+{"t":"settings","name":"...","auto":N,"tries":N}
+{"t":"flashok","op":"clear|note"}
+```
+
+`type`: `B`=boot, `R`=registrazione (val=id), `P`=presenza (val=0/1),
+`N`=nota libera dalla dashboard. La FSM su FPGA gestisce il ring FIFO su 2
+settori (cancella il settore più vecchio quando si entra) — l'UI mostra
+gli ultimi 60 record ordinati per `seq`.

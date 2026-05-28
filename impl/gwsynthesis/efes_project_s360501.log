@@ -25,33 +25,39 @@ Analyzing entity 'spi_master'("/Users/gioelegiunta/Documents/Carriera Scolastica
 Analyzing architecture 'spi_master_behavioral'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/spi_master.vhd":33)
 Analyzing VHDL file '/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd'
 Analyzing entity 'top_system'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":5)
-Analyzing architecture 'behavioral'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":37)
+Analyzing architecture 'behavioral'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":43)
 Analyzing VHDL file '/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/uart_generic.vhd'
 Analyzing entity 'uart_generic'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/uart_generic.vhd":5)
 Analyzing architecture 'uart_generic_behavioral'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/uart_generic.vhd":21)
+Analyzing VHDL file '/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/uart_rx_char.vhd'
+Analyzing entity 'uart_rx_char'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/uart_rx_char.vhd":7)
+Analyzing architecture 'behavioral'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/uart_rx_char.vhd":21)
 Analyzing VHDL file '/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/uart_tx_char.vhd'
 Analyzing entity 'uart_tx_char'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/uart_tx_char.vhd":8)
 Analyzing architecture 'behavioral'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/uart_tx_char.vhd":23)
 Analyzing VHDL file '/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/wb_interconnect.vhd'
 Analyzing entity 'wb_interconnect'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/wb_interconnect.vhd":19)
 Analyzing architecture 'behavioral'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/wb_interconnect.vhd":114)
-Analyzing VHDL file '/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/uart_rx_char.vhd'
-Analyzing entity 'uart_rx_char'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/uart_rx_char.vhd":7)
-Analyzing architecture 'behavioral'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/uart_rx_char.vhd":21)
+Analyzing VHDL file '/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/flash_ctrl.vhd'
+Analyzing entity 'flash_ctrl'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/flash_ctrl.vhd":5)
+Analyzing architecture 'rtl'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/flash_ctrl.vhd":23)
+Analyzing VHDL file '/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/flash_spi.vhd'
+Analyzing entity 'spi_flash'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/flash_spi.vhd":5)
+Analyzing architecture 'spi_flash_behavioral'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/flash_spi.vhd":23)
 Processing 'top_system(behavioral)'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":5)
-WARN  (EX4206) : Using initial value for 's6_rdata' since it is never assigned("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":248)
-WARN  (EX4206) : Using initial value for 'dummy_dat' since it is never assigned("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":252)
-WARN  (EX4206) : Using initial value for 'tst_wr_data' since it is never assigned("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":287)
-Extracting RAM for identifier 'tst_rd_arr2'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":312)
-Extracting RAM for identifier 'txf'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":364)
-Extracting RAM for identifier 'ausp_mag_buf'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":454)
-Extracting RAM for identifier 'fft_bsram'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":490)
+WARN  (EX4206) : Using initial value for 's6_rdata' since it is never assigned("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":272)
+WARN  (EX4206) : Using initial value for 'dummy_dat' since it is never assigned("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":276)
+WARN  (EX4206) : Using initial value for 'tst_wr_data' since it is never assigned("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":311)
+Extracting RAM for identifier 'tst_rd_arr2'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":336)
+Extracting RAM for identifier 'txf'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":388)
+Extracting RAM for identifier 'ausp_mag_buf'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":478)
+Extracting RAM for identifier 'fft_bsram'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":514)
 Processing 'Gowin_rPLL(Behavioral)'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/gowin_rpll/gowin_rpll.vhd":14)
 Processing 'wb_interconnect(behavioral)'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/wb_interconnect.vhd":19)
-Switching to Verilog mode to elaborate module 'SDRAM_controller_top_SIP'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":582)
+Switching to Verilog mode to elaborate module 'SDRAM_controller_top_SIP'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":606)
 Compiling module 'SDRAM_controller_top_SIP'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/SDRAM_controller_top_SIP/SDRAM_controller_top_SIP.v":2842)
 Compiling module '**'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/SDRAM_controller_top_SIP/SDRAM_controller_top_SIP.v":2841)
-Returning to VHDL mode to continue with elaboration("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":582)
+Returning to VHDL mode to continue with elaboration("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":606)
 Processing 'dma(behavioral)'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/dma.vhd":31)
 Extracting RAM for identifier 'spi_raw_buf'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/dma.vhd":111)
 WARN  (EX4206) : Using initial value for 'fft_adr' since it is never assigned("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/dma.vhd":133)
@@ -65,6 +71,9 @@ Processing 'GPIO_GENERIC(nbit=1)(GPIO_GENERIC_BEHAVIORAL)'("/Users/gioelegiunta/
 Processing 'audio_decoder(behavioral)'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/audio_decoder.vhd":20)
 WARN  (EX1998) : Net 'dbg_buf[0][7]' does not have a driver("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/audio_decoder.vhd":76)
 Processing 'uart_tx_char(clk_hz=40500000)(behavioral)'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/uart_tx_char.vhd":8)
+Processing 'flash_ctrl(clk_hz=40500000)(rtl)'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/flash_ctrl.vhd":5)
+Processing 'uart_rx_char(clk_hz=40500000)(behavioral)'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/uart_rx_char.vhd":7)
+Processing 'SPI_Flash(prescaler=8)(SPI_Flash_BEHAVIORAL)'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/flash_spi.vhd":5)
 Processing 'uart_rx_char(behavioral)'("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/uart_rx_char.vhd":7)
 NOTE  (EX0101) : Current top module is "top_system"
 [5%] Running netlist conversion ...
@@ -84,7 +93,7 @@ Running technical mapping ...
 [75%] Tech-Mapping Phase 2 completed
 [80%] Tech-Mapping Phase 3 completed
 [90%] Tech-Mapping Phase 4 completed
-WARN  (NL0002) : The module "GPIO_GENERIC" instantiated to "u_gpio1" is swept in optimizing("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":645)
+WARN  (NL0002) : The module "GPIO_GENERIC" instantiated to "u_gpio1" is swept in optimizing("/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd":669)
 [95%] Generate netlist file "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/impl/gwsynthesis/efes_project_s360501.vg" completed
 [100%] Generate report file "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/impl/gwsynthesis/efes_project_s360501_syn.rpt.html" completed
 GowinSynthesis finish

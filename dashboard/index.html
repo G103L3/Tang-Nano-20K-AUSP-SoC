@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>EFES — Master Dashboard</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=5" />
 </head>
 <body>
   <header class="topbar">
@@ -65,8 +65,60 @@
       </div>
       <ul id="log" class="log"></ul>
     </section>
+
+    <!-- Memoria (flash) -->
+    <section class="card card--mem">
+      <div class="log-head">
+        <div class="head-title">
+          <h2>Memoria</h2>
+          <p class="card-sub">Log persistente sulla flash NOR (FSM su FPGA) <span id="memStats" class="stats"></span></p>
+        </div>
+        <div class="mem-actions">
+          <button id="memLoadBtn" class="btn btn--ghost">Aggiorna</button>
+          <button id="memClearBtn" class="btn btn--ghost">Svuota</button>
+        </div>
+      </div>
+      <div class="note-row">
+        <input id="noteInput" class="input" type="text" maxlength="8" placeholder="Scrivi una nota (max 8 caratteri)" />
+        <button id="noteBtn" class="btn">Aggiungi nota</button>
+      </div>
+      <ul id="memList" class="memlist"><li class="empty">In attesa di connessione al master…</li></ul>
+    </section>
+
+    <!-- Impostazioni -->
+    <section class="card card--settings">
+      <div class="log-head">
+        <div class="head-title">
+          <h2>Impostazioni</h2>
+          <p class="card-sub">Salvate sull'FPGA, applicate al volo <span id="setFeedback" class="stats"></span></p>
+        </div>
+        <div class="mem-actions">
+          <button id="setReloadBtn" class="btn btn--ghost">Aggiorna</button>
+        </div>
+      </div>
+      <div class="settings-grid">
+        <label>
+          <span class="lbl">Nome dispositivo</span>
+          <input id="setName" class="input" type="text" maxlength="15" placeholder="Master EFES" />
+          <span class="hint">Mostrato in dashboard. Max 15 caratteri.</span>
+        </label>
+        <label>
+          <span class="lbl">Auto-presenza</span>
+          <input id="setAuto" class="input" type="number" min="0" max="3600" step="1" placeholder="0" />
+          <span class="hint">Secondi tra le richieste presenza. 0 = disattivato.</span>
+        </label>
+        <label>
+          <span class="lbl">Tentativi presenza</span>
+          <input id="setTries" class="input" type="number" min="1" max="20" step="1" placeholder="6" />
+          <span class="hint">Ritrasmissioni di REQ_PRESENCE prima di mollare.</span>
+        </label>
+      </div>
+      <div class="settings-actions">
+        <button id="setSaveBtn" class="btn">Salva impostazioni</button>
+      </div>
+    </section>
   </main>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>
