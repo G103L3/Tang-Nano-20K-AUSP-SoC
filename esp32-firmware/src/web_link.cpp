@@ -50,27 +50,60 @@ static void send_settings(void) {
 
 static void send_flash_log(void) {
     int head = flash_log_head();
-    if (head < 0) return;
     JsonDocument d;
     d["t"] = "flashlog";
     JsonArray arr = d["recs"].to<JsonArray>();
-    uint8_t rec[FLASH_REC_BYTES];
-    int shown = 0;
-    for (int k = 1; k <= FLASH_N_SLOTS && shown < 60; k++) {
-        int slot = (head - k + FLASH_N_SLOTS) % FLASH_N_SLOTS;
-        if (flash_log_read(slot, 1, rec) != FLASH_REC_BYTES) break;
-        if (rec[2] == 0xFF) break;
-        JsonObject o = arr.add<JsonObject>();
-        char ty[2] = { (char)rec[2], 0 };
-        char txt[9]; memcpy(txt, &rec[8], 8); txt[8] = 0;
-        o["seq"]  = ((int)rec[0] << 8) | rec[1];
-        o["type"] = ty;
-        o["t"]    = ((uint32_t)rec[3] << 24) | ((uint32_t)rec[4] << 16) |
-                    ((uint32_t)rec[5] << 8) | rec[6];
-        o["val"]  = rec[7];
-        o["text"] = txt;
-        shown++;
+
+    uint16_t seen_seq[60];
+    int      nseen = 0;
+
+    /* 1) NOR via FPGA: lettura a ritroso da head-1 scorrendo TUTTI gli slot.
+     *    Skippa i 0xFF (slot erased) e i garbage da retry falliti senza
+     *    fermarsi: gli slot validi possono essere sparpagliati su sessioni
+     *    diverse con buchi in mezzo. Stop solo a 60 record o 512 slot
+     *    visitati. Validi = byte 2 in {B,R,P,N,E}. */
+    if (head >= 0) {
+        uint8_t rec[FLASH_REC_BYTES];
+        for (int k = 1; k <= FLASH_N_SLOTS && nseen < 60; k++) {
+            int slot = (head - k + FLASH_N_SLOTS) % FLASH_N_SLOTS;
+            if (flash_log_read(slot, 1, rec) != FLASH_REC_BYTES) continue;
+            uint8_t t = rec[2];
+            if (t != 'B' && t != 'R' && t != 'P' && t != 'N' && t != 'E') continue;
+            JsonObject o = arr.add<JsonObject>();
+            char ty[2] = { (char)t, 0 };
+            char txt[9]; memcpy(txt, &rec[8], 8); txt[8] = 0;
+            uint16_t seq = ((uint16_t)rec[0] << 8) | rec[1];
+            o["seq"]  = seq;
+            o["type"] = ty;
+            o["t"]    = ((uint32_t)rec[3] << 24) | ((uint32_t)rec[4] << 16) |
+                        ((uint32_t)rec[5] << 8) | rec[6];
+            o["val"]  = rec[7];
+            o["text"] = txt;
+            seen_seq[nseen++] = seq;
+        }
     }
+
+    /* 2) Cache RAM ESP32: aggiungi i record di questa sessione che NON sono
+     *    gia' presenti dalla NOR (dedup per seq). Sopravvive ai refresh della
+     *    dashboard ma non al reboot dell'ESP32. */
+    flash_cache_rec_t cr[60];
+    int cn = flash_cache_get(cr, 60);
+    for (int i = 0; i < cn && nseen < 60; i++) {
+        bool dup = false;
+        for (int j = 0; j < nseen; j++) {
+            if (seen_seq[j] == cr[i].seq) { dup = true; break; }
+        }
+        if (dup) continue;
+        JsonObject o = arr.add<JsonObject>();
+        char ty[2] = { (char)cr[i].type, 0 };
+        o["seq"]  = cr[i].seq;
+        o["type"] = ty;
+        o["t"]    = cr[i].t_sec;
+        o["val"]  = cr[i].val;
+        o["text"] = cr[i].text;
+        seen_seq[nseen++] = cr[i].seq;
+    }
+
     String out; serializeJson(d, out);
     ws.sendTXT(out);
 }

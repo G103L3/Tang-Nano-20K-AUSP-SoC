@@ -55,8 +55,11 @@ architecture rtl of flash_ctrl is
     signal buf : buf_t := (others => (others => '0'));
 
     type st_t is (
-        BOOT, B_WE, B_WRSR, B_WP, SCAN_RD, SCAN_CHK, IDLE, RX_COLLECT, G_PARSE,
-        AP_ERCHK, AP_WE_E, AP_ERASE, AP_EP, AP_WE_P, AP_PROG, AP_PP, AP_DONE,
+        BOOT, B_WE, B_WRSR, B_WP, B_GBU_WE, B_GBU, B_GBU_P,
+        B_RDSR, B_RDSR_CHK, B_REPORT,
+        SCAN_RD, SCAN_CHK, IDLE, RX_COLLECT, G_PARSE,
+        AP_ERCHK, AP_PROBE, AP_PROBE_CHK,
+        AP_WE_E, AP_ERASE, AP_EP, AP_WE_P, AP_PROG, AP_PP, AP_DONE,
         CL_W0, CL_E0, CL_P0, CL_W1, CL_E1, CL_P1, CL_DONE,
         SW_WE_E, SW_ERASE, SW_EP, SW_WE_P, SW_PROG, SW_PP, SW_DONE,
         Q_RD, G_RD, I_RD, T_RD, H_SEND, RD_SEND,
@@ -82,7 +85,11 @@ architecture rtl of flash_ctrl is
     signal rx_cnt   : integer range 0 to BUF_N := 0;
     signal cmd_r    : std_logic_vector(7 downto 0) := (others => '0');
 
-    constant POLL_MAX : integer := 200000;
+    -- W25Q sector erase puo' richiedere fino a 400 ms, page program 3 ms,
+    -- chip erase secondi. Tenere ~620 ms a 40.5 MHz = 25M cicli copre sector
+    -- erase con buon margine. (Vecchio 200000 = ~5 ms era assolutamente
+    -- insufficiente e faceva fallire ogni 0x20 -> POLL_FAIL -> 'E'.)
+    constant POLL_MAX : integer := 25_000_000;
     signal poll_to    : integer range 0 to POLL_MAX := 0;
 
     signal rx_data  : std_logic_vector(7 downto 0);
@@ -98,6 +105,10 @@ architecture rtl of flash_ctrl is
     signal spi_done  : std_logic;
 
     signal cs_r  : std_logic := '1';
+
+    signal chip_locked : std_logic := '0';
+    signal sr_save     : std_logic_vector(7 downto 0) := (others => '0');
+    signal rec_save_b4 : std_logic_vector(7 downto 0) := (others => '0');
 
     function b8(v : integer) return std_logic_vector is
     begin
@@ -132,6 +143,7 @@ begin
             if rst_i = '0' then
                 st <= BOOT; cs_r <= '1'; spi_start <= '0'; tx_stb <= '0';
                 idx <= 0; fn <= 0; head <= 0; scan_i <= 0;
+                chip_locked <= '0';
             else
                 spi_start <= '0';
                 tx_stb    <= '0';
@@ -146,27 +158,88 @@ begin
                         buf(0) <= x"06"; fn <= 1; ret <= B_WRSR; st <= RF_CSL;
 
                     when B_WRSR =>
-                        buf(0) <= x"01"; buf(1) <= x"00";
-                        fn <= 2; ret <= B_WP; st <= RF_CSL;
+                        -- WRSR a 2 byte: SR1=0x00 (clear BP/SRP) e
+                        -- SR2=0x02 (QE=1, clear tutto il resto).
+                        -- QE=1 disabilita le funzioni dei pin /HOLD# e /WP#:
+                        -- nel nostro circuito questi pin sono SCOLLEGATI (la
+                        -- board pilota solo SCK/CS/MOSI/MISO) e floating, e
+                        -- ogni transizione di SCK accoppia capacitivamente
+                        -- /HOLD#, mettendo il chip in pausa con MISO floating
+                        -- (SR e read tornano 0xFF). Con QE=1 il chip ignora
+                        -- /HOLD# e /WP# e diventa indifferente al loro stato.
+                        buf(0) <= x"01"; buf(1) <= x"00"; buf(2) <= x"02";
+                        fn <= 3; ret <= B_WP; st <= RF_CSL;
 
                     when B_WP =>
-                        poll_ret <= SCAN_RD; poll_to <= 0; st <= POLL_SET;
+                        poll_ret <= B_GBU_WE; poll_to <= 0; st <= POLL_SET;
+
+                    when B_GBU_WE =>
+                        -- WE prima del Global Block Unlock. Il W25Q64FV ha
+                        -- individual block lock bits separati dalle SR.BP;
+                        -- senza 0x98 alcuni block possono restare protetti.
+                        buf(0) <= x"06"; fn <= 1; ret <= B_GBU; st <= RF_CSL;
+
+                    when B_GBU =>
+                        buf(0) <= x"98"; fn <= 1; ret <= B_GBU_P; st <= RF_CSL;
+
+                    when B_GBU_P =>
+                        poll_ret <= B_RDSR; poll_to <= 0; st <= POLL_SET;
+
+                    when B_RDSR =>
+                        buf(0) <= x"05"; buf(1) <= x"00";
+                        fn <= 2; ret <= B_RDSR_CHK; st <= RF_CSL;
+
+                    when B_RDSR_CHK =>
+                        sr_save <= buf(1);
+                        -- Solo BP0..BP2 (bit2..4) e SRP (bit7) bloccano davvero
+                        -- le write. WEL (bit1) e WIP (bit0) sono volatili e
+                        -- non hanno nulla a che fare col chip-locked.
+                        if (buf(1) and x"9C") /= x"00" then
+                            chip_locked <= '1';
+                        else
+                            chip_locked <= '0';
+                        end if;
+                        st <= B_REPORT;
+
+                    when B_REPORT =>
+                        buf(0) <= x"53"; buf(1) <= sr_save;
+                        tx_off <= 0; tn <= 2; tidx <= 0; tret <= SCAN_RD;
+                        st <= TX_SEND;
 
                     when SCAN_RD =>
+                        -- Leggiamo 3 byte dati dello slot (seq_hi, seq_lo,
+                        -- type). Il discriminante 'slot valido' usera' SOLO
+                        -- il byte type (buf(6)) contro le 5 lettere note,
+                        -- molto piu' robusto contro SI sporco durante SCAN
+                        -- che fa apparire byte casuali != 0xFF.
                         saddr := SECT0 + scan_i * REC;
                         buf(0) <= x"03";
                         buf(1) <= b8(saddr / 65536);
                         buf(2) <= b8(saddr / 256);
                         buf(3) <= b8(saddr);
                         buf(4) <= x"00";
-                        fn  <= 5;
+                        buf(5) <= x"00";
+                        buf(6) <= x"00";
+                        fn  <= 7;
                         ret <= SCAN_CHK;
                         st  <= RF_CSL;
 
                     when SCAN_CHK =>
-                        if buf(4) = x"FF" or scan_i = N_SLOTS - 1 then
-                            head <= scan_i;
-                            st   <= IDLE;
+                        -- Slot 'valido' = byte 2 (type) e' una delle 5 lettere
+                        -- previste dal protocollo: 'B','R','P','N','E'.
+                        -- Qualunque altro valore (incluso 0xFF dell'erased)
+                        -- significa slot non-valido. head = ultimo valido + 1.
+                        if buf(6) = x"42" or buf(6) = x"52" or
+                           buf(6) = x"50" or buf(6) = x"4E" or
+                           buf(6) = x"45" then
+                            if scan_i = N_SLOTS - 1 then
+                                head <= 0;
+                            else
+                                head <= scan_i + 1;
+                            end if;
+                        end if;
+                        if scan_i = N_SLOTS - 1 then
+                            st <= IDLE;
                         else
                             scan_i <= scan_i + 1;
                             st     <= SCAN_RD;
@@ -195,9 +268,17 @@ begin
                             buf(rx_off + rx_cnt) <= rx_data;
                             if rx_cnt = rx_need - 1 then
                                 if cmd_r = x"4C" then
-                                    st <= AP_ERCHK;
+                                    if chip_locked = '1' then
+                                        st <= POLL_FAIL;
+                                    else
+                                        st <= AP_ERCHK;
+                                    end if;
                                 elsif cmd_r = x"53" then
-                                    st <= SW_WE_E;
+                                    if chip_locked = '1' then
+                                        st <= POLL_FAIL;
+                                    else
+                                        st <= SW_WE_E;
+                                    end if;
                                 else
                                     st <= G_PARSE;
                                 end if;
@@ -212,7 +293,23 @@ begin
                         st    <= G_RD;
 
                     when AP_ERCHK =>
-                        if head = 0 or head = 256 then
+                        rec_save_b4 <= buf(4);
+                        st <= AP_PROBE;
+
+                    when AP_PROBE =>
+                        saddr := SECT0 + head * REC;
+                        buf(0) <= x"03";
+                        buf(1) <= b8(saddr / 65536);
+                        buf(2) <= b8(saddr / 256);
+                        buf(3) <= b8(saddr);
+                        buf(4) <= x"00";
+                        fn  <= 5;
+                        ret <= AP_PROBE_CHK;
+                        st  <= RF_CSL;
+
+                    when AP_PROBE_CHK =>
+                        buf(4) <= rec_save_b4;
+                        if buf(4) /= x"FF" or head = 0 or head = 256 then
                             st <= AP_WE_E;
                         else
                             st <= AP_WE_P;

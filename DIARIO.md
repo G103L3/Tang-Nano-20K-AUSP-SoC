@@ -1820,3 +1820,361 @@ Tutto 3.3 V, niente level shifter, GND comune obbligatorio.
 ```
 
 
+## 2026-06-03 — Persistenza NOR: dal silenzio della FSM al funzionamento stabile
+
+Sezione lunga ma serve. Tutto il debugging della NOR flash W25Q64FV su filini
+e tutti i fix applicati, in ordine cronologico, con le motivazioni tecniche
+viste sul campo (non solo "perché il datasheet lo dice"). Questa parte è la
+*spiegazione del funzionamento* che mancava al diario precedente: lì c'era il
+"cosa", qui c'è il "come" e il "perché".
+
+### Setup hardware reale
+
+- **Chip**: Winbond W25Q64FV (JEDEC `EF 40 17` letto al boot), 64 Mbit / 8 MB,
+  SOIC-8, alimentazione 2.7–3.6 V, frequenza SPI max specificata 104 MHz.
+- **Breakout**: modulo DollaTek W25Q64 a 6 pin header (`VCC`, `CS`, `DO`,
+  `CLK`, `GND`, `DI`). I pin `/WP` (pin 3 del chip) e `/HOLD` (pin 7) NON
+  sono portati all'header esterno: sul PCB del breakout sono già tirati a
+  VCC tramite resistenze SMD (le pasticche da 1.8 kΩ / 10 kΩ visibili attorno
+  al chip).
+- **Cablaggio**: filini volanti Dupont tra Tang Nano 20K e breakout, ~10 cm.
+  Un solo pin GND comune tra `CLK` e `DO`. Niente ground plane, niente
+  twisted pair.
+- **Decoupling**: un condensatore **1 µF** saldato direttamente tra i pin
+  VCC e GND del breakout, il più vicino possibile al chip W25Q (vedi sezione
+  "Perché il condensatore" sotto). Aggiunto in corso d'opera.
+
+### Quadro complessivo della catena di scrittura
+
+```
+Dashboard (browser)              ESP32 master                          FPGA Tang Nano                  Chip W25Q64FV
+─────────────────────            ────────────                          ──────────────                  ─────────────
+WebSocket → Cloudflare Worker → flash_link_append(rec)               flash_ctrl FSM                    page program
+                                  Serial1.write('L'+16B) ───UART──►   RX_COLLECT (buf[4..19])
+                                                                       AP_ERCHK→AP_PROBE
+                                                                       AP_WE_E ── 0x06 WE ──►            WEL=1
+                                                                       AP_ERASE ─ 0x20 + addr ──►        WIP=1, erase 4KB sector
+                                                                       AP_EP  ── POLL 0x05 ──►           WIP=0 quando finisce
+                                                                       AP_WE_P ── 0x06 WE ──►            WEL=1
+                                                                       AP_PROG ── 0x02 + addr + 16B ──►  WIP=1, page program
+                                                                       AP_PP  ── POLL 0x05 ──►           WIP=0
+                                                                       AP_DONE: head++, send 'K' ──►
+                                  Serial1.read() == 'K'              tx_o
+                                  flash_log_head() (opcode 'H')
+                                  flash_log_read(head-1) (opcode 'G')
+                                  if mismatch -> retry, max 5
+```
+
+Il punto chiave è che **l'ESP32 non parla mai con il chip direttamente**:
+manda comandi-opcode di alto livello (`L`, `S`, `G`, `H`, `Q`, `I`, `C`, `T`)
+via UART al FPGA; la FSM `flash_ctrl` traduce questi opcode in transazioni
+SPI verso il W25Q (`0x06 WE`, `0x20 SectorErase`, `0x02 PageProgram`,
+`0x05 RDSR`, `0x9F JEDEC`, `0x01 WRSR`, `0x98 GlobalUnlock`, ...) e gestisce
+il polling del bit WIP. Il prof voleva la NOR "vista" come periferica della
+FPGA, non bridge passivo dell'ESP32: questo è esattamente lo schema.
+
+### La FSM `flash_ctrl` in dettaglio
+
+File: [src/flash_ctrl.vhd](src/flash_ctrl.vhd). Sezioni principali:
+
+**1) Boot (una volta sola dopo reset):**
+
+```
+BOOT
+  ↓
+B_WE          : send 0x06 (WE)
+  ↓
+B_WRSR        : send 0x01 + 0x00 + 0x02   (WRSR a 2 byte: SR1=0, SR2=0x02)
+  ↓                                          - SR1=0  → clear BP0/BP1/BP2/SRP
+B_WP (POLL)                                 - SR2=0x02 → set QE=1 (anche se
+  ↓                                            il breakout pulisce HOLD/WP a
+B_GBU_WE      : send 0x06                    VCC, QE=1 disabilita comunque
+  ↓                                          la funzione dei pin)
+B_GBU         : send 0x98 (Global Block Unlock)
+  ↓
+B_GBU_P (POLL)
+  ↓
+B_RDSR        : send 0x05 + 0x00   (read SR1)
+  ↓
+B_RDSR_CHK    : se (SR1 AND 0x9C) ≠ 0 → chip_locked = '1'
+  ↓                          (BP bits o SRP set: chip ancora protetto)
+B_REPORT      : invia su UART 'S' + SR1 (info diagnostica)
+  ↓
+SCAN_RD/SCAN_CHK   : scansione di TUTTI i 512 slot per trovare head
+```
+
+**2) SCAN** (nuovo, robusto): legge 3 byte dati di ogni slot (`seq_hi`,
+`seq_lo`, `type`) e considera lo slot "valido" SOLO se il byte `type` è una
+delle 5 lettere previste dal protocollo (`B`, `R`, `P`, `N`, `E`).
+Qualunque altro valore (incluso il `0xFF` di un settore erased, ma anche
+bit-flip casuali da SI sporco) è "slot vuoto".
+`head` finale = (ultimo slot valido + 1).
+
+Vecchia versione (rotta): si fermava al primo `byte0 == 0xFF`, con due
+problemi:
+
+- buchi nel log (write fallite con slot ancora 0xFF in mezzo a slot validi)
+  facevano fermare lo SCAN troppo presto;
+- letture sporche durante lo SCAN (capacitive coupling sui filini) facevano
+  apparire `byte0 ≠ 0xFF` su slot in realtà vuoti → falsi positivi → head
+  saltava ad esempio a 456 con la NOR quasi vergine.
+
+**3) 'L' Append record** (opcode UART `0x4C`, 16 byte di dati):
+
+```
+IDLE → RX_COLLECT (16 byte in buf[4..19])
+     → AP_ERCHK     (salva rec_save_b4 = buf[4])
+     → AP_PROBE     (legge byte 0 dello slot a head, mette risultato in buf[4])
+     → AP_PROBE_CHK : ripristina buf[4]=rec_save_b4
+                       if (buf(4)/=0xFF) OR head=0 OR head=256 → AP_WE_E
+                       else                                    → AP_WE_P
+     [se AP_WE_E (slot dirty o boundary settore)]
+       → AP_WE_E    : send 0x06 (WE)
+       → AP_ERASE   : send 0x20 + sector base (SECT0=0x1000 o SECT1=0x2000)
+       → AP_EP      : POLL fino a WIP=0 (sector erase fino a 400 ms)
+       → AP_WE_P    : send 0x06 (WE) di nuovo (l'erase ha cleared WEL)
+     [altrimenti]
+       → AP_WE_P    : send 0x06 (WE)
+     → AP_PROG      : send 0x02 + addr(24b) + 16 byte (buf[0..19] complessivi)
+     → AP_PP        : POLL fino a WIP=0 (page program fino a 3 ms)
+     → AP_DONE      : head++; send 'K' su UART
+```
+
+Note di robustezza:
+
+- **AP_PROBE evita di erasure inutilmente**: se lo SCAN ha messo head a slot
+  N con N ≠ 0/256 ma per qualche motivo lo slot N ha dati (es. write parziale
+  precedente), il probe lo accorge e forza erase del settore, evitando di
+  page-programmare sopra dati esistenti (NOR fa AND, non sovrascrittura).
+- **WEL re-arming**: dopo ogni `0x20 SectorErase` o `0x02 PageProgram` il
+  chip resetta WEL=0 automaticamente. La FSM rifà 0x06 WE prima di ogni
+  comando di scrittura/erase. Non si presume mai che WEL sia ancora alto.
+- **Polling con timeout**: `POLL_MAX = 25_000_000 cicli ≈ 620 ms` a 40.5 MHz
+  di `clk_sdram`. Copre sector erase tipico (30 ms) e pessimo (400 ms) con
+  margine. La versione precedente con `POLL_MAX = 200_000` (~5 ms) faceva
+  fallire ogni erase silenziosamente.
+- **chip_locked gate**: se al boot la FSM ha trovato BP/SRP set, ogni `L`
+  o `S` viene immediatamente reindirizzato a POLL_FAIL → manda `'E'`
+  (Error) invece di provare a scrivere e tornare `'K'` falso.
+
+**4) 'S' Settings save** (opcode UART `0x53`, 32 byte di dati):
+
+Identico a `'L'` ma sul settore settings (`0x0000`): WE → SectorErase 0x0000
+→ POLL → WE → PageProgram 32 byte → POLL → `'K'`.
+
+**5) 'G' Read record(s)** (opcode UART `0x47`, 3 byte: slot_hi, slot_lo, n):
+
+Read SPI `0x03` + indirizzo slot, e clock out di `n*16` byte. Inviati su
+UART verso ESP32.
+
+**6) 'H' Read head** (opcode UART `0x48`):
+
+Restituisce 2 byte (head_hi, head_lo) dal signal `head` corrente della FSM.
+
+**7) 'Q' Read settings** (opcode UART `0x51`):
+
+Read SPI `0x03` + indirizzo `0x0000`, clock out di 32 byte → UART.
+
+**8) 'C' Clear log** (opcode UART `0x43`): WE → SectorErase SECT0 → POLL →
+WE → SectorErase SECT1 → POLL → `head <= 0` → `'K'`.
+
+**9) 'I' Read JEDEC** (opcode UART `0x49`): SPI `0x9F` → 3 byte → UART.
+
+**10) 'T' Read SR** (opcode UART `0x54`): SPI `0x05` → 1 byte → UART.
+
+### Perché il condensatore (1 µF tra VCC e GND)
+
+Il W25Q64FV in stato di lettura assorbe ~4 mA. Durante una **Page Program**
+(0.7 ms tipico, 3 ms max) attiva una charge-pump interna che genera la
+tensione di programmazione delle celle NOR (~10 V), e assorbe ~25 mA di
+picco da VCC per tutta la durata del program.
+
+Sul nostro setup, la VCC del breakout arriva da un pin 3V3 della Tang Nano
+attraverso un **filino Dupont di ~10 cm**. Quel filino ha impedenza non
+trascurabile per impulsi corti: stima dell'induttanza parassita ≈ 100 nH
+(rule of thumb: ~10 nH/cm). Quando i 25 mA si attivano in qualche µs, la
+caduta di tensione V = L·di/dt sul filino è dell'ordine di 100 nH · (25 mA /
+1 µs) = **2.5 mV** — non grossa di per sé. Ma in pratica il problema vero è
+diverso e più subdolo:
+
+- **Crosstalk fra fili SCK/MOSI vicini**: SCK toggla a 1.27 MHz o 5 MHz,
+  e la sua impedenza di driver è bassa. Le transizioni inducono pickup
+  capacitivo sui fili VCC/GND adiacenti, drogando la tensione di
+  alimentazione al chip nei momenti critici.
+- **Imperfetto contatto Dupont**: i connettori dei filini Dupont sono
+  sostanzialmente molle metalliche, con resistenze di contatto variabili
+  (50 mΩ–1 Ω). Quando il chip tira corrente, la R·I genera droop
+  microsecondo-secondo.
+
+Il cap **1 µF in parallelo a VCC** funziona da "tampone locale": è una
+riserva di carica direttamente ai pin del chip. Durante il picco di
+charge-pump, la corrente viene dal cap (vicinissimo) invece di doverla
+estrarre attraverso il filino. La VCC al chip resta stabile sopra la sua
+soglia minima (2.7 V) e il chip non glitcha mid-write.
+
+Effetto misurato sul campo (log USB pre/post cap):
+
+- Pre-cap: SR `0x02` sticky dopo ogni boot (WEL non si resettava → WRSR
+  rifiutata silenziosamente), ~100% write fail, dati che apparivano e
+  sparivano random tra power-cycle.
+- Post-cap: SR `0x00` clean dopo boot (WRSR ora completa), ~50% write
+  passa al primo attempt, il resto al 2-3, retry+verify le porta tutte a
+  conclusione. Persistenza tra power-cycle finalmente funzionante.
+
+Il cap consigliato in letteratura per decoupling SPI flash è **100 nF
+ceramico** vicino al pin VCC del chip (per disturbi alti) **+ 10 µF
+elettrolitico** sul bus di alimentazione (per droop più lenti). Noi
+abbiamo messo solo 1 µF (il pezzo che era a portata di mano) e funziona
+abbastanza, ma a rigore servirebbe la doppia capacitanza.
+
+### Perché il clock SPI così basso
+
+Default scelto: **`SPI_DIV = 64`** in [src/top.vhd](src/top.vhd) →
+`clk_spi = 40.5 MHz / 64 ≈ 633 kHz`. Sembra ridicolo per un chip che
+supporta fino a 104 MHz, ma è giustificato dal setup fisico.
+
+Storia delle riduzioni:
+
+| Versione | SPI_DIV | f_SPI | Bit period | Sintomo |
+|---|---|---|---|---|
+| iniziale | 8 | 5.06 MHz | 197 ns | Sector erase fallivano sempre (POLL_MAX corto), write parziali frequenti |
+| dopo POLL_MAX 25M | 8 | 5.06 MHz | 197 ns | Erase ora OK, ma WRSR rifiutata (WEL sticky), ~100% write parziali |
+| dimezzato | 16 | 2.5 MHz | 400 ns | Migliore, ma `come va?` arrivava come `co` (page program data phase corrotta) |
+| ancora dimezzato | 32 | 1.27 MHz | 790 ns | ~50% write OK al primo, il resto al 2-3 attempt |
+| **attuale** | **64** | **633 kHz** | **1.58 µs** | First-attempt success >> 90%, retry quasi mai necessario |
+
+La ragione tecnica del perché abbassare aiuta: a clock alti il bit period
+dura pochi nanosecondi e il **setup/hold del campionamento sul fronte
+attivo di SCK** è strettissimo. Su filini volanti con induttanza/capacità
+parassita non controllata, MOSI presenta ringing nei nanosecondi che
+seguono il fronte di SCK, e il flip-flop interno del chip può campionare
+il livello sbagliato. Abbassando la frequenza:
+
+- Il segnale ha tempo di **stabilizzarsi** prima del sampling (a 633 kHz,
+  790 ns dopo il fronte di SCK il MOSI è già morto).
+- I picchi di crosstalk con i fili adiacenti diventano **piccoli rispetto
+  alla durata del bit**: anche se il segnale ha un transient di 50 ns, su
+  un bit period di 1580 ns è irrilevante.
+
+Trade-off: una Page Program prende `(4 byte addr + 16 byte data) * 8 bit *
+1.58 µs/bit + overhead FSM ≈ 250 µs` invece di `~50 µs`. Sul timescale
+del progetto (dashboard, presence ogni qualche secondo, note rare), è
+trascurabile.
+
+### Perché il retry x5 lato ESP32
+
+File: [esp32-firmware/src/flash_link.cpp](esp32-firmware/src/flash_link.cpp),
+funzioni `flash_log_append` e `flash_set_settings`.
+
+Cosa fa:
+
+1. Costruisce il record (16 B per log, 32 B per settings).
+2. Manda l'opcode `L` o `S` + dati sull'UART.
+3. Aspetta `'K'` dalla FSM.
+4. Legge indietro il record appena scritto via `'G'`/`'Q'`.
+5. Confronta TUTTI i byte (non solo i primi due). Se anche un solo byte è
+   diverso → fallimento, riprova.
+6. Fino a **5 tentativi**, poi rinuncia.
+
+Ogni tentativo fallito brucia uno slot della NOR (la FSM incrementa head a
+prescindere): non è un problema perché lo SCAN del prossimo boot, grazie al
+nuovo filtro `type ∈ {B,R,P,N,E}`, ignora questi slot garbage. Non vengono
+mai mostrati nella dashboard e non confondono il puntamento di head.
+
+Perché serve la verify *full-16-byte*: prima delle versioni recenti, in
+diversi log abbiamo visto write parziali dove `seq+type` erano OK ma il
+`text` era a metà (es. `"come va?"` salvato come `"co"`). Verificare solo
+i primi 3 byte mascherava il bug.
+
+Quando la verify-full passa al primo tentativo: il record è genuinamente
+in NOR ed è completo. Quando passa al tentativo N, **N-1 slot intermedi
+sono garbage** ma il record N-esimo è completo e leggibile.
+
+### Lato ESP32: cache RAM di 60 record + safety net settings
+
+Anche se la write fallisce definitivamente dopo 5 retry, il record viene
+comunque pushato in una **cache RAM** sull'ESP32 (60 slot, ring buffer).
+La funzione `send_flash_log` lato WebSocket fonde i record da NOR con i
+record dalla cache, deduplicando per `seq`. Effetto: durante la sessione
+in corso, i record si vedono SEMPRE nella dashboard anche se la NOR ha
+fallito; al power-cycle la cache si perde e restano solo i record che la
+NOR ha davvero persistito.
+
+`flash_get_settings` ha un **sanity check** prima di restituire i dati:
+
+- magic byte `b[0]` deve essere `0xA5`;
+- `tries` (`b[18]`) deve essere in `[1, 30]`;
+- `name` (`b[1..15]`) deve essere ASCII stampabile (`0x20..0x7E`) o
+  terminato con `0x00`.
+
+Se uno di questi check fallisce (NOR letta con write parziale storica)
+torna i default `"Master EFES"`/`tries=6`/`auto=0`. Evita di mostrare nella
+dashboard cose come `"Master ?????"` o `tries=255`.
+
+### Lato dashboard: lettura tolerant-of-holes
+
+File: [esp32-firmware/src/web_link.cpp](esp32-firmware/src/web_link.cpp),
+funzione `send_flash_log`.
+
+Vecchio loop: leggi da `head-1` indietro, fermati al primo `rec[2] == 0xFF`.
+Problema: con i retry, fra le sessioni ci sono slot con `0xFF` (write
+fallite, garbage parziale) che facevano abortire la lettura subito,
+nascondendo tutto lo storico.
+
+Nuovo loop: scorre TUTTI i 512 slot, accetta solo quelli con
+`rec[2] ∈ {B,R,P,N,E}`, ferma a 60 record raccolti o slot finiti. I buchi
+vengono skippati, lo storico vero diventa visibile.
+
+### Cosa rimane di "non perfetto"
+
+1. **Retry occasionali**: a 633 kHz dovrebbero diventare rarissimi (tipo
+   1% degli attempt). Se diventano frequenti, primo sospetto è il cavo
+   VCC che si è allentato o il cap si è dissaldato.
+2. **Cap minimale**: 1 µF ceramico/elettrolitico va, ma ortodossamente si
+   dovrebbe avere 100 nF + 10 µF in parallelo (HF + LF decoupling).
+3. **SR `0xFF` glitch al primissimo boot**: la prima `flash_read_sr` dopo
+   il power-on a volte torna `0xFF` (lettura prima che il chip sia
+   completamente sveglio). Il flag `s_chip_locked(sw)` viene erroneamente
+   alzato ma non blocca nulla operativamente perché il vero gate è lato
+   FPGA (`chip_locked` signal). È solo un messaggio cosmetico spurio.
+4. **Wear-out**: con i retry, ogni write logico costa fino a 5 slot. La
+   stima di vita ufficiale (8 anni del DIARIO 2026-05-28) scende a ~1.6
+   anni nel pessimo caso 5x retry costante. Comunque abbondante per il
+   progetto, e nella pratica i retry sono rari.
+
+### Pin map definitiva (per il report)
+
+```
++-----------------+----------+-------------------+------------+----------------+
+| Segnale         | FPGA pin | Banco/Tensione    | Breakout   | ESP32 GPIO     |
++-----------------+----------+-------------------+------------+----------------+
+| SPI flash CLK   | 42       | BANK6 / 3.3 V LV  | CLK        | —              |
+| SPI flash CS    | 41       | BANK6 / 3.3 V LV  | CS         | —              |
+| SPI flash MOSI  | 51       | BANK6 / 3.3 V LV  | DI         | —              |
+| SPI flash MISO  | 48       | BANK6 / 3.3 V LV  | DO         | —              |
+| UART flash TX   | 72       | BANK6 / 3.3 V LV  | —          | 32 (Serial1 RX)|
+| UART flash RX   | 20       | BANK6 / 3.3 V LV  | —          | 33 (Serial1 TX)|
+| Alim 3V3 / GND  | 3V3/GND  | (rail TN20K)      | VCC / GND  | —              |
+| Cap 1 µF        | —        | —                 | VCC ↔ GND  | —              |
++-----------------+----------+-------------------+------------+----------------+
+```
+
+Tutto su BANK6 a 3.3 V perché BANK5 della Tang Nano 20K è bloccato a 1.8 V
+dal `ser_tx`/`ser_rx` del programmer. Niente level shifter, GND comune
+obbligatorio tra Tang Nano, ESP32 e breakout.
+
+### Riassunto: cosa il prof può vedere funzionare
+
+- **FSM su FPGA**: tutta la logica SPI (`flash_ctrl.vhd`, 250+ righe di stati
+  espliciti), non bridge passivo. L'ESP32 manda comandi alto livello tipo
+  "L+16B" o "S+32B", non opcode SPI grezzi.
+- **NOR persistente**: scrivi una nota, stacchi corrente, riattacchi, nota
+  ancora lì. Idem per le impostazioni (`tries`, `auto`, `name`).
+- **Diagnostica completa**: USB serial mostra SR decoded, JEDEC, dump dei
+  primi 10 slot, head pointer, retry count per ogni write.
+- **Ring buffer**: 2 settori (512 slot) gestiti come FIFO circolare,
+  sector erase automatico al boundary.
+- **Robustezza al rumore**: SCAN che valida `type` letters, retry+verify
+  full-record, cache RAM ESP32, sanity check su settings letti.
+
+

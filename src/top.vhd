@@ -740,7 +740,15 @@ begin
         generic map (
             CLK_HZ  => 40_500_000,
             BAUD    => 115200,
-            SPI_DIV => 8
+            -- SPI_DIV=64 -> SPI clock ~633 kHz. A 1.27 MHz (DIV=32) le write
+            -- passavano ma con ~50% di retry al 2-3 attempt: SI ancora
+            -- marginale sui filini volanti senza ground plane. A 633 kHz
+            -- ogni bit dura 1.58 us (setup+hold abbondanti), e i fronti SCK
+            -- diventano talmente lenti che induttanze parassite e crosstalk
+            -- non riescono piu' a sporcare il sampling del W25Q. Trade-off:
+            -- una page program richiede ~250 us invece di 50 us, irrilevante
+            -- visto che la verify+retry ESP32 spendeva di piu' a recuperare.
+            SPI_DIV => 64
         )
         port map (
             clk_i        => clk_sdram,

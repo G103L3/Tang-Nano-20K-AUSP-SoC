@@ -135,7 +135,7 @@
     "SubInsts" : [
      {
       "InstFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/flash_ctrl.vhd",
-      "InstLine" : 111,
+      "InstLine" : 122,
       "InstName" : "u_rx",
       "ModuleFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/uart_rx_char.vhd",
       "ModuleLine" : 7,
@@ -143,7 +143,7 @@
      },
      {
       "InstFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/flash_ctrl.vhd",
-      "InstLine" : 116,
+      "InstLine" : 127,
       "InstName" : "u_tx",
       "ModuleFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/uart_tx_char.vhd",
       "ModuleLine" : 8,
@@ -151,7 +151,7 @@
      },
      {
       "InstFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/flash_ctrl.vhd",
-      "InstLine" : 121,
+      "InstLine" : 132,
       "InstName" : "u_spi",
       "ModuleFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/flash_spi.vhd",
       "ModuleLine" : 5,
@@ -161,7 +161,7 @@
    },
    {
     "InstFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/top.vhd",
-    "InstLine" : 788,
+    "InstLine" : 796,
     "InstName" : "u_uart_rx",
     "ModuleFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/uart_rx_char.vhd",
     "ModuleLine" : 7,

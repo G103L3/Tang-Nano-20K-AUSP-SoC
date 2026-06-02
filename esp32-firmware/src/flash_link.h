@@ -24,6 +24,14 @@ typedef struct {
     uint8_t  presence_tries;
 } flash_settings_t;
 
+typedef struct {
+    uint16_t seq;
+    uint8_t  type;
+    uint32_t t_sec;
+    uint8_t  val;
+    char     text[9];
+} flash_cache_rec_t;
+
 void flash_link_init(void);
 bool flash_read_id(uint8_t id[3]);
 bool flash_read_sr(uint8_t *sr);
@@ -33,6 +41,10 @@ int  flash_log_read(int slot, int n, uint8_t *out);
 bool flash_log_clear(void);
 bool flash_get_settings(flash_settings_t *s);
 bool flash_set_settings(const flash_settings_t *s);
+
+int  flash_cache_get(flash_cache_rec_t *out, int max);
+void flash_log_dump_diagnostic(void);
+bool flash_is_chip_locked(void);
 
 #ifdef __cplusplus
 }
