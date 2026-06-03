@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <string.h>
 #include "flash_link.h"
+#include "uart_reg.h"
 
 #ifndef FLASH_UART_RX_PIN
 #define FLASH_UART_RX_PIN 32
@@ -22,21 +23,11 @@ static int  s_cache_count = 0;
 static bool s_chip_locked = false;
 
 static void flush_in(void) {
-    while (Serial1.available()) Serial1.read();
+    uart_reg_flush_rx(UART_REG_FLASH);
 }
 
 static int read_bytes(uint8_t *out, int n, unsigned long to_ms) {
-    int got = 0;
-    unsigned long t0 = millis();
-    while (got < n) {
-        if (Serial1.available()) {
-            out[got++] = (uint8_t)Serial1.read();
-            t0 = millis();
-        } else if (millis() - t0 > to_ms) {
-            break;
-        }
-    }
-    return got;
+    return uart_reg_read_bytes(UART_REG_FLASH, out, n, (uint32_t)to_ms * 1000u);
 }
 
 static void cache_push(const uint8_t *rec) {
@@ -69,9 +60,9 @@ static void consume_boot_sr_report(void) {
      * mi dara' comunque il SR via opcode 'T'. */
     unsigned long t0 = millis();
     while (millis() - t0 < 50) {
-        if (Serial1.available()) {
-            uint8_t b = (uint8_t)Serial1.read();
-            if (b == 'S') {
+        if (uart_reg_available(UART_REG_FLASH)) {
+            int rb = uart_reg_read(UART_REG_FLASH);
+            if (rb == 'S') {
                 uint8_t sr = 0xFF;
                 if (read_bytes(&sr, 1, 80) == 1) {
                     print_sr_decoded("boot", sr);
@@ -87,7 +78,7 @@ static void consume_boot_sr_report(void) {
 }
 
 void flash_link_init(void) {
-    Serial1.begin(FLASH_UART_BAUD, SERIAL_8N1, FLASH_UART_RX_PIN, FLASH_UART_TX_PIN);
+    uart_reg_init(UART_REG_FLASH, FLASH_UART_RX_PIN, FLASH_UART_TX_PIN, FLASH_UART_BAUD);
     delay(50);
     consume_boot_sr_report();
     flush_in();
@@ -126,19 +117,19 @@ void flash_link_init(void) {
 
 bool flash_read_id(uint8_t id[3]) {
     flush_in();
-    Serial1.write((uint8_t)'I');
+    uart_reg_write_byte(UART_REG_FLASH, 'I');
     return read_bytes(id, 3, FLASH_TIMEOUT_MS) == 3;
 }
 
 bool flash_read_sr(uint8_t *sr) {
     flush_in();
-    Serial1.write((uint8_t)'T');
+    uart_reg_write_byte(UART_REG_FLASH, 'T');
     return read_bytes(sr, 1, FLASH_TIMEOUT_MS) == 1;
 }
 
 int flash_log_head(void) {
     flush_in();
-    Serial1.write((uint8_t)'H');
+    uart_reg_write_byte(UART_REG_FLASH, 'H');
     uint8_t b[2];
     if (read_bytes(b, 2, FLASH_TIMEOUT_MS) != 2) return -1;
     return ((int)b[0] << 8) | b[1];
@@ -172,8 +163,8 @@ bool flash_log_append(uint8_t type, uint32_t t_sec, uint8_t val, const char *tex
 
     for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         flush_in();
-        Serial1.write((uint8_t)'L');
-        Serial1.write(rec, FLASH_REC_BYTES);
+        uart_reg_write_byte(UART_REG_FLASH, 'L');
+        uart_reg_write(UART_REG_FLASH, rec, FLASH_REC_BYTES);
         uint8_t ack;
         int n = read_bytes(&ack, 1, FLASH_TIMEOUT_MS);
         if (n != 1) {
@@ -225,16 +216,16 @@ bool flash_log_append(uint8_t type, uint32_t t_sec, uint8_t val, const char *tex
 int flash_log_read(int slot, int n, uint8_t *out) {
     if (n < 1 || n > 4) return -1;
     flush_in();
-    Serial1.write((uint8_t)'G');
-    Serial1.write((uint8_t)((slot >> 8) & 0xFF));
-    Serial1.write((uint8_t)(slot & 0xFF));
-    Serial1.write((uint8_t)n);
+    uart_reg_write_byte(UART_REG_FLASH, 'G');
+    uart_reg_write_byte(UART_REG_FLASH, (uint8_t)((slot >> 8) & 0xFF));
+    uart_reg_write_byte(UART_REG_FLASH, (uint8_t)(slot & 0xFF));
+    uart_reg_write_byte(UART_REG_FLASH, (uint8_t)n);
     return read_bytes(out, n * FLASH_REC_BYTES, FLASH_TIMEOUT_MS);
 }
 
 bool flash_log_clear(void) {
     flush_in();
-    Serial1.write((uint8_t)'C');
+    uart_reg_write_byte(UART_REG_FLASH, 'C');
     uint8_t ack;
     bool ok = read_bytes(&ack, 1, 2000) == 1 && ack == 'K';
     if (ok) {
@@ -246,7 +237,7 @@ bool flash_log_clear(void) {
 
 bool flash_get_settings(flash_settings_t *s) {
     flush_in();
-    Serial1.write((uint8_t)'Q');
+    uart_reg_write_byte(UART_REG_FLASH, 'Q');
     uint8_t b[FLASH_SET_BYTES];
     if (read_bytes(b, FLASH_SET_BYTES, FLASH_TIMEOUT_MS) != FLASH_SET_BYTES) return false;
 
@@ -299,8 +290,8 @@ bool flash_set_settings(const flash_settings_t *s) {
 
     for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         flush_in();
-        Serial1.write((uint8_t)'S');
-        Serial1.write(b, FLASH_SET_BYTES);
+        uart_reg_write_byte(UART_REG_FLASH, 'S');
+        uart_reg_write(UART_REG_FLASH, b, FLASH_SET_BYTES);
         uint8_t ack;
         int n = read_bytes(&ack, 1, 2000);
         if (n != 1) {
@@ -317,7 +308,7 @@ bool flash_set_settings(const flash_settings_t *s) {
         }
 
         flush_in();
-        Serial1.write((uint8_t)'Q');
+        uart_reg_write_byte(UART_REG_FLASH, 'Q');
         if (read_bytes(rb, FLASH_SET_BYTES, FLASH_TIMEOUT_MS) != FLASH_SET_BYTES) {
             Serial.printf("[flash] settings att.%d/%d: verify read fail\n", attempt, MAX_RETRIES);
             continue;

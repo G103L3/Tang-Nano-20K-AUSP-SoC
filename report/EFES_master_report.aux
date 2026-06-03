@@ -1,0 +1,108 @@
+\relax 
+\providecommand \babel@aux [2]{\global \let \babel@toc \@gobbletwo }
+\@nameuse{bbl@beforestart}
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\babel@aux{english}{}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{4}{section.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.1}What this report focuses on}{4}{subsection.1.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.2}Reading map}{4}{subsection.1.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2}System overview}{5}{section.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Bird eye view}{5}{subsection.2.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces System level view. The two boards talk over the air using audible tones (squiggly red arrows). The master also has a Wi\,Fi link to a Cloudflare Worker that relays WebSocket traffic to a browser dashboard.}}{5}{figure.caption.2}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{fig:system}{{1}{5}{System level view. The two boards talk over the air using audible tones (squiggly red arrows). The master also has a Wi\,Fi link to a Cloudflare Worker that relays WebSocket traffic to a browser dashboard}{figure.caption.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}The master, opened up}{5}{subsection.2.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Master node, opened up. The ESP32 talks to the FPGA via two independent UART links (one for flash storage, one for the audio codebook). The FPGA talks to the W25Q64FV NOR flash, the SPI MEMS microphone, and the speaker output stage. The ESP32 also exposes a USB serial console for the laptop side, used during development.}}{5}{figure.caption.3}\protected@file@percent }
+\newlabel{fig:master}{{2}{5}{Master node, opened up. The ESP32 talks to the FPGA via two independent UART links (one for flash storage, one for the audio codebook). The FPGA talks to the W25Q64FV NOR flash, the SPI MEMS microphone, and the speaker output stage. The ESP32 also exposes a USB serial console for the laptop side, used during development}{figure.caption.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3}The FPGA SoC, top level view}{6}{section.3}\protected@file@percent }
+\newlabel{sec:soc}{{3}{6}{The FPGA SoC, top level view}{section.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}High level block diagram}{7}{subsection.3.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces SoC top level. All masters and slaves hang off a single vertical Wishbone style bus. The original course template used an Avalon style bus and a generic DMA, but in our build we replaced the DMA with a streaming hardware accelerator that pipes audio samples from the SPI microphone into block RAM and from there into the FFT engine and finally into SDRAM, with no CPU intervention on the per sample path. The NOR flash controller hangs off the bus too and exposes itself to the outside world via a dedicated UART line back to the ESP32.}}{7}{figure.caption.4}\protected@file@percent }
+\newlabel{fig:soc}{{3}{7}{SoC top level. All masters and slaves hang off a single vertical Wishbone style bus. The original course template used an Avalon style bus and a generic DMA, but in our build we replaced the DMA with a streaming hardware accelerator that pipes audio samples from the SPI microphone into block RAM and from there into the FFT engine and finally into SDRAM, with no CPU intervention on the per sample path. The NOR flash controller hangs off the bus too and exposes itself to the outside world via a dedicated UART line back to the ESP32}{figure.caption.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Bus and address map}{7}{subsection.3.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Bus address map (slave base addresses, byte addressing).}}{8}{table.caption.5}\protected@file@percent }
+\newlabel{tab:addrmap}{{1}{8}{Bus address map (slave base addresses, byte addressing)}{table.caption.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}What changed from the course template}{8}{subsection.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Component deep dives}{8}{section.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}The soft CPU}{8}{subsection.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Clock tree (rPLL plus per peripheral prescalers)}{9}{subsection.4.2}\protected@file@percent }
+\newlabel{sec:clocks}{{4.2}{9}{Clock tree (rPLL plus per peripheral prescalers)}{subsection.4.2}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Clock tree. The rPLL takes the 27 MHz crystal and produces two synchronous clocks at 40.5 MHz (bus) and 100 MHz (SDRAM, with phase shift). Each peripheral that needs a slower clock instantiates its own integer divider downstream of the bus clock. We did not use Gowin clock gating primitives for any of these, simply because the divider counters are trivial in resources and give us per peripheral control of the prescaler ratio at synthesis time.}}{10}{figure.caption.6}\protected@file@percent }
+\newlabel{fig:clocktree}{{4}{10}{Clock tree. The rPLL takes the 27 MHz crystal and produces two synchronous clocks at 40.5 MHz (bus) and 100 MHz (SDRAM, with phase shift). Each peripheral that needs a slower clock instantiates its own integer divider downstream of the bus clock. We did not use Gowin clock gating primitives for any of these, simply because the divider counters are trivial in resources and give us per peripheral control of the prescaler ratio at synthesis time}{figure.caption.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}SDRAM controller}{10}{subsection.4.3}\protected@file@percent }
+\newlabel{sec:sdram}{{4.3}{10}{SDRAM controller}{subsection.4.3}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.3.1}Init sequence}{10}{subsubsection.4.3.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces SDRAM read cycle, simplified. ACTIVATE opens the row, READ selects the column, the chip drives the data line three clocks later (CAS latency 3). PRECHARGE closes the row.}}{11}{figure.caption.7}\protected@file@percent }
+\newlabel{fig:sdram-timing}{{5}{11}{SDRAM read cycle, simplified. ACTIVATE opens the row, READ selects the column, the chip drives the data line three clocks later (CAS latency 3). PRECHARGE closes the row}{figure.caption.7}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.3.2}Problems we had}{11}{subsubsection.4.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Hardware accelerator pipeline}{11}{subsection.4.4}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Streaming pipeline from microphone to decoded symbol. Each stage is autonomous: the SPI receiver pushes samples into BSRAM as they arrive, the FFT engine pulls 256 sample windows out and produces magnitude bins which are stored in SDRAM, the audio decoder watches the bins for tones matching our codebook and emits a character on the UART when it sees one.}}{11}{figure.caption.8}\protected@file@percent }
+\newlabel{fig:audio-pipeline}{{6}{11}{Streaming pipeline from microphone to decoded symbol. Each stage is autonomous: the SPI receiver pushes samples into BSRAM as they arrive, the FFT engine pulls 256 sample windows out and produces magnitude bins which are stored in SDRAM, the audio decoder watches the bins for tones matching our codebook and emits a character on the UART when it sees one}{figure.caption.8}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.4.1}The FFT engine}{11}{subsubsection.4.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.4.2}Audio decoder, parabolic peak interpolation}{12}{subsubsection.4.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.4.3}The window radius problem}{12}{subsubsection.4.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}PWM speaker}{12}{subsection.4.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.6}NOR flash controller (\texttt  {flash\_ctrl})}{12}{subsection.4.6}\protected@file@percent }
+\newlabel{sec:flashctrl}{{4.6}{12}{NOR flash controller (\texttt {flash\_ctrl})}{subsection.4.6}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.6.1}Memory layout}{13}{subsubsection.4.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.6.2}Top level state machine}{13}{subsubsection.4.6.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces High level state machine of \texttt  {flash\_ctrl}. After power up the FSM runs a boot sequence that clears block protection bits in SR1 and SR2, runs a Global Block Unlock (opcode 0x98), reads SR1 back to confirm the chip is unlocked, and finally scans all 512 log slots to find the head of the ring buffer. From IDLE, opcodes drive one of the operation paths.}}{13}{figure.caption.9}\protected@file@percent }
+\newlabel{fig:flashctrl-fsm}{{7}{13}{High level state machine of \texttt {flash\_ctrl}. After power up the FSM runs a boot sequence that clears block protection bits in SR1 and SR2, runs a Global Block Unlock (opcode 0x98), reads SR1 back to confirm the chip is unlocked, and finally scans all 512 log slots to find the head of the ring buffer. From IDLE, opcodes drive one of the operation paths}{figure.caption.9}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Zoom on the log append (opcode \texttt  {L}) path. After collecting 16 bytes of payload from the UART, the FSM probes the target slot's first byte to decide whether to erase the sector first or just program directly. This self healing behavior was added late in the project after we saw that write parials would leave the head pointer pointing at a slot whose first byte was not 0xFF anymore, causing later writes to AND corrupt the data.}}{14}{figure.caption.10}\protected@file@percent }
+\newlabel{fig:append-fsm}{{8}{14}{Zoom on the log append (opcode \texttt {L}) path. After collecting 16 bytes of payload from the UART, the FSM probes the target slot's first byte to decide whether to erase the sector first or just program directly. This self healing behavior was added late in the project after we saw that write parials would leave the head pointer pointing at a slot whose first byte was not 0xFF anymore, causing later writes to AND corrupt the data}{figure.caption.10}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.6.3}The SCAN strategy}{14}{subsubsection.4.6.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.6.4}Block protection unlock at boot}{14}{subsubsection.4.6.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.6.5}Polling tolerance}{15}{subsubsection.4.6.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.7}UART char modules}{15}{subsection.4.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.8}Timer and GPIO}{15}{subsection.4.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Outside the FPGA}{15}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}The W25Q64FV NOR flash chip}{15}{subsection.5.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces W25Q64FV pinout, SOIC 8 package (top view). Pin 1 is the \texttt  {/CS} chip select. The DollaTek breakout exposes pins 1, 2, 5, 6 on its header, plus VCC and GND, and ties pins 3 and 7 internally to VCC.}}{15}{figure.caption.11}\protected@file@percent }
+\newlabel{fig:w25q-pinout}{{9}{15}{W25Q64FV pinout, SOIC 8 package (top view). Pin 1 is the \texttt {/CS} chip select. The DollaTek breakout exposes pins 1, 2, 5, 6 on its header, plus VCC and GND, and ties pins 3 and 7 internally to VCC}{figure.caption.11}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {5.1.1}Inside the NOR cell}{16}{subsubsection.5.1.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Cross section of a NOR floating gate cell. The trapped charge on the floating gate shifts the threshold of the transistor. Programming pushes electrons from the channel up into the floating gate by Fowler Nordheim tunneling at high V\_CG. Erasing pulls them back down with the opposite polarity. The current driven through these gate dielectrics is where the chip's ``program current'' and ``erase current'' peaks come from.}}{16}{figure.caption.12}\protected@file@percent }
+\newlabel{fig:nor-cell}{{10}{16}{Cross section of a NOR floating gate cell. The trapped charge on the floating gate shifts the threshold of the transistor. Programming pushes electrons from the channel up into the floating gate by Fowler Nordheim tunneling at high V\_CG. Erasing pulls them back down with the opposite polarity. The current driven through these gate dielectrics is where the chip's ``program current'' and ``erase current'' peaks come from}{figure.caption.12}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {5.1.2}Wiring}{16}{subsubsection.5.1.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Wiring between Tang Nano 20K FPGA, W25Q64FV breakout, and ESP32.}}{16}{table.caption.13}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Embedded SDRAM die}{16}{subsection.5.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces SDRAM pin map (internal, fixed by the GW2AR\,18 silicon).}}{17}{table.caption.14}\protected@file@percent }
+\newlabel{tab:sdram-pins}{{3}{17}{SDRAM pin map (internal, fixed by the GW2AR\,18 silicon)}{table.caption.14}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}SPI MEMS microphone}{17}{subsection.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Op amp speaker buffer}{17}{subsection.5.4}\protected@file@percent }
+\newlabel{sec:opamp}{{5.4}{17}{Op amp speaker buffer}{subsection.5.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {11}{\ignorespaces Speaker output stage. The PWM signal from the FPGA is buffered by a unity inverting op amp (configured with equal resistors so gain is $-1$, polarity is then absorbed into the PWM table), then low pass filtered by an RC stage tuned to roll off above the audible band, then fed to the small 8 ohm speaker.}}{17}{figure.caption.15}\protected@file@percent }
+\newlabel{fig:opamp}{{11}{17}{Speaker output stage. The PWM signal from the FPGA is buffered by a unity inverting op amp (configured with equal resistors so gain is $-1$, polarity is then absorbed into the PWM table), then low pass filtered by an RC stage tuned to roll off above the audible band, then fed to the small 8 ohm speaker}{figure.caption.15}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}ESP32 connections}{17}{subsection.5.5}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces ESP32 pin assignments.}}{18}{table.caption.16}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6}Signal integrity, voltage droops, decoupling}{18}{section.6}\protected@file@percent }
+\newlabel{sec:si}{{6}{18}{Signal integrity, voltage droops, decoupling}{section.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}The W25Q64FV brownout during sector erase}{18}{subsection.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}First capacitor: 1 \textmu F}{18}{subsection.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Second capacitor: 10 \textmu F in parallel}{18}{subsection.6.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.4}SPI clock speed reduction}{19}{subsection.6.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.5}Retry plus verify on the ESP32 side}{19}{subsection.6.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.6}The fallback FFL diagnostics}{19}{subsection.6.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}ESP32 firmware}{20}{section.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.1}Architecture}{20}{subsection.7.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.2}Register level UART, instead of HardwareSerial}{20}{subsection.7.2}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {1}{\ignorespaces register level UART, key routines}}{20}{lstlisting.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.3}flash\_link with retry and verify}{21}{subsection.7.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.4}Defensive read of settings}{21}{subsection.7.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8}The acoustic protocol}{21}{section.8}\protected@file@percent }
+\newlabel{sec:protocol}{{8}{21}{The acoustic protocol}{section.8}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {8.1}Codebook}{21}{subsection.8.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Codebook symbols.}}{22}{table.caption.17}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {8.2}CSMA on the air}{22}{subsection.8.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {8.3}Retries}{22}{subsection.8.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {9}What worked, what did not}{22}{section.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.1}Things that worked end to end}{22}{subsection.9.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.2}Things we tried and discarded}{23}{subsection.9.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.3}What still wobbles}{23}{subsection.9.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.4}Numbers from the bench}{23}{subsection.9.4}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Empirical reliability of the NOR flash operations, after the final fix set (633 kHz SPI, 11 \textmu F decoupling, retry plus verify).}}{23}{table.caption.18}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {10}Conclusions}{23}{section.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {A}Quick reference card}{24}{appendix.A}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces Quick reference of magic numbers used throughout the project.}}{24}{table.caption.19}\protected@file@percent }
+\gdef \@abspage@last{24}

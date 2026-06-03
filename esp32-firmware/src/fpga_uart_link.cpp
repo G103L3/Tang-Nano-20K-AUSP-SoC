@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include "fpga_uart_link.h"
 #include "protocol.h"
+#include "uart_reg.h"
 
 #ifndef FPGA_UART_BAUD
 #define FPGA_UART_BAUD   115200
@@ -49,7 +50,7 @@ static bool rx_alt    = true;          /* il pattern e' strettamente alternato? 
 static unsigned long rx_last_sym_ms = 0;
 
 void fpga_uart_init(void) {
-    Serial2.begin(FPGA_UART_BAUD, SERIAL_8N1, FPGA_UART_RX_PIN, FPGA_UART_TX_PIN);
+    uart_reg_init(UART_REG_FPGA, FPGA_UART_RX_PIN, FPGA_UART_TX_PIN, FPGA_UART_BAUD);
 }
 
 static void rx_reset(void) { rx_first = -1; rx_len = 0; rx_last = -1; rx_alt = true; }
@@ -67,8 +68,10 @@ static void rx_finish_pattern(void) {
 }
 
 void fpga_uart_tick(void) {
-    while (Serial2.available()) {
-        char c = (char)Serial2.read();
+    while (uart_reg_available(UART_REG_FPGA)) {
+        int rb = uart_reg_read(UART_REG_FPGA);
+        if (rb < 0) break;
+        char c = (char)rb;
 
         /* MAIUSCOLE A/B/C = carrier SLAVE (quello che il master riceve). */
         if (c == 'A' || c == 'B' || c == 'C') {
@@ -143,20 +146,20 @@ void fpga_uart_send_pattern(int first_bit, int length) {
 
     for (int k = 0; k < EOF_BURST; k++) {
         cs_wait_quiet();
-        Serial2.write((uint8_t)'c');
+        uart_reg_write_byte(UART_REG_FPGA, 'c');
         cs_pace(EMIT_PACE_MS);
     }
 
     for (int i = 0; i < length; i++) {
         cs_wait_quiet();
         int bit = first_bit ^ (i & 1);
-        Serial2.write((uint8_t)(bit ? 'b' : 'a'));
+        uart_reg_write_byte(UART_REG_FPGA, (uint8_t)(bit ? 'b' : 'a'));
         cs_pace(EMIT_PACE_MS);
     }
 
     for (int k = 0; k < EOF_BURST; k++) {
         cs_wait_quiet();
-        Serial2.write((uint8_t)'c');
+        uart_reg_write_byte(UART_REG_FPGA, 'c');
         cs_pace(EMIT_PACE_MS);
     }
 }

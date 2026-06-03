@@ -2178,3 +2178,405 @@ obbligatorio tra Tang Nano, ESP32 e breakout.
   full-record, cache RAM ESP32, sanity check su settings letti.
 
 
+## 2026-06-03 — UART register-level lato ESP32 (rimozione Serial1/Serial2 Arduino)
+
+### Motivazione
+
+Tutto il codice ESP32 fino a oggi appoggiava la comunicazione UART verso la
+FPGA su `Serial1` (linea flash, baud 115200, GPIO 32 RX / 33 TX) e `Serial2`
+(linea audio codebook, baud 115200, GPIO 27 RX / 14 TX). Queste sono istanze
+della classe `HardwareSerial` di Arduino-ESP32, che a sua volta richiama il
+driver UART di ESP-IDF (`uart_driver_install`, code FreeRTOS, interrupt
+handler IDF, ring buffer software, ecc.).
+
+Per il report e per la demo serviva una versione **register-level**: niente
+classe Arduino, niente driver IDF, accesso diretto ai registri hardware
+della periferica UART (CLKDIV, CONF0, CONF1, FIFO, STATUS, INT_*) e
+configurazione manuale di clock, pin matrix, FIFO. Più un timer hardware
+(TIMG0 Timer 0) usato come riferimento microsecondi per i timeout.
+
+### File aggiunti
+
+- [esp32-firmware/src/uart_reg.h](esp32-firmware/src/uart_reg.h)
+- [esp32-firmware/src/uart_reg.cpp](esp32-firmware/src/uart_reg.cpp)
+
+API esposta:
+
+```c
+#define UART_REG_FLASH 1     /* UART1 -> linea flash NOR via FPGA */
+#define UART_REG_FPGA  2     /* UART2 -> linea audio codebook via FPGA */
+
+void     uart_reg_init(int n, int rx_pin, int tx_pin, uint32_t baud);
+int      uart_reg_available(int n);                            /* RX FIFO count */
+int      uart_reg_read(int n);                                 /* -1 se vuoto */
+int      uart_reg_read_bytes(int n, uint8_t *buf, int sz,
+                             uint32_t timeout_us);
+void     uart_reg_write_byte(int n, uint8_t b);
+void     uart_reg_write(int n, const uint8_t *buf, int sz);
+void     uart_reg_flush_rx(int n);
+
+void     hw_timer_init(void);     /* TIMG0 Timer 0 a 1 MHz, free-running */
+uint64_t hw_timer_us(void);       /* 64-bit microsecond counter */
+```
+
+### Dettaglio implementativo
+
+**Clock peripherale**: in `uart_enable_clock(n)` si attiva manualmente il
+gate del clock e si rilascia il reset della periferica UARTn scrivendo i
+bit corretti di `DPORT_PERIP_CLK_EN_REG` (set) e `DPORT_PERIP_RST_EN_REG`
+(clear). Bit map: `DPORT_UART_CLK_EN` (UART0, bit 2), `DPORT_UART1_CLK_EN`
+(UART1, bit 5), `DPORT_UART2_CLK_EN` (UART2, bit 23). Senza questo step la
+periferica resta in reset e ogni accesso a un suo registro non ha effetto.
+
+**Baud rate**: la formula del divisore frazionario del W25Q… cioè di ESP32
+UART è `divisor_Q20.4 = APB_clk / baud`, dove APB_clk = 80 MHz di default.
+Per 115200 baud:
+
+- `integer = 80_000_000 / 115_200 = 694`
+- `fractional = (80_000_000 * 16 / 115_200) AND 0xF = 7`
+- `UART_CLKDIV_REG = 694 OR (7 << 20) = 0x7002B6`
+
+`CLKDIV_FRAG` occupa i bit 20..23 del registro, l'integer i bit 0..19.
+
+**Frame format**: `UART_CONF0_REG = (3 << UART_BIT_NUM_S) | (1 <<
+UART_STOP_BIT_NUM_S) | UART_TICK_REF_ALWAYS_ON`.
+
+- `UART_BIT_NUM_S` = 2, valore 3 → 8 data bit.
+- `UART_STOP_BIT_NUM_S` = 4, valore 1 → 1 stop bit.
+- `UART_TICK_REF_ALWAYS_ON` (bit 27) → riferimento clock = APB (richiesto
+  sopra qualche MHz).
+
+Niente parity (bit 0 e 1 a 0). Frame finale: 8N1 standard.
+
+**FIFO reset**: `SET_PERI_REG_MASK(...UART_RXFIFO_RST | UART_TXFIFO_RST)`
+poi `CLEAR_PERI_REG_MASK` con gli stessi bit. Pulse a 1 → svuota le FIFO
+hardware (128 byte ciascuna).
+
+**Pin matrix routing**: i pin GPIO 32/33/27/14 NON hanno UART come funzione
+diretta in IO_MUX, quindi devono passare per la GPIO matrix. La routine
+fa:
+
+1. `pinMode(tx_pin, OUTPUT)` e `pinMode(rx_pin, INPUT)` (l'unica chiamata
+   non-register-level, fa il setup IO_MUX per dare il pin in modalità GPIO
+   con direzione corretta — `gpio_pad_select_gpio` da `rom/gpio.h`
+   avrebbe fatto altrettanto ma richiede più boilerplate).
+2. `gpio_matrix_out(tx_pin, U{n}TXD_OUT_IDX, false, false)` — il segnale
+   TX della periferica UART viene instradato verso il pin specificato.
+3. `gpio_matrix_in(rx_pin, U{n}RXD_IN_IDX, false)` — il pin RX viene
+   collegato all'input della periferica UART.
+
+`U1TXD_OUT_IDX`, `U1RXD_IN_IDX`, `U2TXD_OUT_IDX`, `U2RXD_IN_IDX` sono
+costanti definite in `soc/gpio_sig_map.h`.
+
+**FIFO read/write**: il registro `UART_FIFO_REG(n)` è speciale: leggerlo
+estrae un byte dalla RX FIFO; scriverlo accoda un byte alla TX FIFO. Si
+usa lo stesso indirizzo per entrambe le direzioni:
+
+```c
+uint8_t b = READ_PERI_REG(UART_FIFO_REG(n)) & 0xFF;     /* RX */
+WRITE_PERI_REG(UART_FIFO_REG(n), (uint32_t)byte_to_send); /* TX */
+```
+
+Il conteggio della RX FIFO si legge da `UART_STATUS_REG` bit 0..7
+(`UART_RXFIFO_CNT_S` / `UART_RXFIFO_CNT_V`), la TX da bit 16..23. La
+funzione `uart_reg_write_byte` busy-aspetta finché la TX FIFO ha meno di
+127 byte (margine di 1 dal massimo di 128).
+
+**Timer hardware**: `hw_timer_init` configura **TIMG0 Timer 0** come
+contatore 64-bit ascendente con divisore 80 (clock APB 80 MHz / 80 =
+1 MHz → un tick ogni microsecondo). Sequenza:
+
+1. `TIMG_T0CONFIG_REG = 0` → disabilita per riprogrammazione.
+2. Carica `LOADLO=0`, `LOADHI=0`, scrive 1 a `LOAD_REG` per applicare.
+3. Riscrive `TIMG_T0CONFIG_REG` con `divider=80`, `autoreload=0`,
+   `increase=1`, `alarm_en=0`, `TIMG_T0_EN=1` → counter parte da 0 e
+   incrementa.
+
+`hw_timer_us()` per leggere il contatore: prima scrive 1 a `UPDATE_REG`
+per latchare il valore corrente nei registri `LO`/`HI` (atomicamente, il
+contatore è 64-bit e va letto sincronizzato), poi compone `(hi << 32) |
+lo`.
+
+Usato in `uart_reg_read_bytes` per i timeout: si campiona `t0 =
+hw_timer_us()` all'inizio e ad ogni byte ricevuto; se passano più di
+`timeout_us` microsecondi senza ricevere nulla, esce con il numero di
+byte raccolti.
+
+### File modificati
+
+- [esp32-firmware/src/flash_link.cpp](esp32-firmware/src/flash_link.cpp):
+  - `Serial1.begin(...)` → `uart_reg_init(UART_REG_FLASH, RX, TX, BAUD)`.
+  - `Serial1.write(b)` → `uart_reg_write_byte(UART_REG_FLASH, b)`.
+  - `Serial1.write(buf, n)` → `uart_reg_write(UART_REG_FLASH, buf, n)`.
+  - `Serial1.available()` → `uart_reg_available(UART_REG_FLASH)`.
+  - `Serial1.read()` → `uart_reg_read(UART_REG_FLASH)`.
+  - `flush_in()` → `uart_reg_flush_rx(UART_REG_FLASH)`.
+  - `read_bytes()` delega a `uart_reg_read_bytes`, convertendo `ms` in
+    `us` (`to_ms * 1000`).
+- [esp32-firmware/src/fpga_uart_link.cpp](esp32-firmware/src/fpga_uart_link.cpp):
+  - Analoghe sostituzioni `Serial2.*` → `uart_reg_*(UART_REG_FPGA, ...)`.
+
+Niente più `Serial1`/`Serial2` in tutto il firmware (l'unica `Serial` rimasta
+è quella USB per il monitor seriale lato PC, che resta Arduino standard).
+
+### Cosa abbiamo guadagnato (per il report)
+
+1. **Codice scolastico-friendly**: tutte le righe importanti sono
+   `READ_PERI_REG` / `WRITE_PERI_REG` su indirizzi documentati. Niente
+   "magia" Arduino.
+2. **Memoria/CPU footprint più bassi**: niente FreeRTOS task UART, niente
+   ring buffer interno IDF (che era 256 byte × 2 direzioni × 2 UART = 1 KB
+   risparmiato), niente interrupt handler (la polling busy-wait è
+   accettabile perché i baud sono solo 115200 e gli accessi sono burst
+   corti).
+3. **Timer register-level**: TIMG0 T0 letto via UPDATE/LO/HI è la stessa
+   tecnica usata dai driver low-level di sistema, dimostra capacità di
+   leggere un counter 64-bit atomicamente.
+4. **Path completo**: ESP32 manda il byte direttamente alla FIFO del
+   peripherale, e la stessa periferica via UART line raggiunge la FPGA. Da
+   un latch ESP32 al chip FPGA passano solo due flip-flop (TX serializer
+   ESP32 + RX deserializer FPGA), nessun layer software in mezzo.
+
+### Cosa non è register-level e perché
+
+- `pinMode(tx, OUTPUT)` / `pinMode(rx, INPUT)`: setup IO_MUX una sola
+  volta al boot. Avrebbe richiesto 10+ righe di calcolo dell'offset
+  IO_MUX_GPIOn_REG e poke di FUN_IE bit. Marginalmente utile dimostrare
+  e marginalmente migliorabile, e non fa parte della "comunicazione
+  UART". Lasciato Arduino per snellire.
+- `Serial.printf(...)`: il monitor USB resta Arduino. Non è UART verso
+  l'FPGA, è la console del developer. Lasciato così.
+- `gpio_matrix_out` / `gpio_matrix_in`: ROM function chiamate al boot, non
+  fanno parte del data path. Sotto cofano fanno poke a un singolo registro
+  della GPIO matrix; usare la ROM function evita di replicare il calcolo
+  dell'offset.
+
+### Test atteso
+
+Comportamento identico alla versione Serial1/Serial2:
+
+- `flash_link_init` mostra JEDEC `EF 40 17`, post-boot SR `0x00`, diag
+  head + 10 slot.
+- `flash_note "ciao"` → `head=N+1 (write OK att.1/5)`.
+- Codebook alternato audio FPGA→ESP32 e ESP32→FPGA continua a funzionare
+  con CSMA e EOF burst.
+- Dashboard riceve/manda comandi WebSocket come prima.
+
+Se qualcosa diverge significa un bug di registri (divisore baud sbagliato,
+pin matrix sull'indice errato, FIFO non resettata). Il log USB mostra
+tutti i messaggi diagnostici esattamente come prima.
+
+
+## 2026-06-03 — Secondo condensatore 10 µF sul breakout: motivazione e calcoli
+
+### Sintomo osservato
+
+Anche con cap 1 µF saldato e SPI a 633 kHz e retry x5 ESP32-side, l'operazione
+`settings_set` falliva sistematicamente con tutti e 5 i tentativi:
+
+```
+[flash] settings att.1/5: VERIFY FAIL byte[0] atteso 0xA5 letto 0xFF
+[flash] settings att.2/5: VERIFY FAIL byte[0] atteso 0xA5 letto 0xFF
+[flash] settings att.3/5: VERIFY FAIL byte[0] atteso 0xA5 letto 0xFF
+[flash] settings att.4/5: VERIFY FAIL byte[0] atteso 0xA5 letto 0xFF
+[flash] settings att.5/5: VERIFY FAIL byte[0] atteso 0xA5 letto 0xFF
+[flash] settings FAIL definitivo dopo 5 retry
+```
+
+Notare: `byte[0] letto 0xFF` → il settore arriva alla verify in stato erased,
+quindi l'erase è andato a buon fine ma la page program che lo segue **non è
+mai stata eseguita** dal chip (o è stata silently rifiutata).
+
+Le scritture di log (`flash_log_append`), invece, continuano a passare quasi
+sempre al primo tentativo o al massimo al secondo.
+
+### Differenza elettrica tra le due operazioni
+
+`flash_note` (log) → solo Page Program di 16 byte:
+
+```
+WE (0x06)                                      ~13 µs SPI
+PAGE PROGRAM (0x02 + 3 addr + 16 data)         ~250 µs SPI
+[charge-pump program]                          0.7-3 ms,  ~25 mA picco
+POLL WIP
+```
+
+`settings_set` → Sector Erase + Page Program di 32 byte:
+
+```
+WE (0x06)                                      ~13 µs SPI
+SECTOR ERASE (0x20 + 3 addr)                   ~50 µs SPI
+[charge-pump erase]                            30-400 ms, ~80 mA picco   ← critico
+POLL WIP
+WE (0x06)                                      ~13 µs SPI
+PAGE PROGRAM (0x02 + 3 addr + 32 data)         ~450 µs SPI
+[charge-pump program]                          0.7-3 ms,  ~25 mA picco
+POLL WIP
+```
+
+Il delta è la fase di **Sector Erase**: il W25Q64FV deve cancellare 4 KB di
+celle NOR, e per farlo attiva la charge-pump interna che genera ~10 V interni
+per ~80 mA di assorbimento di picco, per decine di millisecondi continui.
+È un transient elettrico **3× più intenso** del page program e **dieci-cento
+volte più lungo**.
+
+### Stima della caduta di tensione sul cap esistente (1 µF)
+
+Modello del cap di disaccoppiamento come riserva di carica che si scarica a
+corrente costante durante il transient:
+
+```
+ΔV_cap = I_picco × t_erase / C
+```
+
+Per il caso peggiore realistico (erase tipico 30 ms a 80 mA su 1 µF):
+
+```
+ΔV = 0.080 A × 0.030 s / 1×10⁻⁶ F = 2.4 V
+```
+
+VCC del chip parte da 3.3 V (rail Tang Nano 20K) e droppa di 2.4 V durante
+l'erase, finendo a **0.9 V**. Il **VCC minimo del W25Q64FV per operare è
+2.7 V**. Quindi durante l'erase la tensione di alimentazione del chip va
+ampiamente sotto la specifica, il chip entra in brown-out, la macchina a
+stati interna si glitcha e le operazioni successive (la page program subito
+dopo) vengono rifiutate silenziosamente.
+
+Per il page program-only del log, lo stesso calcolo:
+
+```
+ΔV = 0.025 A × 0.003 s / 1×10⁻⁶ F = 0.075 V
+```
+
+Solo 75 mV di droop, VCC resta a 3.225 V, comodamente sopra i 2.7 V. Ecco
+perché il log funziona quasi sempre al primo colpo: il 1 µF è dimensionato
+per quel transient, ma è sottodimensionato per il transient di erase.
+
+### Perché i retry non aiutano
+
+Il loop di retry x5 sull'ESP32 ripete erase+program 5 volte di fila. Ogni
+erase ridepleta il cap. Tra una iterazione e l'altra passano solo i ~3 ms
+del page program fallito e i ~50 µs di setup della prossima erase, troppo
+poco perché il cap si ricarichi attraverso l'impedenza del filo VCC della
+Tang Nano (~100 nH + qualche Ω di resistenza dei contatti Dupont). Il cap
+resta a fondo scala per tutta la durata della raffica, e tutte e 5 le
+program falliscono per lo stesso motivo.
+
+### Effetto dell'aggiunta del 10 µF in parallelo
+
+Capacità totale di disaccoppiamento dopo la modifica: `C = 1 µF + 10 µF =
+11 µF`. Stessa formula:
+
+```
+ΔV = 0.080 × 0.030 / 11×10⁻⁶ = 0.218 V
+```
+
+VCC droppa di soli **218 mV** durante l'erase, da 3.3 V a 3.08 V, ancora
+ampiamente sopra i 2.7 V minimi del chip. Il brown-out scompare, la page
+program successiva può eseguire pulita.
+
+Anche nel caso pessimo da datasheet (erase massima 400 ms), il calcolo dà:
+
+```
+ΔV = 0.080 × 0.400 / 11×10⁻⁶ = 2.9 V
+```
+
+Ma questo presupporrebbe che il cap NON si ricarichi mai durante i 400 ms,
+cosa che in pratica non succede: il rail Tang Nano è alimentato dal regolatore
+USB della scheda che, anche attraverso 10 cm di filo Dupont, può ricaricare
+il cap a una corrente media stabile (ben sopra gli 80 mA puntuali di picco).
+Quindi il cap fa da buffer per i picchi rapidi mentre l'alimentazione fornisce
+la corrente media; il cap non si scarica completamente.
+
+### Perché 1 µF + 10 µF e non un singolo 11 µF
+
+I due cap lavorano su **bande di frequenza diverse**:
+
+- **1 µF (probabilmente ceramico)**: bassa ESR (~10 mΩ) e bassa ESL (~1 nH).
+  Risponde efficacemente ai transient ad alta frequenza, tipo i picchi rapidi
+  delle commutazioni SPI o del singolo bit di page program.
+- **10 µF (probabilmente elettrolitico)**: ESR più alta (~100 mΩ) e ESL più
+  alta (~10 nH), ma capacità decuplicata. Risponde meglio ai transient lenti
+  (decine di ms di erase) dove serve molto charge integrato nel tempo.
+
+In parallelo coprono entrambe le bande: il ceramico assorbe gli spike fast,
+l'elettrolitico assorbe il droop lungo dell'erase. Questa configurazione
+"hf cap + bulk cap" è lo standard industriale per il disaccoppiamento delle
+periferiche con carichi misti come le SPI NOR flash (cfr. application notes
+Winbond, Macronix, Microchip per i loro chip equivalenti).
+
+### Modifica fisica applicata
+
+Saldato un secondo cap da 10 µF in parallelo al 1 µF già presente, sui pin
+VCC e GND del breakout DollaTek W25Q64. Polarità rispettata (per cap
+elettrolitico: striscia chiara verso GND, lato senza marca/gamba lunga verso
+VCC; per ceramico/tantalio segno `+` verso VCC). Posizione fisica: il più
+vicino possibile ai pin VCC/GND del chip W25Q stesso per minimizzare
+l'induttanza tra cap e chip.
+
+Schema:
+
+```
+                  Breakout DollaTek
+              ┌────────────────────────┐
+              │     ┌──────────┐       │
+              │     │ W25Q64FV │       │
+              │     └──────────┘       │
+              │                        │
+              │ ●───[ 1 µF ]───●       │   ← gia' presente (HF buffer)
+              │ │              │       │
+              │ ●───[ 10 µF ]──●       │   ← nuovo (bulk buffer)
+              │ │              │       │       (rispettare polarita')
+              ├─┤VCC├─...─┤GND├──┤DI├─►
+              └────────────────────────┘
+                  ↑              ↑
+                  └ ai due pin VCC e GND, in parallelo al 1µF esistente
+```
+
+### Risultato atteso
+
+- `settings_set` deve passare con **`att.1/5: OK`** affidabilmente, anche
+  ripetuto rapidamente.
+- Le scritture di log continuano a passare al primo colpo (erano già OK).
+- I retry residui dovrebbero diventare rarissimi (~1% degli attempt invece
+  del ~40% pre-cap).
+- Nessuna modifica firmware necessaria: il fix è puramente fisico.
+
+### Cosa rimane di "non perfetto" anche dopo questo fix
+
+1. **Il path fisico VCC/GND verso il breakout resta filino Dupont da 10 cm**.
+   In un design "vero" si avrebbe ground plane e tracce corte. Per il
+   progetto accademico va benissimo, ma in un prodotto andrebbe rivisto.
+2. **Niente cap 100 nF ceramico vicinissimo al chip per gli alti hi-spike**.
+   Lo schema canonico Winbond suggerirebbe 100 nF + 10 µF; abbiamo 1 µF +
+   10 µF che è una variante equivalente come ordini di grandezza. Funziona,
+   ma non è il bullet-proof da datasheet.
+3. **Niente decoupling sul lato Tang Nano della linea VCC**. Il regolatore
+   USB della Tang Nano ha sicuramente i suoi cap ma il filino aggiunge
+   induttanza non controllata.
+
+### Riepilogo formule chiave (per il report)
+
+| Parametro | Valore |
+|---|---|
+| Picco corrente Sector Erase W25Q64FV | ~80 mA |
+| Durata erase tipica / max | 30 ms / 400 ms |
+| Picco corrente Page Program | ~25 mA |
+| Durata program tipica / max | 0.7 ms / 3 ms |
+| VCC nominale | 3.3 V |
+| VCC minimo W25Q64FV | 2.7 V |
+| Budget di droop ammissibile | 0.6 V |
+| ΔV con 1 µF (erase 30 ms) | 2.4 V → brown-out ❌ |
+| ΔV con 11 µF (erase 30 ms) | 0.22 V → OK ✅ |
+| ΔV con 11 µF (program 3 ms max) | 0.007 V → trascurabile ✅ |
+
+Formula generale: `ΔV = I_picco × t / C`. Per stare entro i 0.6 V di budget
+con erase a 80 mA e 30 ms serve `C ≥ I·t/ΔV = 0.08 × 0.03 / 0.6 = 4 µF`.
+Il 1 µF era sottodimensionato di 4× rispetto al minimo richiesto, gli 11 µF
+totali sono sovradimensionati di ~3× rispetto al minimo (margine sano).
+
+
+
+
+
+
