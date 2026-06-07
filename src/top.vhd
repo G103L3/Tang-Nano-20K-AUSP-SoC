@@ -72,7 +72,9 @@ architecture behavioral of top_system is
             s6_adr_o : out std_logic_vector(31 downto 0); s6_dat_o : out std_logic_vector(31 downto 0); s6_dat_i : in std_logic_vector(31 downto 0);
             s6_we_o  : out std_logic; s6_sel_o : out std_logic_vector(3 downto 0); s6_stb_o : out std_logic; s6_cyc_o : out std_logic; s6_ack_i : in std_logic;
             s7_adr_o : out std_logic_vector(31 downto 0); s7_dat_o : out std_logic_vector(31 downto 0); s7_dat_i : in std_logic_vector(31 downto 0);
-            s7_we_o  : out std_logic; s7_sel_o : out std_logic_vector(3 downto 0); s7_stb_o : out std_logic; s7_cyc_o : out std_logic; s7_ack_i : in std_logic
+            s7_we_o  : out std_logic; s7_sel_o : out std_logic_vector(3 downto 0); s7_stb_o : out std_logic; s7_cyc_o : out std_logic; s7_ack_i : in std_logic;
+            s8_adr_o : out std_logic_vector(31 downto 0); s8_dat_o : out std_logic_vector(31 downto 0); s8_dat_i : in std_logic_vector(31 downto 0);
+            s8_we_o  : out std_logic; s8_sel_o : out std_logic_vector(3 downto 0); s8_stb_o : out std_logic; s8_cyc_o : out std_logic; s8_ack_i : in std_logic
         );
     end component;
 
@@ -123,6 +125,7 @@ architecture behavioral of top_system is
             CLK_HZ        : integer := 27_000_000;
             NBIT          : integer := 8;
             PHASE_NBITS   : integer := 24;
+            K_RECIP_G     : integer := 10_424_999;
             F1_DEFAULT_HZ : integer := 0;
             F2_DEFAULT_HZ : integer := 0;
             AUTO_START    : boolean := false
@@ -189,6 +192,9 @@ architecture behavioral of top_system is
         );
     end component;
 
+    -- Blocco flash NOR HARDWARE (come commit "Works"): riceve i comandi dall'ESP32
+    -- sulla UART dedicata (pin 72/20) e pilota il W25Q via SPI (pin 42/41/51/48).
+    -- Indipendente dalla CPU.
     component flash_ctrl
         generic (
             CLK_HZ  : integer := 27_000_000;
@@ -206,6 +212,79 @@ architecture behavioral of top_system is
             flash_miso_i : in  std_logic
         );
     end component;
+
+    component spi_master_generic
+        generic (
+            PRESCALER  : natural := 16;
+            FRAME_BITS : natural := 8
+        );
+        port (
+            clk_i : in  std_logic;
+            rst_i : in  std_logic;
+            cyc_i : in  std_logic;
+            stb_i : in  std_logic;
+            we_i  : in  std_logic;
+            adr_i : in  std_logic_vector(7 downto 0);
+            dat_i : in  std_logic_vector(31 downto 0);
+            dat_o : out std_logic_vector(31 downto 0);
+            ack_o : out std_logic;
+            MOSI  : out std_logic;
+            MISO  : in  std_logic;
+            SCK   : out std_logic;
+            CS    : out std_logic
+        );
+    end component;
+
+    -- Soft core RISC-V (Gowin PicoRV32). Master Wishbone via OPEN WB (slv_ext_*).
+    component Gowin_PicoRV32_Top
+        port (
+            ser_tx          : out std_logic;
+            ser_rx          : in  std_logic;
+            slv_ext_stb_o   : out std_logic;
+            slv_ext_we_o    : out std_logic;
+            slv_ext_cyc_o   : out std_logic;
+            slv_ext_ack_i   : in  std_logic;
+            slv_ext_adr_o   : out std_logic_vector(31 downto 0);
+            slv_ext_wdata_o : out std_logic_vector(31 downto 0);
+            slv_ext_rdata_i : in  std_logic_vector(31 downto 0);
+            slv_ext_sel_o   : out std_logic_vector(3 downto 0);
+            irq_in          : in  std_logic_vector(31 downto 20);
+            jtag_TDI        : in  std_logic;
+            jtag_TDO        : out std_logic;
+            jtag_TCK        : in  std_logic;
+            jtag_TMS        : in  std_logic;
+            clk_in          : in  std_logic;
+            resetn_in       : in  std_logic
+        );
+    end component;
+
+    component UART_GENERIC
+        port (
+            clk_i : in  std_logic;
+            rst_i : in  std_logic;
+            cyc_i : in  std_logic;
+            stb_i : in  std_logic;
+            we_i  : in  std_logic;
+            adr_i : in  std_logic_vector(7 downto 0);
+            dat_i : in  std_logic_vector(31 downto 0);
+            dat_o : out std_logic_vector(31 downto 0);
+            ack_o : out std_logic;
+            TX_o  : out std_logic;
+            RX_i  : in  std_logic
+        );
+    end component;
+
+    -- OPEN WB master del soft core -> UART_GENERIC della CPU
+    signal core_slv_stb  : std_logic;
+    signal core_slv_we   : std_logic;
+    signal core_slv_cyc  : std_logic;
+    signal core_slv_ack  : std_logic;
+    signal core_slv_adr  : std_logic_vector(31 downto 0);
+    signal core_slv_wdat : std_logic_vector(31 downto 0);
+    signal core_slv_rdat : std_logic_vector(31 downto 0);
+    signal core_slv_sel  : std_logic_vector(3 downto 0);
+    signal core_uart_tx  : std_logic;
+    signal core_ser_tx   : std_logic;   -- simpleuart nativa dell'IP (bring-up su pin 17)
 
     component gpio_generic
         generic ( nbit : integer := 8 );
@@ -272,6 +351,17 @@ architecture behavioral of top_system is
     signal s6_adr, s6_wdata, s6_rdata : std_logic_vector(31 downto 0);
     signal s6_stb, s6_we, s6_cyc, s6_ack : std_logic;
     signal s6_sel : std_logic_vector(3 downto 0);
+
+    signal s7_adr, s7_wdata, s7_rdata : std_logic_vector(31 downto 0);
+    signal s7_stb, s7_we, s7_cyc, s7_ack : std_logic;
+    signal s7_sel : std_logic_vector(3 downto 0);
+
+    signal s8_adr, s8_wdata, s8_rdata : std_logic_vector(31 downto 0);
+    signal s8_stb, s8_we, s8_cyc, s8_ack : std_logic;
+    signal s8_sel : std_logic_vector(3 downto 0);
+
+    -- IRQ verso il PicoRV32 (bit 20 = FFT done dall'audio accelerator)
+    signal core_irq : std_logic_vector(31 downto 20) := (others => '0');
 
     signal dummy_dat : std_logic_vector(31 downto 0) := (others => '0');
 
@@ -550,13 +640,14 @@ begin
 
     u_bus: wb_interconnect
     port map (
-        m0_adr_i => hm_adr,   m0_dat_i => hm_wdat,  m0_dat_o => hm_rdat,
-        m0_we_i  => hm_we,    m0_sel_i => "1111",   m0_stb_i => hm_stb,
-        m0_cyc_i => hm_cyc,   m0_ack_o => hm_ack,
+        -- M0 = CPU PicoRV32 (OPEN WB). Prima era la FSM emit hm_*.
+        m0_adr_i => core_slv_adr, m0_dat_i => core_slv_wdat, m0_dat_o => core_slv_rdat,
+        m0_we_i  => core_slv_we,  m0_sel_i => core_slv_sel,  m0_stb_i => core_slv_stb,
+        m0_cyc_i => core_slv_cyc, m0_ack_o => core_slv_ack,
         m1_adr_i => dma_m_adr,  m1_dat_i => dma_m_wdat,  m1_dat_o => dma_wb_rdat,
         m1_we_i  => dma_m_we,   m1_sel_i => "1111",
-        m1_stb_i => dma_stb_wb,
-        m1_cyc_i => dma_cyc_wb,
+        m1_stb_i => '0',   -- TEST "solo CPU": M1 (DMA) staccato dal bus
+        m1_cyc_i => '0',
         m1_ack_o => dma_wb_ack,
         s0_adr_o => s0_adr, s0_dat_o => s0_wdata, s0_dat_i => s0_rdata,
         s0_we_o  => s0_we,  s0_sel_o => s0_sel,   s0_stb_o => s0_stb,  s0_cyc_o => s0_cyc, s0_ack_i => s0_ack,
@@ -572,12 +663,43 @@ begin
         s5_we_o  => s5_we,  s5_sel_o => s5_sel,   s5_stb_o => s5_stb,  s5_cyc_o => s5_cyc, s5_ack_i => s5_ack,
         s6_adr_o => s6_adr, s6_dat_o => s6_wdata, s6_dat_i => s6_rdata,
         s6_we_o  => s6_we,  s6_sel_o => s6_sel,   s6_stb_o => s6_stb,  s6_cyc_o => s6_cyc, s6_ack_i => s6_ack,
-        s7_adr_o => open, s7_dat_o => open, s7_dat_i => dummy_dat,
-        s7_we_o  => open, s7_sel_o => open, s7_stb_o => open, s7_cyc_o => open, s7_ack_i => '0'
+        s7_adr_o => s7_adr, s7_dat_o => s7_wdata, s7_dat_i => s7_rdata,
+        s7_we_o  => s7_we,  s7_sel_o => s7_sel,   s7_stb_o => s7_stb,  s7_cyc_o => s7_cyc, s7_ack_i => s7_ack,
+        s8_adr_o => s8_adr, s8_dat_o => s8_wdata, s8_dat_i => s8_rdata,
+        s8_we_o  => s8_we,  s8_sel_o => s8_sel,   s8_stb_o => s8_stb,  s8_cyc_o => s8_cyc, s8_ack_i => s8_ack
     );
 
-    s0_rdata <= (others => '0');
-    s0_ack   <= '0';
+    -- ── S0 (0x1000_0000): la FSM tst_ "collegata al bus" (opzione 2) ────────────
+    -- La CPU legge il buffer di burst della FSM tst_ (tst_rd_arr2, 26 parole appena
+    -- lette dalla SDRAM) + uno stato, su flag. NON tocco la FSM: leggo solo i suoi
+    -- segnali; lei continua a leggere la SDRAM come prima (26 parole x 20 burst).
+    --   offset 0x00..0x64 : tst_rd_arr2[0..25]  (26 parole del burst corrente)
+    --   offset 0x80       : stato = [31]=frame_ready, [16]=in_read,
+    --                               [12:8]=tst_burst (0..19), [5:0]=tst_idx (0..26)
+    -- Il firmware aspetta idx=26 (burst pronto), legge le 26 parole, nota tst_burst,
+    -- e ripete per i burst che gli servono (bin = burst*26 + j).
+    s0_proc: process(clk_sdram)
+        variable st_v : std_logic_vector(31 downto 0);
+    begin
+        if rising_edge(clk_sdram) then
+            s0_ack <= '0';
+            if s0_cyc = '1' and s0_stb = '1' then
+                s0_ack <= '1';
+                if s0_we = '0' then
+                    if unsigned(s0_adr(7 downto 2)) <= 25 then
+                        s0_rdata <= tst_rd_arr2(to_integer(unsigned(s0_adr(7 downto 2))));
+                    else
+                        st_v := (others => '0');
+                        st_v(31) := frame_ready_s;
+                        if tst_st = TS_READ then st_v(16) := '1'; end if;
+                        st_v(12 downto 8) := std_logic_vector(to_unsigned(tst_burst, 5));
+                        st_v(5 downto 0)  := std_logic_vector(to_unsigned(tst_idx, 6));
+                        s0_rdata <= st_v;
+                    end if;
+                end if;
+            end if;
+        end if;
+    end process;
 
     -- ── SDRAM Controller IP ──────────────────────────────────────────────────
     test_uart_s <= tst_tx_sr(0);
@@ -610,8 +732,10 @@ begin
     wr_ack_seen_s <= '0'; rd_ack_seen_s <= '0';
 
     -- ── Altri blocchi ... ─────────────────────────────────────────────────────
+    -- TEST "solo CPU/emit": DMA tenuto in RESET (rst_i='0', attivo-basso) -> non gira,
+    -- niente FFT / scritture SDRAM via bypass / dma_irq. Per riattivare: rst_i => rst_i.
     u_dma: dma port map (
-        clk_i => clk_sdram,  rst_i => rst_i, s_cyc_i => s5_cyc, s_stb_i => s5_stb, s_we_i  => s5_we,
+        clk_i => clk_sdram,  rst_i => '0', s_cyc_i => s5_cyc, s_stb_i => s5_stb, s_we_i  => s5_we,
         s_adr_i => s5_adr, s_dat_i => s5_wdata, s_dat_o => s5_rdata, s_ack_o => s5_ack,
         m_cyc_o => dma_m_cyc, m_stb_o => dma_m_stb, m_we_o => dma_m_we, m_adr_o => dma_m_adr,
         m_dat_o => dma_m_wdat, m_dat_i => dma_m_rdat, m_ack_i => dma_m_ack_s,
@@ -624,8 +748,10 @@ begin
         fft_idx_o => fft_idx_s, fft_xk_re_o => fft_xk_re_s, fft_opd_o => fft_opd_s
     );
 
+    -- TEST "solo CPU/emit": SPI ADC tenuto in RESET (rst_i='0') -> niente sampling,
+    -- pin SPI fermi, spi_data_ready_s=0. Per riattivare: rst_i => '1'.
     u_spi: spi_master port map (
-        clk_i => clk_sdram, rst_i => '1', cyc_i => s1_cyc, stb_i => s1_stb, we_i => s1_we,
+        clk_i => clk_sdram, rst_i => '0', cyc_i => s1_cyc, stb_i => s1_stb, we_i => s1_we,
         adr_i => s1_adr(7 downto 0), dat_i => s1_wdata, dat_o => s1_rdata, ack_o => s1_ack,
         data_ready_o => spi_data_ready_s, dbg_cap_o => spi_dbg_cap, mosi => mosi_p, miso => miso_p, sck => sck_p, cs => cs_p
     );
@@ -634,15 +760,16 @@ begin
 
     u_pwm10: pwm_generic
         generic map (
-            CLK_HZ        => 27_000_000,
+            CLK_HZ        => 40_500_000,   -- su clk_sdram: niente CDC col bus della CPU
             NBIT          => 8,
             PHASE_NBITS   => 24,
+            K_RECIP_G     => 6_949_999,
             F1_DEFAULT_HZ => 0,
             F2_DEFAULT_HZ => 0,
-            AUTO_START    => false   -- emette solo su comando WB della FSM TX
+            AUTO_START    => false   -- emette solo su comando WB della CPU
         )
         port map (
-            clk_i => clk_i, rst_i => pwm_rst_s,
+            clk_i => clk_sdram, rst_i => pwm_rst_s,   -- STESSO clock del bus/CPU
             cyc_i => s2_cyc, stb_i => s2_stb, we_i => s2_we,
             adr_i => s2_adr(7 downto 0),
             dat_i => s2_wdata, dat_o => s2_rdata, ack_o => s2_ack,
@@ -689,6 +816,10 @@ begin
         end if;
     end process;
 
+    -- ===== SPOSTATO NEL FIRMWARE (decode nella CPU): BSRAM + u_decoder + char TX =====
+    -- La CPU legge i risultati via S0 (FSM tst_) e decodifica in C. Tenuto come
+    -- riferimento, inattivo via "if false generate" (Gowin non supporta /* */).
+    gen_moved_decode : if false generate
     -- BSRAM: write port (scarico dalla SDRAM via tst_rd_valid_s),
     --         read port registrato (decoder). Index azzerato a inizio frame.
     process(clk_sdram)
@@ -735,21 +866,30 @@ begin
             tx_o   => uart_char_tx_s,
             busy_o => uart_char_busy
         );
+    end generate gen_moved_decode;
+    -- ===== fine blocco spostato nel firmware =====
 
+    -- =====================================================================
+    -- NOR flash W25Q64FV: SPI master generico (slave Wishbone, full-duplex).
+    -- PRESCALER=64 -> SCK ~633 kHz (40.5 MHz / 64). Vedi nota storica in fondo:
+    -- a 633 kHz ogni bit dura 1.58 us, setup/hold abbondanti sui filini volanti.
+    --
+    -- Cablato AGLI STESSI PIN della vecchia flash_ctrl (42 sck / 41 cs /
+    -- 51 mosi / 48 miso). L'interfaccia Wishbone slave e' presente ma per ORA
+    -- NON e' agganciata al crossbar (il bus e' pieno, nibble 0x1-0x7 tutti
+    -- occupati): cyc/stb tenuti a '0', quindi lo SPI resta inattivo (CS alto)
+    -- finche' un master non lo pilota. La logica del protocollo W25Q (la
+    -- vecchia flash_ctrl) verra' implementata NELLA CPU, che guidera' questo
+    -- SPI via i suoi registri. Per ora la flash NON scrive: e' lo scaffold.
+    -- Quando si aggancia al bus: liberare uno slot slave (candidati PWM4/LED
+    -- 0x6 o UART_GENERIC 0x2 se inutilizzati) o aggiungere un sotto-decoder.
+    -- =====================================================================
+    -- FLASH NOR = blocco HARDWARE flash_ctrl (commit "Works", provato). L'ESP32 parla
+    -- DIRETTAMENTE qui via la UART comandi (pin 72/20); flash_ctrl pilota il W25Q col
+    -- proprio SPI (pin 42/41/51/48). La CPU NON e' coinvolta nel flash. QE=1 nella WRSR
+    -- (i pin /HOLD#,/WP# del chip sono flottanti). SPI_DIV=64 -> SCK ~633 kHz.
     u_flash: flash_ctrl
-        generic map (
-            CLK_HZ  => 40_500_000,
-            BAUD    => 115200,
-            -- SPI_DIV=64 -> SPI clock ~633 kHz. A 1.27 MHz (DIV=32) le write
-            -- passavano ma con ~50% di retry al 2-3 attempt: SI ancora
-            -- marginale sui filini volanti senza ground plane. A 633 kHz
-            -- ogni bit dura 1.58 us (setup+hold abbondanti), e i fronti SCK
-            -- diventano talmente lenti che induttanze parassite e crosstalk
-            -- non riescono piu' a sporcare il sampling del W25Q. Trade-off:
-            -- una page program richiede ~250 us invece di 50 us, irrilevante
-            -- visto che la verify+retry ESP32 spendeva di piu' a recuperare.
-            SPI_DIV => 64
-        )
+        generic map ( CLK_HZ => 40_500_000, BAUD => 115200, SPI_DIV => 64 )
         port map (
             clk_i        => clk_sdram,
             rst_i        => pll_lock,
@@ -760,7 +900,110 @@ begin
             flash_mosi_o => flash_mosi_o,
             flash_miso_i => flash_miso_i
         );
+    -- S7 (UART NOR) e S8 (SPI NOR) non hanno piu' slave sul bus: la CPU non li usa.
+    -- Tieni gli ingressi dell'interconnect a 0 (niente driver flottanti).
+    s7_rdata <= (others => '0'); s7_ack <= '0';
+    s8_rdata <= (others => '0'); s8_ack <= '0';
 
+    -- =====================================================================
+    -- Soft core RISC-V (Gowin PicoRV32) + sua UART.
+    -- clk_in = clk_sdram (40.5 MHz, stesso dominio del bus, < 46 MHz di Fmax),
+    -- resetn_in = pll_lock (parte a PLL agganciato). Il core fa da master sul
+    -- suo OPEN WB (slv_ext_*); per ora ci appendiamo solo una UART_GENERIC a
+    -- 0x20000000, cosi' il firmware stampa "SOFT CORE ON" sul laptop riusando
+    -- il pin uart_ext_tx (condiviso a AND con il banner "FPGA ON" del top).
+    -- ser_tx/ser_rx (Simple UART interna) non usati. JTAG e IRQ a riposo.
+    -- =====================================================================
+    -- IRQ bit 20 = fine FFT dall'audio accelerator (il firmware decodifica su questo).
+    core_irq <= (20 => dma_irq, others => '0');
+
+    u_softcore: Gowin_PicoRV32_Top
+        port map (
+            ser_tx          => core_ser_tx,
+            ser_rx          => '1',
+            slv_ext_stb_o   => core_slv_stb,
+            slv_ext_we_o    => core_slv_we,
+            slv_ext_cyc_o   => core_slv_cyc,
+            slv_ext_ack_i   => core_slv_ack,
+            slv_ext_adr_o   => core_slv_adr,
+            slv_ext_wdata_o => core_slv_wdat,
+            slv_ext_rdata_i => core_slv_rdat,
+            slv_ext_sel_o   => core_slv_sel,
+            irq_in          => core_irq,
+            jtag_TDI        => '0',
+            jtag_TDO        => open,
+            jtag_TCK        => '0',
+            jtag_TMS        => '0',
+            clk_in          => clk_sdram,
+            resetn_in       => pll_lock
+        );
+
+    -- UART caratteri = slave S6 (0x2000_0000). La CPU (M0) la raggiunge via bus.
+    u_core_uart: UART_GENERIC
+        port map (
+            clk_i => clk_sdram,
+            rst_i => pll_lock,
+            cyc_i => s6_cyc,
+            stb_i => s6_stb,
+            we_i  => s6_we,
+            adr_i => s6_adr(7 downto 0),
+            dat_i => s6_wdata,
+            dat_o => s6_rdata,
+            ack_o => s6_ack,
+            TX_o  => core_uart_tx,
+            RX_i  => uart_ext_rx
+        );
+
+    -- UART NOR sul bus: RIMOSSA. Il flash e' completamente hardware (flash_ctrl
+    -- riceve dall'ESP32 sui pin 72/20 e pilota il W25Q via SPI), indipendente dalla
+    -- CPU. Lo slot S7 del bus resta libero (s7 tied a 0 piu' sopra).
+
+    -- =====================================================================
+    -- LOGICA W25Q (ex flash_ctrl) -- DA IMPLEMENTARE NELLA CPU.
+    -- Promemoria del protocollo che la CPU dovra' eseguire pilotando
+    -- u_flash_spi via i registri 0x00 RXDATA / 0x04 TXDATA / 0x08 CTRL(CS) /
+    -- 0x0C STATUS(busy,done). Schema generale di una transazione:
+    --   1) CTRL <= 1        (assert CS basso)
+    --   2) per ogni byte:   TXDATA <= byte ; attendi STATUS.busy=0 ; (RXDATA)
+    --   3) CTRL <= 0        (rilascia CS alto)
+    --
+    -- Layout memoria (W25Q64FV, settori da 4 KB):
+    --   0x0000 SETTINGS : 32 B  (magic 0xA5, name[15], auto_s[2], tries[1], ...)
+    --   0x1000 LOG A    : 256 slot x 16 B
+    --   0x2000 LOG B    : 256 slot x 16 B   (ring buffer 512 slot)
+    --   record 16 B = seq[2] type[1] t_sec[4] val[1] text[8]
+    --   type in {B,R,P,N,E}
+    --
+    -- BOOT (una volta):
+    --   WE(0x06) -> WRSR(0x01,0x00,0x02)   SR1=0 (clear BP/SRP), SR2=0x02 (QE=1,
+    --       disabilita funzioni pin /HOLD e /WP che sulla nostra board flottano)
+    --   POLL fino a WIP=0
+    --   WE(0x06) -> Global Block Unlock(0x98) -> POLL
+    --   RDSR(0x05): se (SR1 and 0x9C)/=0 -> chip_locked (BP/SRP ancora attivi)
+    --   SCAN: leggi byte 2 (type) di tutti i 512 slot; valido se in {B,R,P,N,E};
+    --         head = (ultimo slot valido + 1) mod 512
+    --
+    -- APPEND record ('L' + 16 B):
+    --   PROBE: leggi byte0 dello slot a head (0x03 + addr)
+    --   se slot dirty (byte0/=0xFF) o head=0/256 -> WE + SECTOR ERASE(0x20) + POLL
+    --   WE(0x06) -> PAGE PROGRAM(0x02 + addr24 + 16 B) -> POLL fino a WIP=0
+    --   head <- head+1 ; rispondi 'K' (o 'E' se chip_locked)
+    --   POLL_MAX ~25e6 cicli (~620 ms): sector erase fino a 400 ms.
+    --
+    -- SETTINGS save ('S' + 32 B): come APPEND ma sul settore 0x0000.
+    -- READ ('G' slot,n): 0x03 + addr, clock out n*16 B.
+    -- READ HEAD ('H'): ritorna head (2 B).  READ SETTINGS ('Q'): 0x03 @0x0000.
+    -- JEDEC ('I'): 0x9F -> 3 B.  READ SR ('T'): 0x05 -> 1 B.
+    -- CLEAR ('C'): WE+ERASE 0x1000, POLL, WE+ERASE 0x2000, POLL, head<-0.
+    --
+    -- (Storico SI: SCK a 633 kHz + 1uF+10uF decoupling locale + retry/verify
+    --  lato host risolvono i drop di tensione del sector erase e il SI dei
+    --  filini. I LED nudi su pin FPGA avvelenavano la massa: mettere sempre
+    --  una resistenza serie ~330 ohm - 1 k.)
+    -- =====================================================================
+
+    -- ===== MORTE (rimuovibili da git): irq_cnt, blink_led =====
+    gen_dead_a : if false generate
     process(clk_i)
     begin
         if rising_edge(clk_i) then
@@ -777,8 +1020,10 @@ begin
             else led_cnt <= led_cnt + 1; end if;
         end if;
     end process;
+    end generate gen_dead_a;
+    -- ===== fine blocchi morti =====
 
-    irq_led_o <= pll_lock;  
+    irq_led_o <= pll_lock;
     fft_trig_led_o <= wr_ack_seen_s;
 
     pwm_10_o <= pwm10_s;
@@ -788,10 +1033,20 @@ begin
     -- piu' instradati: i loro FSM continuano a girare internamente ma le loro
     -- linee TX sono ignorate. La FSM tst_* serve ancora per leggere la SDRAM,
     -- ma il suo output UART e' bypassato dal decoder.
-    uart_ext_tx <= boot_tx_pin and uart_char_tx_s;
+    -- BRING-UP SOFT CORE: il pin TX e' pilotato SOLO dalla UART della CPU, per
+    -- isolare e verificare la catena PicoRV32 + UART_GENERIC + Wishbone. Il boot
+    -- banner ("FPGA ON") e il char del decoder restano vivi internamente ma sono
+    -- staccati dal pin (l'AND a 3 vie rompeva tutto: vedi storia). Per tornare
+    -- alla produzione: uart_ext_tx <= boot_tx_pin and uart_char_tx_s;
+    -- PRODUZIONE: pin 17 = UART caratteri (UART_GENERIC su S6, via bus).
+    uart_ext_tx <= core_uart_tx;
     ausp_dbg_o <= spi_dbg_cap;
     sdram_nz_o <= rd_ack_seen_s;
 
+    -- ===== SPOSTATO NEL FIRMWARE (emit nella CPU): RX char + FIFO + FSM toni + banner =====
+    -- Tenuto come riferimento, commentato. La CPU fa RX dall'UART caratteri (S6),
+    -- decodifica il char e pilota la PWM (S2) via bus.
+    gen_moved_emit : if false generate
     -- ── Path TX FPGA: UART RX (da ESP32) -> emissione carrier+tono via PWM ──
     u_uart_rx: uart_rx_char
         generic map (CLK_HZ => 27_000_000, BAUD => 115200)
@@ -915,7 +1170,11 @@ begin
             end case;
         end if;
     end process;
+    end generate gen_moved_emit;
+    -- ===== fine blocco emit (spostato nel firmware) =====
 
+    -- ===== MORTE (rimuovibili da git): fft_direct_buf, rtx_st, ausp_st, adc_nonzero =====
+    gen_dead_b : if false generate
     process(clk_i)
         variable abs_v : unsigned(14 downto 0);
     begin
@@ -1023,6 +1282,8 @@ begin
             end if;
         end if;
     end process;
+    end generate gen_dead_b;
+    -- ===== fine blocchi morti =====
 
     -- ── TEST SDRAM UART TX ──────────────────────────────────────────────────
     process(clk_sdram)

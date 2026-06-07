@@ -68,10 +68,24 @@ static void rx_finish_pattern(void) {
 }
 
 void fpga_uart_tick(void) {
+    /* Canale DEBUG della FPGA: il firmware del soft core manda righe "$....\n".
+     * Quando vediamo '$' entriamo in modalita' verbatim e inoltriamo TUTTO su USB
+     * (anche a/b/c/A/B/C, che fuori da qui verrebbero filtrati/decodificati) fino a
+     * '\n'. Cosi' i log del soft core arrivano puliti e con a-capo, senza disturbare
+     * il decoder dei simboli carrier. */
+    static bool dbg_mode = false;
+
     while (uart_reg_available(UART_REG_FPGA)) {
         int rb = uart_reg_read(UART_REG_FPGA);
         if (rb < 0) break;
         char c = (char)rb;
+
+        if (dbg_mode) {
+            if (c == '\n')      { Serial.write('\n'); dbg_mode = false; }
+            else if (c != '\r') { Serial.write((uint8_t)c); }
+            continue;
+        }
+        if (c == '$') { dbg_mode = true; Serial.print("\n[FPGA] "); continue; }
 
         /* MAIUSCOLE A/B/C = carrier SLAVE (quello che il master riceve). */
         if (c == 'A' || c == 'B' || c == 'C') {

@@ -1,0 +1,5 @@
+# artefatti GHDL e waveform generate
+work-obj*.cf
+*.vcd
+*.o
+*.cf

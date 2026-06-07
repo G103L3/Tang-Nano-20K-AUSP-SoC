@@ -10,6 +10,10 @@
    "Type" : "verilog"
   },
   {
+   "Path" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/gowin_picorv32/gowin_picorv32.v",
+   "Type" : "verilog"
+  },
+  {
    "Library" : "work",
    "Path" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/audio_decoder.vhd",
    "Type" : "vhdl"
@@ -77,6 +81,11 @@
   {
    "Library" : "work",
    "Path" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/wb_interconnect.vhd",
+   "Type" : "vhdl"
+  },
+  {
+   "Library" : "work",
+   "Path" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/spi_master_generic.vhd",
    "Type" : "vhdl"
   }
  ],

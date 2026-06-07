@@ -22,6 +22,7 @@ entity PWM_GENERIC is
         CLK_HZ        : integer := 27_000_000;
         NBIT          : integer := 8;
         PHASE_NBITS   : integer := 24;
+        K_RECIP_G     : integer := 10_424_999;
         -- Se AUTO_START = true, al reset il generatore parte da solo con
         -- le frequenze F1_DEFAULT_HZ / F2_DEFAULT_HZ. Wishbone puo' comunque
         -- fermare (0x08) o riconfigurare (stop poi 0x04) in qualsiasi momento.
@@ -49,11 +50,10 @@ architecture PWM_GENERIC_BEHAVIORAL of PWM_GENERIC is
     constant FRAC_BITS : integer := 24;
     constant K_WIDTH   : integer := 40;
 
-    -- K_RECIP = round(2^(FRAC_BITS + PHASE_NBITS) / CLK_HZ)
-    --        = round(2^48 / 27_000_000) = 10_424_999
+    -- K_RECIP_G = round(2^(FRAC_BITS + PHASE_NBITS) / CLK_HZ)
     -- phase_inc = (f_hz * K_RECIP + 2^(FRAC_BITS-1)) >> FRAC_BITS
     constant K_RECIP : unsigned(K_WIDTH - 1 downto 0) :=
-        to_unsigned(10_424_999, K_WIDTH);
+        to_unsigned(K_RECIP_G, K_WIDTH);
 
     constant SINE_LUT_DEPTH : integer := 2**NBIT;
     type sine_lut_t is array(0 to SINE_LUT_DEPTH - 1) of unsigned(NBIT - 1 downto 0);

@@ -1,14 +1,14 @@
 /*
- * Linker script per PicoRV32 - GowinPicoSoC
+ * Linker script per PicoRV32 - Gowin PicoRV32 IP (efes_project_s360501).
  *
- * ITCM: 0x02000000  64K  codice + rodata (pre-caricato nel bitstream)
- * DTCM: 0x01000000  64K  dati, BSS, heap, stack
+ * ITCM: 0x02000000  32K  codice + rodata (pre-caricato nel bitstream via .hex)
+ * DTCM: 0x01000000  16K  dati, BSS, heap, stack
  *
- * DTCM configurato a 64K in pico_define.vh (D_MEM_K_BYTE 64).
+ * Dimensioni allineate a pico_define.vh: I_MEM_K_BYTE 32, D_MEM_K_BYTE 16.
  */
 
 MEMORY {
-    ITCM (rx)  : ORIGIN = 0x02000000, LENGTH = 64K
+    ITCM (rx)  : ORIGIN = 0x02000000, LENGTH = 32K
     DTCM (rwx) : ORIGIN = 0x01000000, LENGTH = 16K
 }
 

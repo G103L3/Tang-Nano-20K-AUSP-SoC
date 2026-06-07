@@ -1,16 +1,31 @@
 v 4
-file . "src/flash_ctrl.vhd" "ca1080763d3487a7cac7fdea8b0ce2161936302c" "20260602223857.911":
-  entity flash_ctrl at 1( 0) + 0 on 115;
-  architecture rtl of flash_ctrl at 23( 559) + 0 on 116;
-file . "src/uart_tx_char.vhd" "5c51089b36efb2e1d29138ddd93a55b13d4c3288" "20260602223857.823":
-  entity uart_tx_char at 1( 0) + 0 on 111;
-  architecture behavioral of uart_tx_char at 23( 629) + 0 on 112;
-file . "src/uart_rx_char.vhd" "e01e0d6c7ad15d5939a9a35bf64fd745516ee80c" "20260602223857.726":
-  entity uart_rx_char at 1( 0) + 0 on 109;
-  architecture behavioral of uart_rx_char at 21( 580) + 0 on 110;
-file . "src/flash_spi.vhd" "860f99cac0368482d9b44b6195819c325dcce1de" "20260602223857.863":
-  entity spi_flash at 1( 0) + 0 on 113;
-  architecture spi_flash_behavioral of spi_flash at 23( 546) + 0 on 114;
+file . "src/pwm_generic_master.vhd" "8dab70cf7f454c59239e3cb077d2eb7a9a20977c" "20260607085136.833":
+  entity pwm_generic at 1( 0) + 0 on 245;
+  architecture pwm_generic_behavioral of pwm_generic at 47( 1885) + 0 on 246;
+file . "src/top.vhd" "0063c561fd7c079f6564458e7c9887f868b9d06c" "20260607082147.190":
+  entity top_system at 1( 0) + 0 on 243;
+  architecture behavioral of top_system at 43( 1489) + 0 on 244;
+file . "src/uart_generic.vhd" "7132806f81aa3414dc9d085bf569b7bd0f5ffbaa" "20260606213711.330":
+  entity uart_generic at 1( 0) + 0 on 229;
+  architecture uart_generic_behavioral of uart_generic at 21( 551) + 0 on 230;
+file . "src/flash_ctrl.vhd" "ca1080763d3487a7cac7fdea8b0ce2161936302c" "20260606213711.643":
+  entity flash_ctrl at 1( 0) + 0 on 237;
+  architecture rtl of flash_ctrl at 23( 559) + 0 on 238;
+file . "src/uart_tx_char.vhd" "5c51089b36efb2e1d29138ddd93a55b13d4c3288" "20260606213711.536":
+  entity uart_tx_char at 1( 0) + 0 on 233;
+  architecture behavioral of uart_tx_char at 23( 629) + 0 on 234;
+file . "src/uart_rx_char.vhd" "e01e0d6c7ad15d5939a9a35bf64fd745516ee80c" "20260606213711.484":
+  entity uart_rx_char at 1( 0) + 0 on 231;
+  architecture behavioral of uart_rx_char at 21( 580) + 0 on 232;
+file . "src/flash_spi.vhd" "860f99cac0368482d9b44b6195819c325dcce1de" "20260606213711.586":
+  entity spi_flash at 1( 0) + 0 on 235;
+  architecture spi_flash_behavioral of spi_flash at 23( 546) + 0 on 236;
 file . "src/audio_decoder.vhd" "7fc546738417c97bf1abc1b192a7b9638759bdc1" "20260602223858.152":
   entity audio_decoder at 1( 0) + 0 on 117;
   architecture behavioral of audio_decoder at 39( 1527) + 0 on 118;
+file . "src/spi_master_generic.vhd" "e79b2af2c80fe2ecbd2259dd907858fbf118486b" "20260603233824.076":
+  entity spi_master_generic at 1( 0) + 0 on 119;
+  architecture rtl of spi_master_generic at 43( 1559) + 0 on 120;
+file . "src/wb_interconnect.vhd" "ded5e7ff40af9dd178c1d4e3a3e4dcdabe33860c" "20260606213711.929":
+  entity wb_interconnect at 1( 0) + 0 on 239;
+  architecture behavioral of wb_interconnect at 123( 5365) + 0 on 240;

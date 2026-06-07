@@ -7,11 +7,13 @@
 // CPU memory map:
 //   0x01000000  DTCM  - data RAM (stack, variabili)
 //   0x02000000  ITCM  - istruzioni (firmware caricato via JTAG)
-// WB esterno (attivo per addr[31:28]>0 e bit31=0):
-//   0x10000000  S0    - SDRAM
-//   0x20000000  S6    - UART_GENERIC esterno
-//   0x30000000  S5    - DMA control
-//   0x40000000  S1    - SPI Master
+// WB esterno (decode 5 bit addr[31:27], 9 slave):
+//   0x48000000  S0    - SDRAM (via FSM tst_, lettura burst)  [NON 0x10000000: range interno IP]
+//   0x20000000  S6    - UART_GENERIC caratteri (pin 17/18)
+//   0x28000000  S7    - UART_GENERIC comandi NOR (dall'ESP32, pin 72/20)
+//   0x30000000  S5    - DMA / audio accelerator control
+//   0x38000000  S8    - spi_master_generic (SPI verso chip NOR, pin 42/41/51/48)
+//   0x40000000  S1    - SPI Master (ADC)
 //   0x50000000  S2    - PWM 10-bit
 //   0x60000000  S3    - PWM 4-bit
 //   0x70000000  S4    - GPIO 1-bit
@@ -49,7 +51,7 @@ static inline void uartext_init(uint32_t clk_hz, uint32_t baud, uint32_t cfg) {
     UARTEXT_START = 1;
 }
 static inline void uartext_putchar(char c) {
-    while (UARTEXT_STATUS & 0x1u) {}
+    while (UARTEXT_STATUS & 0x1u) {}   /* attende tx_busy=0 (letture bus ora funzionano) */
     UARTEXT_DATA = (uint8_t)c;
 }
 static inline int uartext_getchar_nb(void) {
@@ -129,5 +131,29 @@ static inline void gpio_set(uint32_t val) { GPIO_REG = val & 1u; }
 #define DMA_STOP        (*(volatile uint32_t*)(DMA_BASE + 0x08))
 #define DMA_SETBASE     (*(volatile uint32_t*)(DMA_BASE + 0x0C))
 
-// --- SDRAM (0x10000000) 
-#define SDRAM_BASE      ((volatile uint32_t*)0x10000000u)
+// --- SDRAM via FSM tst_ (S0, 0x48000000)
+// NB: NON 0x10000000! adr[31:29]=000 e' il range INTERNO dell'IP (DTCM/ITCM/simpleuart):
+// le letture esterne li' non completano mai. S0 deve stare a un indirizzo con adr[31:29]!=000.
+#define SDRAM_BASE      ((volatile uint32_t*)0x48000000u)
+
+// --- UART comandi NOR (S7, 0x28000000): la CPU riceve i comandi storage dall'ESP32 ---
+// Stessa UART_GENERIC della caratteri (stessi registri 0x00..0x14, vedi sopra).
+#define NORUART_BASE    0x28000000u
+#define NORUART_DATA    (*(volatile uint32_t*)(NORUART_BASE + 0x00))  // RD: [8]=rx_valid,[7:0]=byte
+#define NORUART_START   (*(volatile uint32_t*)(NORUART_BASE + 0x04))
+#define NORUART_STOP    (*(volatile uint32_t*)(NORUART_BASE + 0x08))
+#define NORUART_DIV     (*(volatile uint32_t*)(NORUART_BASE + 0x0C))
+#define NORUART_CFG     (*(volatile uint32_t*)(NORUART_BASE + 0x10))
+#define NORUART_STATUS  (*(volatile uint32_t*)(NORUART_BASE + 0x14))  // [1]=rx_valid,[0]=tx_busy
+
+// --- SPI NOR engine (S8, 0x38000000): spi_master_generic verso il chip W25Q ---
+// La CPU manda i comandi SPI (WE/erase/page-program/poll/read) come faceva flash_ctrl.
+//   0x00 RD : RXDATA (ultimo byte ricevuto)
+//   0x04 WR : TXDATA (scrive un byte e avvia il trasferimento full-duplex)
+//   0x08 WR : CTRL  bit0 = CS (1 = CS basso, tenuto tra i byte)
+//   0x0C RD : STATUS bit0 = busy, bit1 = done
+#define NORSPI_BASE     0x38000000u
+#define NORSPI_RXDATA   (*(volatile uint32_t*)(NORSPI_BASE + 0x00))
+#define NORSPI_TXDATA   (*(volatile uint32_t*)(NORSPI_BASE + 0x04))
+#define NORSPI_CTRL     (*(volatile uint32_t*)(NORSPI_BASE + 0x08))
+#define NORSPI_STATUS   (*(volatile uint32_t*)(NORSPI_BASE + 0x0C))

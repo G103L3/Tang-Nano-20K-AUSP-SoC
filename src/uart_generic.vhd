@@ -244,10 +244,11 @@ begin
                     when S_RX_STOP =>
                         if rx_baud_cnt = baud_div - 1 then
                             rx_baud_cnt <= 0;
-                            if rx_q1 = '1' then
-                                rx_data  <= rx_shift(7 downto 0);
-                                rx_valid <= '1';
-                            end if;
+                            -- Accetta SEMPRE il byte, come fa uart_rx_char del flash (che
+                            -- funziona): NON scartare se lo stop bit campiona '0' (jitter,
+                            -- baud 0.16% off, framing back-to-back) -> ricezione affidabile.
+                            rx_data  <= rx_shift(7 downto 0);
+                            rx_valid <= '1';
                             rx_state <= S_RX_IDLE;
                         else
                             rx_baud_cnt <= rx_baud_cnt + 1;

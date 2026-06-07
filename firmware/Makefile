@@ -1,7 +1,7 @@
 # Makefile per firmware PicoRV32 - GowinPicoSoC
 # Toolchain: mingw-w64-x86_64-riscv64-unknown-elf-gcc (MSYS2 MINGW64)
 
-CROSS   = riscv64-unknown-elf
+CROSS   = riscv64-elf
 CC      = $(CROSS)-gcc
 OBJCOPY = $(CROSS)-objcopy
 OBJDUMP = $(CROSS)-objdump
@@ -19,15 +19,17 @@ CFLAGS  = $(ARCH) -O1 -g -nostartfiles -ffreestanding -Wall -Wextra \
 # -lm: funzioni matematiche (sin, cos, sqrt, log10)
 # -lc: funzioni stringa (memset, strlen, strcmp, ...)
 # -lgcc: runtime compilatore (float software: __muldf3, __adddf3, ...)
-LDFLAGS = $(ARCH) -nostartfiles -T link.ld
-LDLIBS  = --specs=nosys.specs -lm -lc -lgcc
+LDFLAGS = $(ARCH) -nostdlib -T link.ld
+LDLIBS  = -lgcc
 
 SRCS    = src/crt0.S \
-          src/syscalls.c \
           src/main.c
 TARGET  = firmware
 
-all: $(TARGET).hex $(TARGET).bin $(TARGET).dump
+# ITCM size = 32 KB -> 8192 parole da 32 bit
+ITCM_WORDS = 8192
+
+all: $(TARGET).hex $(TARGET).bin $(TARGET).dump ram32.hex
 
 # Librerie in coda ai sorgenti (risolve riferimenti in avanti)
 $(TARGET).elf: $(SRCS) link.ld
@@ -43,7 +45,12 @@ $(TARGET).bin: $(TARGET).elf
 $(TARGET).dump: $(TARGET).elf
 	$(OBJDUMP) -d -S $< > $@
 
+# ram32.hex = formato ITCM Initialization File del Gowin PicoRV32 (flat, 1 parola/riga).
+# QUESTO va dato all'IP come "ITCM Initialization File" (NON firmware.hex Intel-HEX).
+ram32.hex: $(TARGET).bin
+	python3 makehex.py $(TARGET).bin $(ITCM_WORDS)
+
 clean:
-	rm -f $(TARGET).elf $(TARGET).hex $(TARGET).bin $(TARGET).dump
+	rm -f $(TARGET).elf $(TARGET).hex $(TARGET).bin $(TARGET).dump ram32.hex
 
 .PHONY: all clean
