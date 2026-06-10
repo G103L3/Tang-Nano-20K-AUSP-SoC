@@ -22,4 +22,9 @@ rx_symbol_t decode_symbol(const int16_t *re, int n);
  * 0 = niente. */
 char decode_char(const int16_t *re, int n);
 
+/* 1 se il carrier dello SLAVE (bin27) e' presente nel frame (indipendente dal dato e
+ * dal proprio carrier). La logica del canale (main) lo usa per non parlare/interrompersi
+ * quando lo slave sta trasmettendo. */
+int decode_slave_carrier(const int16_t *re, int n);
+
 #endif /* DECODER_H_ */

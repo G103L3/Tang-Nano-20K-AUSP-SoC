@@ -54,8 +54,9 @@ static int fft_mag(int bin) {           /* |xk_re| del bin dallo spettro coerent
     return (v < 0) ? -(int)v : (int)v;
 }
 
-/* bin per 'DEC m=' : bit0(13) bit1(19) EOF(27) + 2 ref: bin24(buco) e bin39 (vecchio dato) */
-static const int DISP_BIN[5] = { 13, 19, 27, 24, 39 };
+/* bin per 'DEC m=' (protocollo carrier+bit c9bf2c0):
+ *   carrier master(22) / carrier slave(27) / bit0(39) / bit1(50) / EOF(32) */
+static const int DISP_BIN[5] = { 22, 27, 39, 50, 32 };
 
 static void dbg_decode(int got, char d) {
     static uint32_t last = 0;
@@ -168,16 +169,28 @@ static void sys_tick(void) {
 /* ── RX: la CPU legge la SDRAM (read_sdram_collect) in g_sdram[512] in modo coerente,
  *    alza g_sdram_ready, qui lo consumiamo passandolo al decoder (che usa solo i bin
  *    ai target +-3). Niente piu' lettura strappata burst-per-burst. ── */
+/* CSMA half-duplex: tengo l'istante in cui ho sentito l'ULTIMA volta il carrier dello
+ * slave. Se e' nei 3 s -> canale occupato -> il player non emette (vedi emit_tone.c). */
+static uint32_t g_slave_last = 0;
+static int      g_slave_seen = 0;
+#define CHANNEL_HOLD_CYCLES (3u * CPU_HZ)        /* 3 secondi a 40.5 MHz */
+
 static void decode_step(void) {
-    read_sdram_tick();                          /* 1 poll: sync frame + prende burst 0/1 */
+    read_sdram_tick();                          /* 1 poll: snapshot BSRAM stabile */
     if (g_sdram_ready) {
         g_sess++;
+        if (decode_slave_carrier(g_sdram, 512)) {   /* sento il carrier SLAVE (bin27)? */
+            g_slave_last = rdcycle32(); g_slave_seen = 1;
+        }
         char d = decode_char(g_sdram, 512);
         g_ok++;
-        if (d) uartext_putchar(d);              /* RX reale: simbolo all'ESP32 */
+        if (d >= 'A' && d <= 'C') uartext_putchar(d);   /* SOLO RX dallo slave (maiuscole) */
         dbg_decode(1, d);
         g_sdram_ready = 0;                       /* consumato -> prossima cattura */
     }
+    /* canale occupato se il carrier slave e' stato udito negli ultimi 3 s */
+    g_channel_busy = (g_slave_seen &&
+        (uint32_t)(rdcycle32() - g_slave_last) < CHANNEL_HOLD_CYCLES) ? 1 : 0;
 }
 
 int main(void) {

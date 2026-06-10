@@ -17,8 +17,12 @@ static inline uint32_t rdcycle32(void) {
 }
 static inline uint32_t ms_to_cycles(uint32_t ms) { return ms * (CPU_HZ / 1000u); }
 
+/* stato del canale (CSMA half-duplex): 1 = sto sentendo il carrier dello SLAVE ->
+ * il player NON emette / si interrompe. Lo aggiorna decode_step() in main.c. */
+extern volatile int g_channel_busy;
+
 void     emit_capture(void);      /* legge un char dall'UART (S6) e lo accoda (non blocca) */
-void     emit_player_tick(void);  /* FSM toni PWM, non bloccante */
+void     emit_player_tick(void);  /* FSM toni PWM, non bloccante (rispetta g_channel_busy) */
 
 /* accessori per la diagnostica */
 uint32_t emit_rx_count(void);     /* char di protocollo catturati */

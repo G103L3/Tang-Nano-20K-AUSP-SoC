@@ -189,13 +189,46 @@ and demodulated on the other side (Section~\ref{sec:protocol}). The Wi\,Fi link 
 only there so I can watch and command the system from a browser; it is not part of
 the acoustic protocol.
 
-Inside the master, the ESP32 and the FPGA split the work cleanly. The FPGA does
-everything that is timing critical or sample rate bound: it reads the ADC,
-computes the FFT, decodes the tones, generates the output PWM tone, and stores the
-log on the NOR flash. The ESP32 does everything that is decision bound: it runs
-the protocol state machine, talks to the dashboard, and tells the FPGA which tones
-to emit. The two are connected by two UARTs, one carrying the decoded and to be
-emitted acoustic symbols, the other carrying the flash storage commands.
+Inside the master, three units split the work: the FPGA fabric, the soft core (a
+PicoRV32 inside the FPGA), and the ESP32. The fabric does everything that is timing
+critical or sample rate bound: it reads the ADC, computes the FFT, copies the
+spectrum into an on chip snapshot, generates the output PWM tone, and stores the log
+on the NOR flash. The soft core does the per frame work that is not sample bound: it
+reads the spectrum snapshot over the bus, decodes the tones, and decides whether the
+channel is free before emitting. The ESP32 does everything that is decision bound: it
+runs the protocol state machine, talks to the dashboard, and tells the soft core
+which tones to emit. Table~\ref{tab:partition} lists the split operation by operation.
+The units are joined by two UARTs, one carrying the decoded and to be emitted acoustic
+symbols, the other carrying the flash storage commands.
+
+\begin{table}[H]
+\centering
+\caption{Hardware/software partition: who performs each operation. \emph{Fabric} is
+fixed FPGA logic, \emph{soft core} is C running on the on chip PicoRV32, \emph{ESP32}
+is the companion microcontroller. The fabric only samples, transforms, moves, emits
+and stores; every decision (decode, channel sense, protocol) runs in software.}
+\label{tab:partition}
+\begin{tabular}{lll}
+\toprule
+\textbf{Operation} & \textbf{Where} & \textbf{Type} \\
+\midrule
+ADC sampling (MCP3201, SPI)              & FPGA fabric        & hardware \\
+Move samples to SDRAM (DMA)              & FPGA fabric        & hardware \\
+512 point FFT                           & FPGA fabric        & hardware \\
+Store spectrum in SDRAM                  & FPGA fabric        & hardware \\
+Copy spectrum to BSRAM snapshot          & FPGA fabric        & hardware \\
+Two tone generation (DDS, sine sum)      & FPGA fabric        & hardware \\
+NOR flash storage                        & FPGA fabric        & hardware \\
+Read snapshot over the Wishbone bus      & soft core          & software \\
+Tone decode (carrier + bit)              & soft core          & software \\
+Carrier sense, emit gating (CSMA)        & soft core          & software \\
+Choose which tones to emit               & soft core          & software \\
+Protocol state machine                   & ESP32              & software \\
+Pattern $\leftrightarrow$ message framing & ESP32, soft core  & software \\
+Wi\,Fi and dashboard                     & ESP32              & software \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 % =====================================================================
 \section{The FPGA SoC}
@@ -895,17 +928,23 @@ Table~\ref{tab:bins}.
 
 \begin{table}[H]
 \centering
-\caption{Protocol tones and their FFT bins ($\Delta f = 91.6$ Hz, $N=512$).}
+\caption{Protocol tones, their FFT bins, and which node emits them. Master and slave
+share the same 46.875\,kHz\,/\,512 grid ($\Delta f = 91.6$ Hz), so every tone is
+\emph{on bin} in both directions and a single set of frequencies serves both. The
+frequencies are the exact bin centres ($f = k\,\Delta f$) used in the code
+(\texttt{emit\_tone.c} on the master, \texttt{global\_parameters.h} on the slave).
+The two \emph{carriers} are distinct so each side knows who is speaking; the three
+\emph{data} tones (EOF, bit 0, bit 1) are shared by both directions.}
 \label{tab:bins}
-\begin{tabular}{lll}
+\begin{tabular}{llll}
 \toprule
-\textbf{Tone} & \textbf{Frequency} & \textbf{Bin $k$} \\
+\textbf{Tone} & \textbf{Frequency} & \textbf{Bin $k$} & \textbf{Emitted by} \\
 \midrule
-master carrier & 2000 Hz & 22 \\
-slave carrier  & 2400 Hz & 27 \\
-EOF marker     & 2900 Hz & 32 \\
-data bit 0     & 3500 Hz & 39 \\
-data bit 1     & 4500 Hz & 50 \\
+master carrier & 2014 Hz & 22 & master only \\
+slave carrier  & 2472 Hz & 27 & slave only \\
+EOF marker     & 2930 Hz & 32 & both \\
+data bit 0     & 3571 Hz & 39 & both \\
+data bit 1     & 4577 Hz & 50 & both \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -919,11 +958,13 @@ next.
 For each of the five candidate bins, the decoder decides whether that tone is
 present. It applies, in order: a local maximum test, the candidate bin magnitude
 must be greater than or equal to its six neighbours within $\pm 3$ bins
-($k\!-\!3 \dots k\!+\!3$); an amplitude test, the magnitude must exceed a threshold
-derived from the running noise floor; and a parabolic interpolation on the three
-points $k\!-\!1, k, k\!+\!1$ to confirm the peak is genuinely centred on $k$ and not
-the skirt of a neighbour. If all three pass, the decoder emits the character for
-that tone on the UART.
+($k\!-\!3 \dots k\!+\!3$); a curvature test on the three points $k\!-\!1, k, k\!+\!1$,
+which must form a peak that opens downward (positive second difference), so that $k$
+is genuinely a crest and not the skirt of a neighbour; and an amplitude test, the
+parabolically interpolated peak must clear a fixed magnitude threshold. If all three
+pass, the decoder picks the strongest data tone and the carrier, and emits the
+character for that pair. The whole test is integer only (no division, no floating
+point), so it is cheap on the soft core.
 
 The $\pm 3$ neighbourhood, rather than a strict $\pm 1$, is used because the Hann
 window applied before the FFT spreads a pure tone over two or three bins.
@@ -1483,21 +1524,45 @@ the NOR has a half written sector.
 % =====================================================================
 
 The protocol uses an alternating bit codebook. A pattern is two or three symbols,
-with the rule that two consecutive symbols must differ. This makes detection robust,
-because the decoder triggers on a \emph{change} of tone, which is easy to see, rather
-than on silence, which is hard to measure over a noisy channel. There are six
-symbols: lowercase \texttt{a}, \texttt{b}, \texttt{c} on the 2000\,Hz master carrier
-(bit 0, bit 1, end of frame), and uppercase \texttt{A}, \texttt{B}, \texttt{C} on the
-2400\,Hz slave carrier. The master sends lowercase and the slave sends uppercase, so
-each side knows who spoke. A few patterns from master to slave: \texttt{ab} is a
-presence request, \texttt{ba} assigns an id, \texttt{aba} is an abort.
+with the rule that two consecutive symbols must differ; the decoder then triggers on
+a \emph{change} of tone, which is easy to see, rather than on silence, which is hard
+to measure over a noisy channel. There are six symbols: lowercase \texttt{a},
+\texttt{b}, \texttt{c} (bit 0, bit 1, end of frame) ride the 2014\,Hz master carrier,
+and uppercase \texttt{A}, \texttt{B}, \texttt{C} ride the 2472\,Hz slave carrier. The
+master sends lowercase and the slave sends uppercase, so each side knows who spoke.
 
-The channel is half duplex, so only one side transmits at a time. The master does
-carrier sense: it watches the decoder for any uppercase symbol and waits for the
-channel to be quiet for at least one second before transmitting. Retries are handled
-by the ESP32: a presence request with no answer within five seconds is repeated up
-to a configurable number of times (stored in the flash settings), after which the
-master gives up and tells the dashboard.
+A message is identified by its first bit and its length, while the carrier gives the
+direction; the same bits therefore mean two different messages on the two carriers.
+Table~\ref{tab:codebook} is the whole codebook. Each pattern is framed by an EOF tone
+(\texttt{c} or \texttt{C}) at both ends.
+
+\begin{table}[H]
+\centering
+\caption{The alternating bit codebook. A pattern (its first bit and length) plus the
+carrier it rides on selects one message; the same pattern means different things on
+the two carriers, because the carrier says who is speaking. On the master carrier the
+data bits are the tones \texttt{a}/\texttt{b}, on the slave carrier \texttt{A}/\texttt{B}.}
+\label{tab:codebook}
+\begin{tabular}{llll}
+\toprule
+\textbf{Pattern} & \textbf{(first, length)} & \textbf{Master carrier (to slave)} & \textbf{Slave carrier (to master)} \\
+\midrule
+\texttt{01}  & (0, 2) & presence request   & presence: yes         \\
+\texttt{10}  & (1, 2) & assign id ($=1$)   & presence: no          \\
+\texttt{010} & (0, 3) & abort              & registration request  \\
+\texttt{101} & (1, 3) & ---                & acknowledge           \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The channel is half duplex, so only one side transmits at a time. Both sides do
+carrier sense: each watches the decoder for the \emph{other} carrier and stays quiet
+while it is active and for three seconds after the last symbol it heard. If the master
+is emitting and the slave carrier appears, the master aborts the tone in progress and
+yields, so a collision resolves to one talker. Retries are handled by the ESP32: a
+presence request with no answer within five seconds is repeated up to a configurable
+number of times (stored in the flash settings), after which the master gives up and
+tells the dashboard.
 
 % =====================================================================
 \section{Power supply}

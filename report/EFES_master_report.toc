@@ -3,39 +3,39 @@
 \contentsline {subsection}{\numberline {1.1}What this version is}{3}{subsection.1.1}%
 \contentsline {subsection}{\numberline {1.2}The hardware I used}{3}{subsection.1.2}%
 \contentsline {section}{\numberline {2}System overview}{4}{section.2}%
-\contentsline {section}{\numberline {3}The FPGA SoC}{4}{section.3}%
-\contentsline {subsection}{\numberline {3.1}Block diagram}{5}{subsection.3.1}%
-\contentsline {subsection}{\numberline {3.2}The on chip bus and the address map}{5}{subsection.3.2}%
-\contentsline {subsection}{\numberline {3.3}Arbitration}{6}{subsection.3.3}%
-\contentsline {subsection}{\numberline {3.4}The simple slaves: UART and GPIO register maps}{7}{subsection.3.4}%
-\contentsline {section}{\numberline {4}Clock tree}{7}{section.4}%
-\contentsline {section}{\numberline {5}SDRAM controller}{8}{section.5}%
-\contentsline {subsection}{\numberline {5.1}Bring up sequence}{8}{subsection.5.1}%
-\contentsline {section}{\numberline {6}Audio accelerator and tone decoder}{9}{section.6}%
-\contentsline {subsection}{\numberline {6.1}Timing in cycles and in seconds}{10}{subsection.6.1}%
-\contentsline {subsection}{\numberline {6.2}The two state machines}{11}{subsection.6.2}%
-\contentsline {subsection}{\numberline {6.3}FFT size and the tone bins}{11}{subsection.6.3}%
-\contentsline {subsection}{\numberline {6.4}The tone decoder, with its checks}{12}{subsection.6.4}%
-\contentsline {section}{\numberline {7}SPI master for the ADC, and the microphone front end}{12}{section.7}%
-\contentsline {subsection}{\numberline {7.1}Why a custom SPI master and not a generic one}{12}{subsection.7.1}%
-\contentsline {section}{\numberline {8}PWM speaker and LED}{13}{section.8}%
-\contentsline {section}{\numberline {9}NOR flash controller}{14}{section.9}%
-\contentsline {subsection}{\numberline {9.1}Memory layout}{14}{subsection.9.1}%
-\contentsline {subsection}{\numberline {9.2}State machine}{15}{subsection.9.2}%
-\contentsline {paragraph}{Append (opcode L) as an SPI sequence.}{15}{section*.21}%
-\contentsline {subsection}{\numberline {9.3}SCAN: finding the head after power up}{16}{subsection.9.3}%
-\contentsline {subsection}{\numberline {9.4}Unlocking the chip and the polling timeout}{16}{subsection.9.4}%
-\contentsline {subsection}{\numberline {9.5}Generic SPI engine register map}{16}{subsection.9.5}%
-\contentsline {subsection}{\numberline {9.6}Note on the current architecture}{16}{subsection.9.6}%
-\contentsline {section}{\numberline {10}Signal integrity and decoupling}{17}{section.10}%
-\contentsline {subsection}{\numberline {10.1}Brownout during sector erase}{17}{subsection.10.1}%
-\contentsline {subsection}{\numberline {10.2}SPI clock too fast for the wiring}{17}{subsection.10.2}%
-\contentsline {subsection}{\numberline {10.3}Retry and verify in firmware}{17}{subsection.10.3}%
-\contentsline {section}{\numberline {11}ESP32 firmware}{18}{section.11}%
-\contentsline {subsection}{\numberline {11.1}Register level UART}{18}{subsection.11.1}%
-\contentsline {subsection}{\numberline {11.2}Flash link: retry and verify, and a defensive read}{18}{subsection.11.2}%
-\contentsline {section}{\numberline {12}The acoustic protocol}{19}{section.12}%
-\contentsline {section}{\numberline {13}Power supply}{19}{section.13}%
-\contentsline {section}{\numberline {14}What worked and what did not}{19}{section.14}%
-\contentsline {section}{\numberline {15}Conclusions}{19}{section.15}%
-\contentsline {section}{\numberline {A}Quick reference}{20}{appendix.A}%
+\contentsline {section}{\numberline {3}The FPGA SoC}{5}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Block diagram}{6}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}The on chip bus and the address map}{6}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Arbitration}{7}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}The simple slaves: UART and GPIO register maps}{8}{subsection.3.4}%
+\contentsline {section}{\numberline {4}Clock tree}{8}{section.4}%
+\contentsline {section}{\numberline {5}SDRAM controller}{9}{section.5}%
+\contentsline {subsection}{\numberline {5.1}Bring up sequence}{9}{subsection.5.1}%
+\contentsline {section}{\numberline {6}Audio accelerator and tone decoder}{10}{section.6}%
+\contentsline {subsection}{\numberline {6.1}Timing in cycles and in seconds}{11}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}The two state machines}{12}{subsection.6.2}%
+\contentsline {subsection}{\numberline {6.3}FFT size and the tone bins}{12}{subsection.6.3}%
+\contentsline {subsection}{\numberline {6.4}The tone decoder, with its checks}{13}{subsection.6.4}%
+\contentsline {section}{\numberline {7}SPI master for the ADC, and the microphone front end}{13}{section.7}%
+\contentsline {subsection}{\numberline {7.1}Why a custom SPI master and not a generic one}{13}{subsection.7.1}%
+\contentsline {section}{\numberline {8}PWM speaker and LED}{14}{section.8}%
+\contentsline {section}{\numberline {9}NOR flash controller}{15}{section.9}%
+\contentsline {subsection}{\numberline {9.1}Memory layout}{15}{subsection.9.1}%
+\contentsline {subsection}{\numberline {9.2}State machine}{16}{subsection.9.2}%
+\contentsline {paragraph}{Append (opcode L) as an SPI sequence.}{16}{section*.22}%
+\contentsline {subsection}{\numberline {9.3}SCAN: finding the head after power up}{17}{subsection.9.3}%
+\contentsline {subsection}{\numberline {9.4}Unlocking the chip and the polling timeout}{17}{subsection.9.4}%
+\contentsline {subsection}{\numberline {9.5}Generic SPI engine register map}{17}{subsection.9.5}%
+\contentsline {subsection}{\numberline {9.6}Note on the current architecture}{17}{subsection.9.6}%
+\contentsline {section}{\numberline {10}Signal integrity and decoupling}{18}{section.10}%
+\contentsline {subsection}{\numberline {10.1}Brownout during sector erase}{18}{subsection.10.1}%
+\contentsline {subsection}{\numberline {10.2}SPI clock too fast for the wiring}{18}{subsection.10.2}%
+\contentsline {subsection}{\numberline {10.3}Retry and verify in firmware}{18}{subsection.10.3}%
+\contentsline {section}{\numberline {11}ESP32 firmware}{19}{section.11}%
+\contentsline {subsection}{\numberline {11.1}Register level UART}{19}{subsection.11.1}%
+\contentsline {subsection}{\numberline {11.2}Flash link: retry and verify, and a defensive read}{19}{subsection.11.2}%
+\contentsline {section}{\numberline {12}The acoustic protocol}{20}{section.12}%
+\contentsline {section}{\numberline {13}Power supply}{20}{section.13}%
+\contentsline {section}{\numberline {14}What worked and what did not}{20}{section.14}%
+\contentsline {section}{\numberline {15}Conclusions}{21}{section.15}%
+\contentsline {section}{\numberline {A}Quick reference}{21}{appendix.A}%

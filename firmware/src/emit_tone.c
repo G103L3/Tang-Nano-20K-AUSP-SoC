@@ -18,23 +18,35 @@ static int is_proto(uint8_t c) {
     return (c >= 'a' && c <= 'd') || (c >= 'A' && c <= 'D');
 }
 
-/* char -> parola PWM. UN TONO ALLA VOLTA: metto la freq del simbolo in f1 [15:0], f2=0
- * [31:16] (oscillatore 2 spento). Stesse 3 frequenze del decode (half-duplex condiviso).
- * 'd'/'D' = EOF di warmup (stessa freq di 'c'/'C', cambia solo la durata nel player). */
+/* Protocollo CARRIER + BIT (c9bf2c0): il MASTER emette SEMPRE il proprio carrier
+ * (bin22 ~2014 Hz) PIU' il tono-dato, come DUE toni simultanei sul DDS PWM (la HW
+ * somma sin(f1)+sin(f2)). Lo slave decodifica il carrier master (=ci sente il
+ * mittente) + il bit. Frequenze = centro-bin a fs=46875, N=512 (bin*91.55 Hz). */
+#define CARRIER_MASTER 2014   /* bin22: carrier del master (sempre presente in TX) */
+#define F_BIT0         3571   /* bin39: bit 0 */
+#define F_BIT1         4577   /* bin50: bit 1 */
+#define F_EOF          2930   /* bin32: EOF */
+
+/* char -> parola PWM a DUE toni: f1[15:0]=carrier master, f2[31:16]=tono-dato.
+ * 'A'/'a'->bit0, 'B'/'b'->bit1, 'C'/'c'->EOF. 'd'/'D' = EOF di warmup (tono lungo). */
 static int tone_word_for_char(char ch, uint32_t *word) {
-    int sig = 0;
+    int f2 = 0;
     if      (ch == 'd') ch = 'c';
     else if (ch == 'D') ch = 'C';
     char up = (ch >= 'a' && ch <= 'z') ? (char)(ch - 32) : ch;
     switch (up) {
-        case 'A': sig = 1200; break;   /* bit 0 -> bin13 */
-        case 'B': sig = 1700; break;   /* bit 1 -> bin19 */
-        case 'C': sig = 2472; break;   /* EOF   -> bin27 */
+        case 'A': f2 = F_BIT0; break;   /* bit 0 -> bin39 */
+        case 'B': f2 = F_BIT1; break;   /* bit 1 -> bin50 */
+        case 'C': f2 = F_EOF;  break;   /* EOF   -> bin32 */
         default: return 0;
     }
-    *word = (uint32_t)sig;             /* f1=sig (tono), f2=0 (spento) */
+    *word = ((uint32_t)f2 << 16) | (uint32_t)CARRIER_MASTER;   /* f2=dato, f1=carrier */
     return 1;
 }
+
+/* Stato del canale (aggiornato dal decode in main.c): 1 = sto sentendo il carrier
+ * dello SLAVE -> non devo parlare / se sto parlando mi interrompo (CSMA half-duplex). */
+volatile int g_channel_busy = 0;
 
 /* ---- coda SW dei char da suonare ---- */
 #define TXQ_LEN 16u
@@ -68,13 +80,20 @@ void emit_player_tick(void) {
     uint8_t ch; uint32_t word;
     switch (pstate) {
         case P_IDLE:
-            if (dequeue(&ch) && tone_word_for_char((char)ch, &word)) {
+            /* CSMA: non parlo se il canale e' occupato dallo slave (carrier slave udito
+             * negli ultimi 3 s). Tengo il char in coda e riprovo al giro dopo. */
+            if (!g_channel_busy && dequeue(&ch) && tone_word_for_char((char)ch, &word)) {
                 PWM10_TONES = word; p_t0 = now;
                 p_warm = (ch == 'd' || ch == 'D');   /* EOF di warmup -> tono lungo */
                 pstate = P_TONE;
             }
             break;
         case P_TONE:
+            /* se lo slave comincia a parlare mentre emetto -> mi interrompo subito */
+            if (g_channel_busy) {
+                PWM10_STOPW = 1; p_t0 = now; pstate = P_SIL;
+                break;
+            }
             if ((now - p_t0) >= ms_to_cycles(p_warm ? WARMUP_MS : TONE_MS)) {
                 PWM10_STOPW = 1; p_t0 = now; pstate = P_SIL;
             }
