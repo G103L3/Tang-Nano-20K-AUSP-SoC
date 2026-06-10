@@ -1,6 +1,5 @@
 Reading netlist file: "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/impl/gwsynthesis/efes_project_s360501.vg"
 Parsing netlist file "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/impl/gwsynthesis/efes_project_s360501.vg" completed
-WARN  (PA1011) : Signal connected to pin(CEB) of 'u_dma/spi_raw_buf_spi_raw_buf_0_0_s'(SDPB) lead to a no-read-mode block ram
 Processing netlist completed
 Reading constraint file: "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/efes_project_s360501.cst"
 Physical Constraint parsed completed
@@ -27,5 +26,5 @@ Generate file "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Elec
 Generate file "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/impl/pnr/efes_project_s360501.rpt.html" completed
 Generate file "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/impl/pnr/efes_project_s360501.rpt.txt" completed
 Generate file "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/impl/pnr/efes_project_s360501.tr.html" completed
-Sun Jun  7 11:28:27 2026
+Wed Jun 10 13:59:19 2026
 

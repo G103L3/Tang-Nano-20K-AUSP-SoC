@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.25)  6 JUN 2026 15:17
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.25)  8 JUN 2026 10:47
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -964,7 +964,7 @@ Overfull \hbox (2.12445pt too wide) in paragraph at lines 524--538
 
 [7] [8] [9]
 LaTeX Font Info:    Font shape `T1/cmtt/bx/n' in size <10.95> not available
-(Font)              Font shape `T1/cmtt/m/n' tried instead on input line 852.
+(Font)              Font shape `T1/cmtt/m/n' tried instead on input line 856.
  [10] [11] [12] [13] [14] [15] [16] [17] [18] [19] [20]
 (./EFES_master_report.aux)
  ***********
@@ -977,7 +977,7 @@ Package rerunfilecheck Info: File `EFES_master_report.out' has not changed.
 Here is how much of TeX's memory you used:
  28916 strings out of 469006
  558850 string characters out of 5454813
- 1052137 words of memory out of 5000000
+ 1052196 words of memory out of 5000000
  57060 multiletter control sequences out of 15000+600000
  653150 words of font info for 103 fonts, out of 8000000 for 9000
  319 hyphenation exceptions out of 8191
@@ -1021,9 +1021,9 @@ m/cmr8.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts
 ts/cm/cmsy10.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/am
 sfonts/cm/cmsy8.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public
 /amsfonts/cm/cmsy9.pfb>
-Output written on EFES_master_report.pdf (20 pages, 423284 bytes).
+Output written on EFES_master_report.pdf (20 pages, 423812 bytes).
 PDF statistics:
- 1251 PDF objects out of 1440 (max. 8388607)
+ 1252 PDF objects out of 1440 (max. 8388607)
  450 compressed objects within 5 object streams
  88 named destinations out of 1000 (max. 500000)
  325 words of extra memory for PDF output out of 10000 (max. 10000000)

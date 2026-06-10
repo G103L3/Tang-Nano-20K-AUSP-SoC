@@ -21,10 +21,14 @@
 #define FPGA_RX_ECHO 1
 #endif
 
-/* La FPGA emette ogni simbolo ~72 ms tono + ~350 ms silenzio = ~422 ms.
- * Mando un char ogni ~430 ms cosi' il ritmo dell'ESP32 segue quello della FPGA
- * e la FIFO TX (32) non si riempie. (Adegua se cambi SIL_CYCLES in top.vhd.) */
-static const unsigned long EMIT_PACE_MS = 430;
+/* La FPGA emette ogni simbolo 144 ms tono + 400 ms silenzio = ~544 ms.
+ * Mando un char ogni ~550 ms cosi' il ritmo dell'ESP32 segue quello della FPGA e la
+ * coda toni non si riempie. (Adegua se cambi TONE_MS/SIL_MS nel firmware FPGA.) */
+static const unsigned long EMIT_PACE_MS = 550;
+
+/* Preambolo di WARMUP: char 'd' = la FPGA suona un EOF LUNGO (~300ms) per far assestare
+ * l'AGC del mic dello slave prima del frame. 300ms tono + 400ms silenzio ~= 700ms. */
+static const unsigned long WARMUP_PACE_MS = 700;
 
 /* Carrier-sense: non trasmettere mentre lo slave parla (carrier slave attivo). */
 static const unsigned long CHANNEL_GUARD_MS = 1000;
@@ -68,11 +72,8 @@ static void rx_finish_pattern(void) {
 }
 
 void fpga_uart_tick(void) {
-    /* Canale DEBUG della FPGA: il firmware del soft core manda righe "$....\n".
-     * Quando vediamo '$' entriamo in modalita' verbatim e inoltriamo TUTTO su USB
-     * (anche a/b/c/A/B/C, che fuori da qui verrebbero filtrati/decodificati) fino a
-     * '\n'. Cosi' i log del soft core arrivano puliti e con a-capo, senza disturbare
-     * il decoder dei simboli carrier. */
+    /* Canale DEBUG della FPGA: righe "$....\n" inoltrate verbatim su USB (anche i
+     * caratteri che fuori da qui sarebbero filtrati/decodificati), fino a '\n'. */
     static bool dbg_mode = false;
 
     while (uart_reg_available(UART_REG_FPGA)) {
@@ -157,6 +158,13 @@ static void cs_pace(unsigned long ms) {
  * Se inizia mid-trasmissione si interrompe e aspetta che finisca, poi riprende. */
 void fpga_uart_send_pattern(int first_bit, int length) {
     cs_wait_quiet();
+
+    /* WARMUP: un EOF LUNGO (~300ms) come preambolo, per svegliare/assestare l'AGC del mic
+     * del ricevitore prima del frame. Sull'aria e' un EOF -> il RX fa flush a vuoto, NON
+     * e' un dato. Char 'd' = la FPGA lo suona per WARMUP_MS invece di TONE_MS. */
+    cs_wait_quiet();
+    uart_reg_write_byte(UART_REG_FPGA, 'd');
+    cs_pace(WARMUP_PACE_MS);
 
     for (int k = 0; k < EOF_BURST; k++) {
         cs_wait_quiet();

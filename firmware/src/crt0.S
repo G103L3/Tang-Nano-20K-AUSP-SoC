@@ -52,10 +52,9 @@ _reset:
     j       .copy_data
 .data_done:
 
-    /* TEST "solo CPU": TUTTI gli IRQ MASCHERATI (0xFFFFFFFF). Niente ISR, niente
-     * decode, la CPU non puo' crashare per l'IRQ. La ISR sotto resta ma non viene
-     * mai chiamata. Per RIATTIVARE il decode (FFT done = bit 20): usare 0xFFEFFFFF. */
-    li      t0, 0xFFFFFFFF
+    /* Smaschera SOLO il bit 20 (FFT done): serve al decode. Gli altri IRQ restano
+     * mascherati. La ISR chiama irq_handler() (alza g_frame_ready). Emit: 0xFFFFFFFF. */
+    li      t0, 0xFFEFFFFF
     MASKIRQ x0, t0
 
     call    main

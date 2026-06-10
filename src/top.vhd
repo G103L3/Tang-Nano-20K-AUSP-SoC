@@ -613,6 +613,13 @@ architecture behavioral of top_system is
     signal decode_frame_s  : std_logic := '0';  -- pulse: questo frame va letto+decodificato
     signal frame_ready_s   : std_logic := '0';  -- pulse: BSRAM pronta -> start decoder
 
+    -- DEBUG acceleratore: contatori (dominio clk_sdram) esposti su S0 a 0x84/0x88/0x8C.
+    -- Dicono DOVE si ferma la catena: rdy=campioni ADC, trig=finestre da 512, irq=FFT done.
+    signal acc_rdy_cnt  : unsigned(31 downto 0) := (others => '0');
+    signal acc_trig_cnt : unsigned(31 downto 0) := (others => '0');
+    signal acc_irq_cnt  : unsigned(31 downto 0) := (others => '0');
+    signal acc_rdy_prev, acc_trig_prev, acc_irq_prev : std_logic := '0';
+
 begin
 
     u_pll: Gowin_rPLL
@@ -646,8 +653,8 @@ begin
         m0_cyc_i => core_slv_cyc, m0_ack_o => core_slv_ack,
         m1_adr_i => dma_m_adr,  m1_dat_i => dma_m_wdat,  m1_dat_o => dma_wb_rdat,
         m1_we_i  => dma_m_we,   m1_sel_i => "1111",
-        m1_stb_i => '0',   -- TEST "solo CPU": M1 (DMA) staccato dal bus
-        m1_cyc_i => '0',
+        m1_stb_i => dma_stb_wb,   -- M1 (DMA) sul bus per l'acceleratore audio (legge ADC via S1)
+        m1_cyc_i => dma_cyc_wb,
         m1_ack_o => dma_wb_ack,
         s0_adr_o => s0_adr, s0_dat_o => s0_wdata, s0_dat_i => s0_rdata,
         s0_we_o  => s0_we,  s0_sel_o => s0_sel,   s0_stb_o => s0_stb,  s0_cyc_o => s0_cyc, s0_ack_i => s0_ack,
@@ -686,18 +693,39 @@ begin
             if s0_cyc = '1' and s0_stb = '1' then
                 s0_ack <= '1';
                 if s0_we = '0' then
-                    if unsigned(s0_adr(7 downto 2)) <= 25 then
-                        s0_rdata <= tst_rd_arr2(to_integer(unsigned(s0_adr(7 downto 2))));
-                    else
-                        st_v := (others => '0');
-                        st_v(31) := frame_ready_s;
-                        if tst_st = TS_READ then st_v(16) := '1'; end if;
-                        st_v(12 downto 8) := std_logic_vector(to_unsigned(tst_burst, 5));
-                        st_v(5 downto 0)  := std_logic_vector(to_unsigned(tst_idx, 6));
-                        s0_rdata <= st_v;
-                    end if;
+                    case to_integer(unsigned(s0_adr(7 downto 2))) is
+                        when 0 to 25 =>            -- 0x00..0x64: burst corrente
+                            s0_rdata <= tst_rd_arr2(to_integer(unsigned(s0_adr(7 downto 2))));
+                        when 33 =>                 -- 0x84: DEBUG campioni ADC pronti
+                            s0_rdata <= std_logic_vector(acc_rdy_cnt);
+                        when 34 =>                 -- 0x88: DEBUG trigger FFT (finestre 512)
+                            s0_rdata <= std_logic_vector(acc_trig_cnt);
+                        when 35 =>                 -- 0x8C: DEBUG IRQ FFT (frame fatti)
+                            s0_rdata <= std_logic_vector(acc_irq_cnt);
+                        when others =>             -- 0x80 e altri: stato FSM tst_
+                            st_v := (others => '0');
+                            st_v(31) := frame_ready_s;
+                            if tst_st = TS_READ then st_v(16) := '1'; end if;
+                            st_v(12 downto 8) := std_logic_vector(to_unsigned(tst_burst, 5));
+                            st_v(5 downto 0)  := std_logic_vector(to_unsigned(tst_idx, 6));
+                            s0_rdata <= st_v;
+                    end case;
                 end if;
             end if;
+        end if;
+    end process;
+
+    -- DEBUG acceleratore: conta i fronti di salita di spi_data_ready / dma_fft_trig /
+    -- dma_irq. La CPU li legge via S0 (0x84/0x88/0x8C) per capire dove si ferma la catena.
+    acc_dbg_proc: process(clk_sdram)
+    begin
+        if rising_edge(clk_sdram) then
+            if spi_data_ready_s = '1' and acc_rdy_prev = '0'  then acc_rdy_cnt  <= acc_rdy_cnt  + 1; end if;
+            if dma_fft_trig     = '1' and acc_trig_prev = '0' then acc_trig_cnt <= acc_trig_cnt + 1; end if;
+            if dma_irq          = '1' and acc_irq_prev = '0'  then acc_irq_cnt  <= acc_irq_cnt  + 1; end if;
+            acc_rdy_prev  <= spi_data_ready_s;
+            acc_trig_prev <= dma_fft_trig;
+            acc_irq_prev  <= dma_irq;
         end if;
     end process;
 
@@ -732,10 +760,9 @@ begin
     wr_ack_seen_s <= '0'; rd_ack_seen_s <= '0';
 
     -- ── Altri blocchi ... ─────────────────────────────────────────────────────
-    -- TEST "solo CPU/emit": DMA tenuto in RESET (rst_i='0', attivo-basso) -> non gira,
-    -- niente FFT / scritture SDRAM via bypass / dma_irq. Per riattivare: rst_i => rst_i.
+    -- DMA acceleratore audio ATTIVO: si auto-avvia, legge ADC via M1->S1, FFT, dma_irq.
     u_dma: dma port map (
-        clk_i => clk_sdram,  rst_i => '0', s_cyc_i => s5_cyc, s_stb_i => s5_stb, s_we_i  => s5_we,
+        clk_i => clk_sdram,  rst_i => rst_i, s_cyc_i => s5_cyc, s_stb_i => s5_stb, s_we_i  => s5_we,
         s_adr_i => s5_adr, s_dat_i => s5_wdata, s_dat_o => s5_rdata, s_ack_o => s5_ack,
         m_cyc_o => dma_m_cyc, m_stb_o => dma_m_stb, m_we_o => dma_m_we, m_adr_o => dma_m_adr,
         m_dat_o => dma_m_wdat, m_dat_i => dma_m_rdat, m_ack_i => dma_m_ack_s,
@@ -748,10 +775,9 @@ begin
         fft_idx_o => fft_idx_s, fft_xk_re_o => fft_xk_re_s, fft_opd_o => fft_opd_s
     );
 
-    -- TEST "solo CPU/emit": SPI ADC tenuto in RESET (rst_i='0') -> niente sampling,
-    -- pin SPI fermi, spi_data_ready_s=0. Per riattivare: rst_i => '1'.
+    -- SPI ADC ATTIVO: campiona il MCP3201 e alza spi_data_ready_s per il DMA.
     u_spi: spi_master port map (
-        clk_i => clk_sdram, rst_i => '0', cyc_i => s1_cyc, stb_i => s1_stb, we_i => s1_we,
+        clk_i => clk_sdram, rst_i => '1', cyc_i => s1_cyc, stb_i => s1_stb, we_i => s1_we,
         adr_i => s1_adr(7 downto 0), dat_i => s1_wdata, dat_o => s1_rdata, ack_o => s1_ack,
         data_ready_o => spi_data_ready_s, dbg_cap_o => spi_dbg_cap, mosi => mosi_p, miso => miso_p, sck => sck_p, cs => cs_p
     );

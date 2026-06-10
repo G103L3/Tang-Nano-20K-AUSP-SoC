@@ -744,8 +744,11 @@ few seconds; the $7.81\,\mu$s counter made retention solid.
 % =====================================================================
 
 The receive path is built from two state machines that run in parallel and a
-ping-pong buffer between them. The CPU starts it once and then only reads decoded
-symbols; it never touches a sample. The capture FSM (\texttt{dma\_proc}) reads the
+ping-pong buffer between them. The accelerator turns microphone samples into a
+spectrum in SDRAM and raises an IRQ; the CPU starts it once and then, on each IRQ,
+reads that spectrum back over the bus (slave S0) and decodes the tones \emph{in
+software}, consistent with the design goal of keeping the high level logic on the
+soft core. It never touches a raw sample. The capture FSM (\texttt{dma\_proc}) reads the
 ADC over SPI and writes samples into \texttt{spi\_raw\_buf}, a 1024 word block RAM
 holding two 512 sample windows. The FFT FSM (\texttt{fft\_proc}) takes the window
 just filled, feeds it to the Gowin FFT core, collects the 512 spectrum words in
@@ -767,14 +770,15 @@ sample is lost.
 \node[blk, right=0.7cm of raw] (fft) {Gowin FFT\\ \footnotesize 512 pt, \texttt{fft\_proc}};
 \node[buf, below=0.8cm of fft] (res) {\texttt{fft\_result\_buf}\\ \footnotesize $512\times16$ BSRAM};
 \node[blk, left=0.7cm of res] (sdram) {SDRAM\\ \footnotesize spectrum};
-\node[blk, left=0.7cm of sdram] (dec) {tone decoder};
+\node[blk, left=0.7cm of sdram] (dec) {soft core\\ \footnotesize decode (firmware)};
 \node[blk, left=0.7cm of dec] (uart) {UART\\ \footnotesize to ESP32};
 \draw[a] (adc)--(spirx); \draw[a] (spirx)--(raw); \draw[a] (raw)--(fft);
 \draw[a] (fft)--(res); \draw[a] (res)--(sdram); \draw[a] (sdram)--(dec); \draw[a] (dec)--(uart);
 \end{tikzpicture}
 \caption{Receive pipeline (black and white). The capture FSM fills one half of the
 ping-pong block RAM while the FFT FSM processes the other half into a spectrum in
-SDRAM; the decoder reads the spectrum and sends one character per tone to the ESP32.}
+SDRAM; the soft core then reads the spectrum back over the bus (S0) and, in firmware,
+decodes one character per tone and sends it to the ESP32.}
 \label{fig:audio-pipeline}
 \end{figure}
 

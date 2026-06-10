@@ -5,6 +5,7 @@
 #include <WiFi.h>
 #include <WebSocketsClient.h>
 #include <ArduinoJson.h>
+#include "soc/gpio_reg.h"        /* GPIO_OUT_W1TS/W1TC_REG: LED di stato a livello registro */
 
 #include "web_link.h"
 #include "protocol.h"
@@ -31,6 +32,20 @@
 #endif
 
 static WebSocketsClient ws;
+
+/* ---- LED di stato, controllati A LIVELLO REGISTRO (GPIO_OUT_W1TS/W1TC, niente
+ * digitalWrite). Pin liberi e adiacenti sul dev board:
+ *   GPIO 25 = WiFi connesso, GPIO 26 = WebSocket connesso. */
+#define LED_WIFI_PIN 25
+#define LED_WS_PIN   26
+static inline void led_set(int pin, bool on) {
+    if (on) WRITE_PERI_REG(GPIO_OUT_W1TS_REG, (1u << pin));   /* set   -> ~3.3V */
+    else    WRITE_PERI_REG(GPIO_OUT_W1TC_REG, (1u << pin));   /* clear -> 0V    */
+}
+static void led_init(int pin) {
+    pinMode(pin, OUTPUT);     /* configura il pad come uscita push-pull */
+    led_set(pin, false);      /* spento all'avvio */
+}
 
 static void send_json(const char *json) {
     ws.sendTXT(json);            /* no-op se non connesso */
@@ -166,11 +181,13 @@ static void on_command(const char *payload) {
 static void on_ws_event(WStype_t type, uint8_t *payload, size_t length) {
     switch (type) {
         case WStype_CONNECTED:
+            led_set(LED_WS_PIN, true);          /* LED WebSocket ON (GPIO 26) */
             Serial.println("[web] WebSocket connesso");
             send_json("{\"t\":\"hello\",\"role\":\"device\"}");
             protocol_publish_state();   /* riallinea subito la dashboard */
             break;
         case WStype_DISCONNECTED:
+            led_set(LED_WS_PIN, false);         /* LED WebSocket OFF */
             Serial.println("[web] WebSocket disconnesso");
             break;
         case WStype_TEXT: {
@@ -187,6 +204,9 @@ static void on_ws_event(WStype_t type, uint8_t *payload, size_t length) {
 }
 
 void web_link_init(void) {
+    led_init(LED_WIFI_PIN);      /* GPIO 25: WiFi connesso  */
+    led_init(LED_WS_PIN);        /* GPIO 26: WebSocket connesso */
+
     WiFi.mode(WIFI_STA);
     WiFi.begin(WIFI_SSID, WIFI_PASS);
     /* Riduce il picco di corrente della radio (~da 19.5 a 11 dBm): aiuta su
@@ -206,6 +226,8 @@ void web_link_init(void) {
 
 void web_link_tick(void) {
     ws.loop();
+    /* LED WiFi (GPIO 25) segue lo stato della connessione, a livello registro. */
+    led_set(LED_WIFI_PIN, WiFi.status() == WL_CONNECTED);
 }
 
 /* ---- push verso la dashboard ---- */
