@@ -606,6 +606,16 @@ architecture behavioral of top_system is
     signal bsram_rdata : std_logic_vector(15 downto 0) := (others => '0');
     signal dec_mem_addr : std_logic_vector(8 downto 0);
 
+    -- ── Snapshot BSRAM per la CPU (S0, regione 0x48001000) ───────────────────
+    -- La FSM tst_ riempie fft_bsram in modo deterministico (bin = burst*26+idx);
+    -- la CPU legge da qui uno spettro STABILE per tutto il frame (niente race coi
+    -- "cassettini" da 200 cicli). Lettura registrata -> ack ritardato di 2 cicli.
+    signal bsram_addr_cpu : std_logic_vector(8 downto 0) := (others => '0');
+    signal s0_bsram_cnt   : integer range 0 to 2 := 0;
+    -- fill_cnt: incrementa a ogni frame completato (pulse frame_ready_s). La CPU
+    -- lo poll-a su S0/0x90 per leggere la BSRAM solo a frame pronto (stabile ~11 ms).
+    signal fill_cnt       : unsigned(15 downto 0) := (others => '0');
+
     -- Decimazione: 1 frame decodificato/stampato ogni FRAME_DIV catture
     -- (campione ~11 ms -> ~550 ms tra una riga di debug e l'altra).
     constant FRAME_DIV     : integer := 1;
@@ -690,28 +700,70 @@ begin
     begin
         if rising_edge(clk_sdram) then
             s0_ack <= '0';
-            if s0_cyc = '1' and s0_stb = '1' then
-                s0_ack <= '1';
-                if s0_we = '0' then
-                    case to_integer(unsigned(s0_adr(7 downto 2))) is
-                        when 0 to 25 =>            -- 0x00..0x64: burst corrente
-                            s0_rdata <= tst_rd_arr2(to_integer(unsigned(s0_adr(7 downto 2))));
-                        when 33 =>                 -- 0x84: DEBUG campioni ADC pronti
-                            s0_rdata <= std_logic_vector(acc_rdy_cnt);
-                        when 34 =>                 -- 0x88: DEBUG trigger FFT (finestre 512)
-                            s0_rdata <= std_logic_vector(acc_trig_cnt);
-                        when 35 =>                 -- 0x8C: DEBUG IRQ FFT (frame fatti)
-                            s0_rdata <= std_logic_vector(acc_irq_cnt);
-                        when others =>             -- 0x80 e altri: stato FSM tst_
-                            st_v := (others => '0');
-                            st_v(31) := frame_ready_s;
-                            if tst_st = TS_READ then st_v(16) := '1'; end if;
-                            st_v(12 downto 8) := std_logic_vector(to_unsigned(tst_burst, 5));
-                            st_v(5 downto 0)  := std_logic_vector(to_unsigned(tst_idx, 6));
-                            s0_rdata <= st_v;
-                    end case;
+            if s0_bsram_cnt = 1 then               -- 1o ciclo di attesa latenza BSRAM
+                s0_bsram_cnt <= 2;
+            elsif s0_bsram_cnt = 2 then            -- dato BSRAM pronto -> ack
+                s0_rdata     <= x"0000" & bsram_rdata;
+                s0_ack       <= '1';
+                s0_bsram_cnt <= 0;
+            elsif s0_cyc = '1' and s0_stb = '1' and s0_ack = '0' then
+                if s0_we = '0' and s0_adr(12) = '1' then
+                    -- 0x48001000 + bin*4: snapshot BSRAM (lettura registrata, ack +2)
+                    bsram_addr_cpu <= s0_adr(10 downto 2);
+                    s0_bsram_cnt   <= 1;
+                else
+                    s0_ack <= '1';                 -- registri/scritture: ack immediato
+                    if s0_we = '0' then
+                        case to_integer(unsigned(s0_adr(7 downto 2))) is
+                            when 0 to 25 =>            -- 0x00..0x64: burst corrente (legacy)
+                                s0_rdata <= tst_rd_arr2(to_integer(unsigned(s0_adr(7 downto 2))));
+                            when 33 =>                 -- 0x84: DEBUG campioni ADC pronti
+                                s0_rdata <= std_logic_vector(acc_rdy_cnt);
+                            when 34 =>                 -- 0x88: DEBUG trigger FFT (finestre 512)
+                                s0_rdata <= std_logic_vector(acc_trig_cnt);
+                            when 35 =>                 -- 0x8C: DEBUG IRQ FFT (frame fatti)
+                                s0_rdata <= std_logic_vector(acc_irq_cnt);
+                            when 36 =>                 -- 0x90: fill_cnt (frame BSRAM completati)
+                                s0_rdata <= x"0000" & std_logic_vector(fill_cnt);
+                            when others =>             -- 0x80 e altri: stato FSM tst_
+                                st_v := (others => '0');
+                                st_v(31) := frame_ready_s;
+                                if tst_st = TS_READ then st_v(16) := '1'; end if;
+                                st_v(12 downto 8) := std_logic_vector(to_unsigned(tst_burst, 5));
+                                st_v(5 downto 0)  := std_logic_vector(to_unsigned(tst_idx, 6));
+                                s0_rdata <= st_v;
+                        end case;
+                    end if;
                 end if;
             end if;
+        end if;
+    end process;
+
+    -- ── BSRAM frame buffer: snapshot stabile dei 512 bin per la CPU ───────────
+    -- Scrittura DETERMINISTICA: ogni parola valida letta dalla SDRAM (tst_rd_valid_s,
+    -- stesso gate idx<26 di tst_rd_arr2) va al suo bin = tst_burst*26 + tst_idx.
+    -- Niente race: il frame resta stabile finche' tst_ non lo riscrive (~11 ms).
+    -- Read port registrato (1 ciclo) verso la CPU via s0_proc.
+    bsram_proc: process(clk_sdram)
+        variable widx : integer;
+    begin
+        if rising_edge(clk_sdram) then
+            if tst_rd_valid_s = '1' and tst_idx < 26 then
+                widx := tst_burst * 26 + tst_idx;
+                if widx < 512 then
+                    fft_bsram(widx) <= tst_rd_data(15 downto 0);
+                end if;
+            end if;
+            bsram_rdata <= fft_bsram(to_integer(unsigned(bsram_addr_cpu)));
+        end if;
+    end process;
+
+    -- Contatore frame completati: la CPU lo legge (S0/0x90) per sincronizzarsi e
+    -- copiare la BSRAM solo a fill terminata (snapshot coerente). tst_ resta intatta.
+    fillcnt_proc: process(clk_sdram)
+    begin
+        if rising_edge(clk_sdram) then
+            if frame_ready_s = '1' then fill_cnt <= fill_cnt + 1; end if;
         end if;
     end process;
 

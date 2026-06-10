@@ -54,8 +54,8 @@ static int fft_mag(int bin) {           /* |xk_re| del bin dallo spettro coerent
     return (v < 0) ? -(int)v : (int)v;
 }
 
-/* bin per 'DEC m=' : master(13) slave(19) bit0(39) bit1(50) EOF(32) */
-static const int DISP_BIN[5] = { 13, 19, 39, 50, 32 };
+/* bin per 'DEC m=' : bit0(13) bit1(19) EOF(27) + 2 ref: bin24(buco) e bin39 (vecchio dato) */
+static const int DISP_BIN[5] = { 13, 19, 27, 24, 39 };
 
 static void dbg_decode(int got, char d) {
     static uint32_t last = 0;
@@ -97,11 +97,10 @@ static void dbg_decode(int got, char d) {
     }
 }
 
-/* === DEBUG TEMPORANEO (DA ELIMINARE): dump INDIPENDENTE dei 512 bin letti DIRETTI
- *     dalla SDRAM via tst_ (block-read aggressivo dei 20 burst, NON da g_sdram).
+/* === DEBUG (dump dei 512 bin dallo snapshot BSRAM, STABILE e attendibile).
  *     Serve a sapere se la SDRAM contiene i dati FFT veri: se F0 mostra bin0 ~1015
- *     (offset DC dell'ADC) la pipe e' viva; se 0 la FFT non arriva in SDRAM.
- *     word0 letta per 1a -> coerente anche col block read che si strappa sui word alti. */
+ *     (offset DC dell'ADC) la pipe e' viva; se 0 la FFT non arriva in SDRAM. Ora
+ *     legge la BSRAM (no race): i bin riflettono davvero lo spettro del frame. */
 static uint16_t dbgbuf[20][26];
 static void dbg_dump512(void) {
     static uint32_t last = 0;
@@ -109,17 +108,9 @@ static void dbg_dump512(void) {
     if ((uint32_t)(now - last) < (CPU_HZ * 3u)) return;   /* ~ogni 3s */
     last = now;
 
-    uint32_t mask = 0, guard = 2000000u;                  /* cattura tutti i 20 burst */
-    while (mask != 0xFFFFFu && guard--) {
-        uint32_t st  = FFT_S0_STATUS;
-        unsigned idx = st & 0x3Fu;
-        unsigned b   = (st >> 8) & 0x1Fu;
-        if (idx >= 26u && b < 20u && !(mask & (1u << b))) {
-            for (int j = 0; j < 26; j++)
-                dbgbuf[b][j] = (uint16_t)(FFT_S0_WORDS[j] & 0xFFFFu);
-            mask |= (1u << b);
-        }
-    }
+    /* lettura DIRETTA e STABILE dalla BSRAM (snapshot del frame, niente race) */
+    for (int bin = 0; bin < 512; bin++)
+        dbgbuf[bin / 26][bin % 26] = (uint16_t)(FFT_BSRAM[bin] & 0xFFFFu);
 
     int bmaxi = 0, mmax = 0;                               /* picco (salto DC, bin>=4) */
     for (int bin = 4; bin < 512; bin++) {
@@ -131,7 +122,7 @@ static void dbg_dump512(void) {
     dbg_str("MAX bin="); put_u32((uint32_t)bmaxi);
     uartext_putchar('@'); put_u32(((uint32_t)bmaxi * 46875u) / 512u);
     dbg_str(" m=");      put_u32((uint32_t)mmax);
-    dbg_str(" cap=");    put_u32(mask == 0xFFFFFu ? 20u : 0u);
+    dbg_str(" cap=");    put_u32(20u);   /* snapshot BSRAM: sempre completo */
     dbg_end();
 
     for (int burst = 0; burst < 20; burst++) {            /* tutti i 512 bin, 26/riga */
@@ -191,7 +182,7 @@ static void decode_step(void) {
 
 int main(void) {
     uartext_init(CPU_HZ, BAUD, UARTEXT_CFG_PARITY_NONE | UARTEXT_CFG_BITS(8));
-    uartext_puts("\r\nSYSTEM UP v32 (freq-1200-1700)\r\n");
+    uartext_puts("\r\nSYSTEM UP v34 (eof-2472)\r\n");
 
     DMA_SETBASE = 0;       /* acceleratore audio: base + start (si auto-avvia comunque) */
     DMA_START   = 1;

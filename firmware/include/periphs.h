@@ -136,6 +136,14 @@ static inline void gpio_set(uint32_t val) { GPIO_REG = val & 1u; }
 // le letture esterne li' non completano mai. S0 deve stare a un indirizzo con adr[31:29]!=000.
 #define SDRAM_BASE      ((volatile uint32_t*)0x48000000u)
 
+// --- Snapshot BSRAM dei 512 bin FFT (S0, 0x48001000) ---
+// La FSM tst_ riempie una BSRAM hardware in modo DETERMINISTICO (bin = burst*26+idx);
+// la CPU legge da qui uno spettro STABILE per tutto il frame (niente race coi
+// "cassettini" da 200 cicli che il vecchio S0/0x00..0x64 esponeva). bin i -> +i*4.
+//   0x90 RD: fill_cnt = #frame completati (poll: cambia -> nuovo snapshot pronto).
+#define FFT_BSRAM       ((volatile uint32_t*)(0x48000000u + 0x1000u))  // [bin] -> xk_re (16b)
+#define S0_FILLCNT      (*(volatile uint32_t*)(0x48000000u + 0x90u))
+
 // --- UART comandi NOR (S7, 0x28000000): la CPU riceve i comandi storage dall'ESP32 ---
 // Stessa UART_GENERIC della caratteri (stessi registri 0x00..0x14, vedi sopra).
 #define NORUART_BASE    0x28000000u

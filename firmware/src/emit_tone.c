@@ -18,21 +18,21 @@ static int is_proto(uint8_t c) {
     return (c >= 'a' && c <= 'd') || (c >= 'A' && c <= 'D');
 }
 
-/* char -> parola PWM (carrier f1 in [15:0], tono f2 in [31:16]); 0 se non valido. */
+/* char -> parola PWM. UN TONO ALLA VOLTA: metto la freq del simbolo in f1 [15:0], f2=0
+ * [31:16] (oscillatore 2 spento). Stesse 3 frequenze del decode (half-duplex condiviso).
+ * 'd'/'D' = EOF di warmup (stessa freq di 'c'/'C', cambia solo la durata nel player). */
 static int tone_word_for_char(char ch, uint32_t *word) {
-    int letter = -1, carrier = 0, sig = 0;
-    /* 'd'/'D' = EOF di warmup: STESSE frequenze di 'c'/'C', cambia solo la durata (player) */
+    int sig = 0;
     if      (ch == 'd') ch = 'c';
     else if (ch == 'D') ch = 'C';
-    if      (ch >= 'A' && ch <= 'Z') { letter = ch - 'A'; carrier = 1700; } /* slave (b19)  */
-    else if (ch >= 'a' && ch <= 'z') { letter = ch - 'a'; carrier = 1200; } /* master (b13) */
-    switch (letter) {
-        case 0:  sig = 3571; break;   /* bit 0 (b39) */
-        case 1:  sig = 4578; break;   /* bit 1 (b50) */
-        case 2:  sig = 2930; break;   /* EOF   (b32) */
+    char up = (ch >= 'a' && ch <= 'z') ? (char)(ch - 32) : ch;
+    switch (up) {
+        case 'A': sig = 1200; break;   /* bit 0 -> bin13 */
+        case 'B': sig = 1700; break;   /* bit 1 -> bin19 */
+        case 'C': sig = 2472; break;   /* EOF   -> bin27 */
         default: return 0;
     }
-    *word = ((uint32_t)sig << 16) | (uint32_t)carrier;
+    *word = (uint32_t)sig;             /* f1=sig (tono), f2=0 (spento) */
     return 1;
 }
 

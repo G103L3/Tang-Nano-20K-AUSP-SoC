@@ -4,11 +4,12 @@
 #define DEC_NFFT  512          /* punti FFT (per la risoluzione in frequenza) */
 
 
-#define F_MASTER  1200         /* carrier master (loopback) bin13 */
-#define F_EOF     2930         /* bin32 */
-#define F_SLAVE   1700         /* carrier slave bin19 */
-#define F_BIT0    3571         /* bin39 */
-#define F_BIT1    4578         /* bin50 */
+/* UN TONO ALLA VOLTA (half-duplex, 2 soli device): 3 frequenze TUTTE forti, condivise da
+ * master e slave. Il simbolo E' la frequenza; il decode = bin piu' forte tra i 3.
+ * Niente piu' carrier+dato: chi ricevi mentre sei zitto e' per forza l'altro. */
+#define F_BIT0    1200         /* bit 0         -> bin13 (provato forte: decodifica A) */
+#define F_BIT1    1700         /* bit 1         -> bin19 (provato forte: 34-138 in v32) */
+#define F_EOF     2472         /* EOF/preambolo -> bin27 (vecchio carrier: 34-90 per decine di log) */
 
 /* meta'-finestra del massimo locale: ±3 (come l'hardware: WINR=3) */
 #define WIN_HALF  3
@@ -19,14 +20,10 @@
 #define NF_SKIP_LOW 8        /* salta DC + bin bassi nel noise floor */
 
 
-/* CARRIER: soglia assoluta 6 (arriva sempre fortissimo, m=27..52 -> margine enorme).
- * DATO: il canale lo attenua fuori risonanza -> arriva a m=4..6 (picco pulito, 5x il
- * noise floor 1..2). La soglia 6 lo tagliava per un pelo: la porto a 3 (resta 2..3x il
- * rumore; il gate sul carrier a 6 evita falsi positivi quando lo slave tace). */
-#define CARR_MULT   0.0
-#define CARR_MIN    6.0
-#define DATA_MULT   0.0
-#define DATA_MIN    3.0
+/* Soglia unica: i 3 toni arrivano FORTI (34..138), il rumore sta a 1..3 -> 6 separa pulito.
+ * mult=0 -> nf ignorato, conta solo il minimo assoluto. */
+#define TONE_MULT   0.0
+#define TONE_MIN    6.0
 
 /* magnitudine del bin = |parte reale| */
 static int bin_mag(const int16_t *re, int bin) {
@@ -74,29 +71,25 @@ static double detect_freq(const int16_t *re, int n, int target_hz, double nf,
 }
 
 rx_symbol_t decode_symbol(const int16_t *re, int n) {
-    rx_symbol_t r; r.channel = -1; r.sym = -1;
+    rx_symbol_t r; r.channel = 1; r.sym = -1;       /* canale non piu' usato (half-duplex) */
     double nf = noise_floor(re, n);
 
-    double cm = detect_freq(re, n, F_MASTER, nf, CARR_MULT, CARR_MIN);   /* carrier master */
-    double cs = detect_freq(re, n, F_SLAVE,  nf, CARR_MULT, CARR_MIN);   /* carrier slave  */
-    if (cm <= 0.0 && cs <= 0.0) return r;           /* nessun carrier -> niente   */
-    int channel = (cs >= cm) ? 1 : 0;
-
-    double a0 = detect_freq(re, n, F_BIT0, nf, DATA_MULT, DATA_MIN);
-    double a1 = detect_freq(re, n, F_BIT1, nf, DATA_MULT, DATA_MIN);
-    double ae = detect_freq(re, n, F_EOF,  nf, DATA_MULT, DATA_MIN);
+    /* UN tono alla volta: prendo il PIU' FORTE tra i 3 bin (sopra soglia). Ognuno passa per
+     * detect_freq -> 3 bin attorno + parabolica + max locale; poi vince il maggiore. */
+    double a0 = detect_freq(re, n, F_BIT0, nf, TONE_MULT, TONE_MIN);   /* 1200 bin13 */
+    double a1 = detect_freq(re, n, F_BIT1, nf, TONE_MULT, TONE_MIN);   /* 1700 bin19 */
+    double ae = detect_freq(re, n, F_EOF,  nf, TONE_MULT, TONE_MIN);   /* 2200 bin24 */
     double best = 0.0; int sym = -1;
     if (a0 > best) { best = a0; sym = 0; }
     if (a1 > best) { best = a1; sym = 1; }
     if (ae > best) { best = ae; sym = 2; }
 
-    if (sym >= 0) { r.channel = channel; r.sym = sym; }
+    r.sym = sym;
     return r;
 }
 
 char decode_char(const int16_t *re, int n) {
     rx_symbol_t s = decode_symbol(re, n);
     if (s.sym < 0) return 0;
-    int base = (s.channel == 0) ? 'a' : 'A';
-    return (char)(base + s.sym);
+    return (char)('A' + s.sym);   /* bit0->'A', bit1->'B', EOF->'C' (mittente = l'altro device) */
 }
