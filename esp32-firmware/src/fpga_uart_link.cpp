@@ -103,10 +103,15 @@ void fpga_uart_tick(void) {
                 rx_finish_pattern();
             } else {                           /* bit dati: A=0, B=1 */
                 int bit = (c == 'B') ? 1 : 0;
-                if (rx_len == 0)            rx_first = bit;
-                else if (bit == rx_last)    rx_alt   = false;  /* due uguali di fila */
-                rx_last = bit;
-                if (rx_len < 16) rx_len++;
+                if (rx_len > 0 && bit == rx_last) {
+                    /* Stesso bit di fila: il codebook e' STRETTAMENTE alternato,
+                     * quindi un doppione = coda/riverbero del tono precedente ->
+                     * IGNORALO invece di rompere il pattern (alt=false lo scartava). */
+                } else {
+                    if (rx_len == 0) rx_first = bit;
+                    rx_last = bit;
+                    if (rx_len < 16) rx_len++;
+                }
             }
         }
         /* minuscole a/b/c = carrier master = loopback del proprio TX -> ignora.

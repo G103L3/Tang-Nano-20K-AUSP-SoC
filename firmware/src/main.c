@@ -34,6 +34,11 @@ void irq_handler(void) { }
  * =========================================================================== */
 static uint32_t g_loops, g_sess, g_ok, g_to;
 
+/* debug_on: 1 = manda i dump diagnostici sul canale $...\n (DEC/PK, SYS/ACC, MAX/F...);
+ * 0 = li tace, resta solo la sequenza dei caratteri ricevuti (A/B/C) e i log dell'ESP32.
+ * Metterlo a 1 quando serve diagnosticare lo spettro/letture. */
+static int debug_on = 0;
+
 static void dbg_begin(void) { uartext_putchar('$'); }
 static void dbg_end(void)   { uartext_putchar('\n'); }
 static void dbg_str(const char *s) { while (*s) uartext_putchar(*s++); }
@@ -185,7 +190,7 @@ static void decode_step(void) {
         char d = decode_char(g_sdram, 512);
         g_ok++;
         if (d >= 'A' && d <= 'C') uartext_putchar(d);   /* SOLO RX dallo slave (maiuscole) */
-        dbg_decode(1, d);
+        if (debug_on) dbg_decode(1, d);
         g_sdram_ready = 0;                       /* consumato -> prossima cattura */
     }
     /* canale occupato se il carrier slave e' stato udito negli ultimi 3 s */
@@ -205,8 +210,10 @@ int main(void) {
         emit_capture();      /* TX */
         emit_player_tick();  /* TX */
         decode_step();       /* RX (polling + decoder) */
-        sys_tick();          /* diagnostica ~1/s */
-        dbg_dump512();       /* DEBUG TEMPORANEO: dump 512 bin ~ogni 3s */
+        if (debug_on) {
+            sys_tick();      /* diagnostica ~1/s */
+            dbg_dump512();   /* dump 512 bin ~ogni 3s */
+        }
     }
     return 0;
 }

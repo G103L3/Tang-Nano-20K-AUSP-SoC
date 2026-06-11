@@ -1,0 +1,1031 @@
+
+firmware.elf:     file format elf32-littleriscv
+
+
+Disassembly of section .text:
+
+02000000 <_start>:
+.macro MASKIRQ rd, rs
+    .insn r 0x0b, 6, 3, \rd, \rs, x0
+.endm
+
+_start:
+    j   _reset
+ 2000000:	a809                	j	2000012 <_reset>
+	...
+
+02000010 <_irq_vec>:
+
+/* Vettore IRQ: l'IP (PROGADDR_IRQ = 0x10) salta qui quando arriva un IRQ.
+ * Qui c'e' solo un salto alla ISR vera (sotto). */
+.org 0x10
+_irq_vec:
+    j   _irq
+ 2000010:	a8b9                	j	200006e <_irq>
+
+02000012 <_reset>:
+
+_reset:
+    la      sp, _stack_top
+ 2000012:	ff004117          	auipc	sp,0xff004
+ 2000016:	fee10113          	addi	sp,sp,-18 # 1004000 <_stack_top>
+
+    /* azzera .bss */
+    la      t0, _bss_start
+ 200001a:	ff000297          	auipc	t0,0xff000
+ 200001e:	fea28293          	addi	t0,t0,-22 # 1000004 <tone_q>
+    la      t1, _bss_end
+ 2000022:	ff000317          	auipc	t1,0xff000
+ 2000026:	3f230313          	addi	t1,t1,1010 # 1000414 <g_slave_seen>
+
+0200002a <.zero_bss>:
+.zero_bss:
+    bge     t0, t1, .bss_done
+ 200002a:	0062d663          	bge	t0,t1,2000036 <.bss_done>
+    sw      zero, 0(t0)
+ 200002e:	0002a023          	sw	zero,0(t0)
+    addi    t0, t0, 4
+ 2000032:	0291                	addi	t0,t0,4
+    j       .zero_bss
+ 2000034:	bfdd                	j	200002a <.zero_bss>
+
+02000036 <.bss_done>:
+.bss_done:
+
+    /* copia .data (LMA -> VMA) */
+    la      t0, _data_lma
+ 2000036:	00000297          	auipc	t0,0x0
+ 200003a:	6e328293          	addi	t0,t0,1763 # 2000719 <_data_lma>
+    la      t1, _data_start
+ 200003e:	ff000317          	auipc	t1,0xff000
+ 2000042:	fc230313          	addi	t1,t1,-62 # 1000000 <rs_last_fill>
+    la      t2, _data_end
+ 2000046:	ff000397          	auipc	t2,0xff000
+ 200004a:	fba38393          	addi	t2,t2,-70 # 1000000 <rs_last_fill>
+
+0200004e <.copy_data>:
+.copy_data:
+    bge     t1, t2, .data_done
+ 200004e:	00735963          	bge	t1,t2,2000060 <.data_done>
+    lw      t3, 0(t0)
+ 2000052:	0002ae03          	lw	t3,0(t0)
+    sw      t3, 0(t1)
+ 2000056:	01c32023          	sw	t3,0(t1)
+    addi    t0, t0, 4
+ 200005a:	0291                	addi	t0,t0,4
+    addi    t1, t1, 4
+ 200005c:	0311                	addi	t1,t1,4
+    j       .copy_data
+ 200005e:	bfc5                	j	200004e <.copy_data>
+
+02000060 <.data_done>:
+.data_done:
+
+    /* Smaschera SOLO il bit 20 (FFT done): serve al decode. Gli altri IRQ restano
+     * mascherati. La ISR chiama irq_handler() (alza g_frame_ready). Emit: 0xFFFFFFFF. */
+    li      t0, 0xFFEFFFFF
+ 2000060:	fff002b7          	lui	t0,0xfff00
+ 2000064:	12fd                	addi	t0,t0,-1 # ffefffff <_data_lma+0xfdeff8e6>
+    MASKIRQ x0, t0
+ 2000066:	0602e00b          	.insn	4, 0x0602e00b
+
+    call    main
+ 200006a:	2a31                	jal	2000186 <main>
+
+0200006c <.hang>:
+
+.hang:
+    j       .hang
+ 200006c:	a001                	j	200006c <.hang>
+
+0200006e <_irq>:
+ * li preserva irq_handler per ABI). Il PC di ritorno lo tiene l'IP e lo
+ * ripristina retirq, quindi non va salvato. picorv32 blocca gli IRQ annidati
+ * finche' non si fa retirq, percio' la ISR non e' rientrante (ok).
+ * ============================================================ */
+_irq:
+    addi    sp, sp, -64
+ 200006e:	7139                	addi	sp,sp,-64
+    sw      ra,  0(sp)
+ 2000070:	c006                	sw	ra,0(sp)
+    sw      t0,  4(sp)
+ 2000072:	c216                	sw	t0,4(sp)
+    sw      t1,  8(sp)
+ 2000074:	c41a                	sw	t1,8(sp)
+    sw      t2, 12(sp)
+ 2000076:	c61e                	sw	t2,12(sp)
+    sw      a0, 16(sp)
+ 2000078:	c82a                	sw	a0,16(sp)
+    sw      a1, 20(sp)
+ 200007a:	ca2e                	sw	a1,20(sp)
+    sw      a2, 24(sp)
+ 200007c:	cc32                	sw	a2,24(sp)
+    sw      a3, 28(sp)
+ 200007e:	ce36                	sw	a3,28(sp)
+    sw      a4, 32(sp)
+ 2000080:	d03a                	sw	a4,32(sp)
+    sw      a5, 36(sp)
+ 2000082:	d23e                	sw	a5,36(sp)
+    sw      a6, 40(sp)
+ 2000084:	d442                	sw	a6,40(sp)
+    sw      a7, 44(sp)
+ 2000086:	d646                	sw	a7,44(sp)
+    sw      t3, 48(sp)
+ 2000088:	d872                	sw	t3,48(sp)
+    sw      t4, 52(sp)
+ 200008a:	da76                	sw	t4,52(sp)
+    sw      t5, 56(sp)
+ 200008c:	dc7a                	sw	t5,56(sp)
+    sw      t6, 60(sp)
+ 200008e:	de7e                	sw	t6,60(sp)
+
+    jal     irq_handler          /* void irq_handler(void) -> setta g_frame_ready */
+ 2000090:	0f4000ef          	jal	2000184 <irq_handler>
+
+    lw      ra,  0(sp)
+ 2000094:	4082                	lw	ra,0(sp)
+    lw      t0,  4(sp)
+ 2000096:	4292                	lw	t0,4(sp)
+    lw      t1,  8(sp)
+ 2000098:	4322                	lw	t1,8(sp)
+    lw      t2, 12(sp)
+ 200009a:	43b2                	lw	t2,12(sp)
+    lw      a0, 16(sp)
+ 200009c:	4542                	lw	a0,16(sp)
+    lw      a1, 20(sp)
+ 200009e:	45d2                	lw	a1,20(sp)
+    lw      a2, 24(sp)
+ 20000a0:	4662                	lw	a2,24(sp)
+    lw      a3, 28(sp)
+ 20000a2:	46f2                	lw	a3,28(sp)
+    lw      a4, 32(sp)
+ 20000a4:	5702                	lw	a4,32(sp)
+    lw      a5, 36(sp)
+ 20000a6:	5792                	lw	a5,36(sp)
+    lw      a6, 40(sp)
+ 20000a8:	5822                	lw	a6,40(sp)
+    lw      a7, 44(sp)
+ 20000aa:	58b2                	lw	a7,44(sp)
+    lw      t3, 48(sp)
+ 20000ac:	5e42                	lw	t3,48(sp)
+    lw      t4, 52(sp)
+ 20000ae:	5ed2                	lw	t4,52(sp)
+    lw      t5, 56(sp)
+ 20000b0:	5f62                	lw	t5,56(sp)
+    lw      t6, 60(sp)
+ 20000b2:	5ff2                	lw	t6,60(sp)
+    addi    sp, sp, 64
+ 20000b4:	6121                	addi	sp,sp,64
+
+    RETIRQ
+ 20000b6:	0400000b          	.insn	4, 0x0400000b
+
+020000ba <dbg_begin>:
+    UARTEXT_DIV   = clk_hz / baud;
+    UARTEXT_CFG   = cfg;
+    UARTEXT_START = 1;
+}
+static inline void uartext_putchar(char c) {
+    while (UARTEXT_STATUS & 0x1u) {}   /* attende tx_busy=0 (letture bus ora funzionano) */
+ 20000ba:	20000737          	lui	a4,0x20000
+ 20000be:	0751                	addi	a4,a4,20 # 20000014 <_data_lma+0x1dfff8fb>
+ 20000c0:	431c                	lw	a5,0(a4)
+ 20000c2:	8b85                	andi	a5,a5,1
+ 20000c4:	fff5                	bnez	a5,20000c0 <dbg_begin+0x6>
+    UARTEXT_DATA = (uint8_t)c;
+ 20000c6:	200007b7          	lui	a5,0x20000
+ 20000ca:	02400713          	li	a4,36
+ 20000ce:	c398                	sw	a4,0(a5)
+/* debug_on: 1 = manda i dump diagnostici sul canale $...\n (DEC/PK, SYS/ACC, MAX/F...);
+ * 0 = li tace, resta solo la sequenza dei caratteri ricevuti (A/B/C) e i log dell'ESP32.
+ * Metterlo a 1 quando serve diagnosticare lo spettro/letture. */
+static int debug_on = 0;
+
+static void dbg_begin(void) { uartext_putchar('$'); }
+ 20000d0:	8082                	ret
+
+020000d2 <dbg_end>:
+    while (UARTEXT_STATUS & 0x1u) {}   /* attende tx_busy=0 (letture bus ora funzionano) */
+ 20000d2:	20000737          	lui	a4,0x20000
+ 20000d6:	0751                	addi	a4,a4,20 # 20000014 <_data_lma+0x1dfff8fb>
+ 20000d8:	431c                	lw	a5,0(a4)
+ 20000da:	8b85                	andi	a5,a5,1
+ 20000dc:	fff5                	bnez	a5,20000d8 <dbg_end+0x6>
+    UARTEXT_DATA = (uint8_t)c;
+ 20000de:	200007b7          	lui	a5,0x20000
+ 20000e2:	4729                	li	a4,10
+ 20000e4:	c398                	sw	a4,0(a5)
+static void dbg_end(void)   { uartext_putchar('\n'); }
+ 20000e6:	8082                	ret
+
+020000e8 <dbg_str>:
+static void dbg_str(const char *s) { while (*s) uartext_putchar(*s++); }
+ 20000e8:	00054683          	lbu	a3,0(a0)
+ 20000ec:	ce91                	beqz	a3,2000108 <dbg_str+0x20>
+    while (UARTEXT_STATUS & 0x1u) {}   /* attende tx_busy=0 (letture bus ora funzionano) */
+ 20000ee:	20000737          	lui	a4,0x20000
+ 20000f2:	0751                	addi	a4,a4,20 # 20000014 <_data_lma+0x1dfff8fb>
+    UARTEXT_DATA = (uint8_t)c;
+ 20000f4:	20000637          	lui	a2,0x20000
+ 20000f8:	0505                	addi	a0,a0,1
+    while (UARTEXT_STATUS & 0x1u) {}   /* attende tx_busy=0 (letture bus ora funzionano) */
+ 20000fa:	431c                	lw	a5,0(a4)
+ 20000fc:	8b85                	andi	a5,a5,1
+ 20000fe:	fff5                	bnez	a5,20000fa <dbg_str+0x12>
+    UARTEXT_DATA = (uint8_t)c;
+ 2000100:	c214                	sw	a3,0(a2)
+ 2000102:	00054683          	lbu	a3,0(a0)
+ 2000106:	faed                	bnez	a3,20000f8 <dbg_str+0x10>
+ 2000108:	8082                	ret
+
+0200010a <put_u32>:
+static void put_u32(uint32_t v) {
+ 200010a:	1141                	addi	sp,sp,-16
+    char b[10]; int i = 0;
+ 200010c:	4681                	li	a3,0
+    if (v == 0) { uartext_putchar('0'); return; }
+    while (v) { b[i++] = (char)('0' + (v % 10u)); v /= 10u; }
+ 200010e:	00410893          	addi	a7,sp,4
+ 2000112:	ccccd5b7          	lui	a1,0xccccd
+ 2000116:	ccd58593          	addi	a1,a1,-819 # cccccccd <_data_lma+0xcaccc5b4>
+ 200011a:	4825                	li	a6,9
+    if (v == 0) { uartext_putchar('0'); return; }
+ 200011c:	c921                	beqz	a0,200016c <put_u32+0x62>
+    while (v) { b[i++] = (char)('0' + (v % 10u)); v /= 10u; }
+ 200011e:	0685                	addi	a3,a3,1
+ 2000120:	00d88633          	add	a2,a7,a3
+ 2000124:	02b53733          	mulhu	a4,a0,a1
+ 2000128:	830d                	srli	a4,a4,0x3
+ 200012a:	00271793          	slli	a5,a4,0x2
+ 200012e:	97ba                	add	a5,a5,a4
+ 2000130:	0786                	slli	a5,a5,0x1
+ 2000132:	40f507b3          	sub	a5,a0,a5
+ 2000136:	03078793          	addi	a5,a5,48 # 20000030 <_data_lma+0x1dfff917>
+ 200013a:	fef60fa3          	sb	a5,-1(a2) # 1fffffff <_data_lma+0x1dfff8e6>
+ 200013e:	87aa                	mv	a5,a0
+ 2000140:	853a                	mv	a0,a4
+ 2000142:	fcf86ee3          	bltu	a6,a5,200011e <put_u32+0x14>
+    while (i) uartext_putchar(b[--i]);
+ 2000146:	c28d                	beqz	a3,2000168 <put_u32+0x5e>
+ 2000148:	004c                	addi	a1,sp,4
+ 200014a:	96ae                	add	a3,a3,a1
+    while (UARTEXT_STATUS & 0x1u) {}   /* attende tx_busy=0 (letture bus ora funzionano) */
+ 200014c:	20000737          	lui	a4,0x20000
+ 2000150:	0751                	addi	a4,a4,20 # 20000014 <_data_lma+0x1dfff8fb>
+    UARTEXT_DATA = (uint8_t)c;
+ 2000152:	20000537          	lui	a0,0x20000
+ 2000156:	fff6c603          	lbu	a2,-1(a3)
+    while (UARTEXT_STATUS & 0x1u) {}   /* attende tx_busy=0 (letture bus ora funzionano) */
+ 200015a:	431c                	lw	a5,0(a4)
+ 200015c:	8b85                	andi	a5,a5,1
+ 200015e:	fff5                	bnez	a5,200015a <put_u32+0x50>
+    UARTEXT_DATA = (uint8_t)c;
+ 2000160:	c110                	sw	a2,0(a0)
+ 2000162:	16fd                	addi	a3,a3,-1
+ 2000164:	fed599e3          	bne	a1,a3,2000156 <put_u32+0x4c>
+}
+ 2000168:	0141                	addi	sp,sp,16
+ 200016a:	8082                	ret
+    while (UARTEXT_STATUS & 0x1u) {}   /* attende tx_busy=0 (letture bus ora funzionano) */
+ 200016c:	20000737          	lui	a4,0x20000
+ 2000170:	0751                	addi	a4,a4,20 # 20000014 <_data_lma+0x1dfff8fb>
+ 2000172:	431c                	lw	a5,0(a4)
+ 2000174:	8b85                	andi	a5,a5,1
+ 2000176:	fff5                	bnez	a5,2000172 <put_u32+0x68>
+    UARTEXT_DATA = (uint8_t)c;
+ 2000178:	200007b7          	lui	a5,0x20000
+ 200017c:	03000713          	li	a4,48
+ 2000180:	c398                	sw	a4,0(a5)
+    if (v == 0) { uartext_putchar('0'); return; }
+ 2000182:	b7dd                	j	2000168 <put_u32+0x5e>
+
+02000184 <irq_handler>:
+void irq_handler(void) { }
+ 2000184:	8082                	ret
+
+02000186 <main>:
+    /* canale occupato se il carrier slave e' stato udito negli ultimi 3 s */
+    g_channel_busy = (g_slave_seen &&
+        (uint32_t)(rdcycle32() - g_slave_last) < CHANNEL_HOLD_CYCLES) ? 1 : 0;
+}
+
+int main(void) {
+ 2000186:	1101                	addi	sp,sp,-32
+ 2000188:	ce06                	sw	ra,28(sp)
+ 200018a:	cc22                	sw	s0,24(sp)
+ 200018c:	ca26                	sw	s1,20(sp)
+ 200018e:	c84a                	sw	s2,16(sp)
+ 2000190:	c64e                	sw	s3,12(sp)
+ 2000192:	c452                	sw	s4,8(sp)
+    UARTEXT_STOP  = 1;
+ 2000194:	20000737          	lui	a4,0x20000
+ 2000198:	4785                	li	a5,1
+ 200019a:	c71c                	sw	a5,8(a4)
+    UARTEXT_DIV   = clk_hz / baud;
+ 200019c:	15f00693          	li	a3,351
+ 20001a0:	c754                	sw	a3,12(a4)
+    UARTEXT_CFG   = cfg;
+ 20001a2:	46e1                	li	a3,24
+ 20001a4:	cb14                	sw	a3,16(a4)
+    UARTEXT_START = 1;
+ 20001a6:	c35c                	sw	a5,4(a4)
+static inline int uartext_getchar_nb(void) {
+    uint32_t d = UARTEXT_DATA;
+    return (d & (1u << 8)) ? (int)(d & 0xFF) : -1;
+}
+static inline void uartext_puts(const char *s) {
+    while (*s) uartext_putchar(*s++);
+ 20001a8:	4635                	li	a2,13
+    UARTEXT_START = 1;
+ 20001aa:	020006b7          	lui	a3,0x2000
+ 20001ae:	6fc68693          	addi	a3,a3,1788 # 20006fc <read_sdram_tick+0x6e>
+    while (UARTEXT_STATUS & 0x1u) {}   /* attende tx_busy=0 (letture bus ora funzionano) */
+ 20001b2:	0751                	addi	a4,a4,20 # 20000014 <_data_lma+0x1dfff8fb>
+    UARTEXT_DATA = (uint8_t)c;
+ 20001b4:	20000537          	lui	a0,0x20000
+    while (*s) uartext_putchar(*s++);
+ 20001b8:	020005b7          	lui	a1,0x2000
+ 20001bc:	71858593          	addi	a1,a1,1816 # 2000718 <read_sdram_tick+0x8a>
+ 20001c0:	0685                	addi	a3,a3,1
+    while (UARTEXT_STATUS & 0x1u) {}   /* attende tx_busy=0 (letture bus ora funzionano) */
+ 20001c2:	431c                	lw	a5,0(a4)
+ 20001c4:	8b85                	andi	a5,a5,1
+ 20001c6:	fff5                	bnez	a5,20001c2 <main+0x3c>
+    UARTEXT_DATA = (uint8_t)c;
+ 20001c8:	c110                	sw	a2,0(a0)
+    while (*s) uartext_putchar(*s++);
+ 20001ca:	0006c603          	lbu	a2,0(a3)
+ 20001ce:	feb699e3          	bne	a3,a1,20001c0 <main+0x3a>
+    uartext_init(CPU_HZ, BAUD, UARTEXT_CFG_PARITY_NONE | UARTEXT_CFG_BITS(8));
+    uartext_puts("\r\nSYSTEM UP v34 (eof-2472)\r\n");
+
+    DMA_SETBASE = 0;       /* acceleratore audio: base + start (si auto-avvia comunque) */
+ 20001d2:	300007b7          	lui	a5,0x30000
+ 20001d6:	0007a623          	sw	zero,12(a5) # 3000000c <_data_lma+0x2dfff8f3>
+    DMA_START   = 1;
+ 20001da:	4705                	li	a4,1
+ 20001dc:	c3d8                	sw	a4,4(a5)
+
+    for (;;) {
+        g_loops++;
+ 20001de:	01000437          	lui	s0,0x1000
+    if (g_sdram_ready) {
+ 20001e2:	010004b7          	lui	s1,0x1000
+        if (decode_slave_carrier(g_sdram, 512)) {   /* sento il carrier SLAVE (bin27)? */
+ 20001e6:	010009b7          	lui	s3,0x1000
+ 20001ea:	01498993          	addi	s3,s3,20 # 1000014 <g_sdram>
+            g_slave_last = rdcycle32(); g_slave_seen = 1;
+ 20001ee:	01000937          	lui	s2,0x1000
+ 20001f2:	8a3a                	mv	s4,a4
+ 20001f4:	a0bd                	j	2000262 <main+0xdc>
+        g_sess++;
+ 20001f6:	01000737          	lui	a4,0x1000
+ 20001fa:	42072783          	lw	a5,1056(a4) # 1000420 <g_sess>
+ 20001fe:	0785                	addi	a5,a5,1
+ 2000200:	42f72023          	sw	a5,1056(a4)
+        if (decode_slave_carrier(g_sdram, 512)) {   /* sento il carrier SLAVE (bin27)? */
+ 2000204:	20000593          	li	a1,512
+ 2000208:	854e                	mv	a0,s3
+ 200020a:	2695                	jal	200056e <decode_slave_carrier>
+ 200020c:	c909                	beqz	a0,200021e <main+0x98>
+#define CPU_HZ 40500000u
+
+/* contatore cicli (ENABLE_COUNTERS=1: conta i cicli reali a 40.5 MHz) */
+static inline uint32_t rdcycle32(void) {
+    uint32_t c;
+    __asm__ volatile ("rdcycle %0" : "=r"(c));
+ 200020e:	c0002773          	rdcycle	a4
+            g_slave_last = rdcycle32(); g_slave_seen = 1;
+ 2000212:	010007b7          	lui	a5,0x1000
+ 2000216:	40e7ac23          	sw	a4,1048(a5) # 1000418 <g_slave_last>
+ 200021a:	41492a23          	sw	s4,1044(s2) # 1000414 <g_slave_seen>
+        char d = decode_char(g_sdram, 512);
+ 200021e:	20000593          	li	a1,512
+ 2000222:	854e                	mv	a0,s3
+ 2000224:	2181                	jal	2000664 <decode_char>
+        g_ok++;
+ 2000226:	01000737          	lui	a4,0x1000
+ 200022a:	41c72783          	lw	a5,1052(a4) # 100041c <g_ok>
+ 200022e:	0785                	addi	a5,a5,1
+ 2000230:	40f72e23          	sw	a5,1052(a4)
+        if (d >= 'A' && d <= 'C') uartext_putchar(d);   /* SOLO RX dallo slave (maiuscole) */
+ 2000234:	fbf50793          	addi	a5,a0,-65 # 1fffffbf <_data_lma+0x1dfff8a6>
+ 2000238:	0ff7f793          	zext.b	a5,a5
+ 200023c:	4709                	li	a4,2
+ 200023e:	00f76b63          	bltu	a4,a5,2000254 <main+0xce>
+    while (UARTEXT_STATUS & 0x1u) {}   /* attende tx_busy=0 (letture bus ora funzionano) */
+ 2000242:	20000737          	lui	a4,0x20000
+ 2000246:	0751                	addi	a4,a4,20 # 20000014 <_data_lma+0x1dfff8fb>
+ 2000248:	431c                	lw	a5,0(a4)
+ 200024a:	8b85                	andi	a5,a5,1
+ 200024c:	fff5                	bnez	a5,2000248 <main+0xc2>
+    UARTEXT_DATA = (uint8_t)c;
+ 200024e:	200007b7          	lui	a5,0x20000
+ 2000252:	c388                	sw	a0,0(a5)
+        g_sdram_ready = 0;                       /* consumato -> prossima cattura */
+ 2000254:	4404ac23          	sw	zero,1112(s1) # 1000458 <g_sdram_ready>
+ 2000258:	a005                	j	2000278 <main+0xf2>
+    g_channel_busy = (g_slave_seen &&
+ 200025a:	01000737          	lui	a4,0x1000
+ 200025e:	44f72023          	sw	a5,1088(a4) # 1000440 <g_channel_busy>
+        g_loops++;
+ 2000262:	42442783          	lw	a5,1060(s0) # 1000424 <g_loops>
+ 2000266:	0785                	addi	a5,a5,1 # 20000001 <_data_lma+0x1dfff8e8>
+ 2000268:	42f42223          	sw	a5,1060(s0)
+        emit_capture();      /* TX */
+ 200026c:	203d                	jal	200029a <emit_capture>
+        emit_player_tick();  /* TX */
+ 200026e:	2865                	jal	2000326 <emit_player_tick>
+    read_sdram_tick();                          /* 1 poll: snapshot BSRAM stabile */
+ 2000270:	2939                	jal	200068e <read_sdram_tick>
+    if (g_sdram_ready) {
+ 2000272:	4584a783          	lw	a5,1112(s1)
+ 2000276:	f3c1                	bnez	a5,20001f6 <main+0x70>
+    g_channel_busy = (g_slave_seen &&
+ 2000278:	41492783          	lw	a5,1044(s2)
+        (uint32_t)(rdcycle32() - g_slave_last) < CHANNEL_HOLD_CYCLES) ? 1 : 0;
+ 200027c:	dff9                	beqz	a5,200025a <main+0xd4>
+ 200027e:	c00027f3          	rdcycle	a5
+ 2000282:	01000737          	lui	a4,0x1000
+ 2000286:	41872703          	lw	a4,1048(a4) # 1000418 <g_slave_last>
+ 200028a:	8f99                	sub	a5,a5,a4
+ 200028c:	073df737          	lui	a4,0x73df
+ 2000290:	16070713          	addi	a4,a4,352 # 73df160 <_data_lma+0x53dea47>
+ 2000294:	00e7b7b3          	sltu	a5,a5,a4
+ 2000298:	b7c9                	j	200025a <main+0xd4>
+
+0200029a <emit_capture>:
+static pstate_t pstate = P_IDLE;
+static uint32_t p_t0 = 0;
+static int      p_warm = 0;     /* il tono in corso e' un EOF di warmup ('d'/'D') -> lungo */
+
+void emit_capture(void) {
+    if (UARTEXT_STATUS & 0x2u) {                 /* bit1 = rx_valid (non consuma) */
+ 200029a:	200007b7          	lui	a5,0x20000
+ 200029e:	4bdc                	lw	a5,20(a5)
+ 20002a0:	8b89                	andi	a5,a5,2
+ 20002a2:	cf99                	beqz	a5,20002c0 <emit_capture+0x26>
+        uint8_t ch = (uint8_t)(UARTEXT_DATA & 0xFFu);  /* bit8 race -> ignorato */
+ 20002a4:	200007b7          	lui	a5,0x20000
+ 20002a8:	439c                	lw	a5,0(a5)
+ 20002aa:	0ff7f693          	zext.b	a3,a5
+    return (c >= 'a' && c <= 'd') || (c >= 'A' && c <= 'D');
+ 20002ae:	0df7f793          	andi	a5,a5,223
+ 20002b2:	fbf78793          	addi	a5,a5,-65 # 1fffffbf <_data_lma+0x1dfff8a6>
+        if (is_proto(ch)) { enqueue(ch); s_rx++; }
+ 20002b6:	0ff7f793          	zext.b	a5,a5
+ 20002ba:	470d                	li	a4,3
+ 20002bc:	00f77363          	bgeu	a4,a5,20002c2 <emit_capture+0x28>
+    }
+}
+ 20002c0:	8082                	ret
+    if (q_count >= TXQ_LEN) { q_tail = (q_tail + 1u) % TXQ_LEN; q_count--; }
+ 20002c2:	010007b7          	lui	a5,0x1000
+ 20002c6:	4347a783          	lw	a5,1076(a5) # 1000434 <q_count>
+ 20002ca:	473d                	li	a4,15
+ 20002cc:	00f77f63          	bgeu	a4,a5,20002ea <emit_capture+0x50>
+ 20002d0:	01000637          	lui	a2,0x1000
+ 20002d4:	43862703          	lw	a4,1080(a2) # 1000438 <q_tail>
+ 20002d8:	0705                	addi	a4,a4,1
+ 20002da:	8b3d                	andi	a4,a4,15
+ 20002dc:	42e62c23          	sw	a4,1080(a2)
+ 20002e0:	17fd                	addi	a5,a5,-1
+ 20002e2:	01000737          	lui	a4,0x1000
+ 20002e6:	42f72a23          	sw	a5,1076(a4) # 1000434 <q_count>
+    tone_q[q_head] = c; q_head = (q_head + 1u) % TXQ_LEN; q_count++;
+ 20002ea:	01000637          	lui	a2,0x1000
+ 20002ee:	43c62783          	lw	a5,1084(a2) # 100043c <q_head>
+ 20002f2:	01000737          	lui	a4,0x1000
+ 20002f6:	00470713          	addi	a4,a4,4 # 1000004 <tone_q>
+ 20002fa:	973e                	add	a4,a4,a5
+ 20002fc:	00d70023          	sb	a3,0(a4)
+ 2000300:	0785                	addi	a5,a5,1
+ 2000302:	8bbd                	andi	a5,a5,15
+ 2000304:	42f62e23          	sw	a5,1084(a2)
+ 2000308:	01000737          	lui	a4,0x1000
+ 200030c:	43472783          	lw	a5,1076(a4) # 1000434 <q_count>
+ 2000310:	0785                	addi	a5,a5,1
+ 2000312:	42f72a23          	sw	a5,1076(a4)
+        if (is_proto(ch)) { enqueue(ch); s_rx++; }
+ 2000316:	01000737          	lui	a4,0x1000
+ 200031a:	44872783          	lw	a5,1096(a4) # 1000448 <s_rx>
+ 200031e:	0785                	addi	a5,a5,1
+ 2000320:	44f72423          	sw	a5,1096(a4)
+}
+ 2000324:	8082                	ret
+
+02000326 <emit_player_tick>:
+ 2000326:	c00026f3          	rdcycle	a3
+
+void emit_player_tick(void) {
+    uint32_t now = rdcycle32();
+    uint8_t ch; uint32_t word;
+    switch (pstate) {
+ 200032a:	010007b7          	lui	a5,0x1000
+ 200032e:	4307a783          	lw	a5,1072(a5) # 1000430 <pstate>
+ 2000332:	4705                	li	a4,1
+ 2000334:	0ce78d63          	beq	a5,a4,200040e <emit_player_tick+0xe8>
+ 2000338:	4709                	li	a4,2
+ 200033a:	14e78463          	beq	a5,a4,2000482 <emit_player_tick+0x15c>
+ 200033e:	e791                	bnez	a5,200034a <emit_player_tick+0x24>
+        case P_IDLE:
+            /* CSMA: non parlo se il canale e' occupato dallo slave (carrier slave udito
+             * negli ultimi 3 s). Tengo il char in coda e riprovo al giro dopo. */
+            if (!g_channel_busy && dequeue(&ch) && tone_word_for_char((char)ch, &word)) {
+ 2000340:	010007b7          	lui	a5,0x1000
+ 2000344:	4407a783          	lw	a5,1088(a5) # 1000440 <g_channel_busy>
+ 2000348:	c391                	beqz	a5,200034c <emit_player_tick+0x26>
+            if ((now - p_t0) >= ms_to_cycles(SIL_MS)) {
+                s_em++; pstate = P_IDLE;
+            }
+            break;
+    }
+}
+ 200034a:	8082                	ret
+    if (q_count == 0) return 0;
+ 200034c:	010007b7          	lui	a5,0x1000
+ 2000350:	4347a703          	lw	a4,1076(a5) # 1000434 <q_count>
+ 2000354:	db7d                	beqz	a4,200034a <emit_player_tick+0x24>
+    *c = tone_q[q_tail]; q_tail = (q_tail + 1u) % TXQ_LEN; q_count--; return 1;
+ 2000356:	010005b7          	lui	a1,0x1000
+ 200035a:	4385a783          	lw	a5,1080(a1) # 1000438 <q_tail>
+ 200035e:	01000637          	lui	a2,0x1000
+ 2000362:	00460613          	addi	a2,a2,4 # 1000004 <tone_q>
+ 2000366:	963e                	add	a2,a2,a5
+ 2000368:	00064603          	lbu	a2,0(a2)
+ 200036c:	0785                	addi	a5,a5,1
+ 200036e:	8bbd                	andi	a5,a5,15
+ 2000370:	42f5ac23          	sw	a5,1080(a1)
+ 2000374:	177d                	addi	a4,a4,-1
+ 2000376:	010007b7          	lui	a5,0x1000
+ 200037a:	42e7aa23          	sw	a4,1076(a5) # 1000434 <q_count>
+    if      (ch == 'd') ch = 'c';
+ 200037e:	06400793          	li	a5,100
+ 2000382:	02f60063          	beq	a2,a5,20003a2 <emit_player_tick+0x7c>
+    else if (ch == 'D') ch = 'C';
+ 2000386:	04400793          	li	a5,68
+ 200038a:	04f60163          	beq	a2,a5,20003cc <emit_player_tick+0xa6>
+    char up = (ch >= 'a' && ch <= 'z') ? (char)(ch - 32) : ch;
+ 200038e:	f9f60793          	addi	a5,a2,-97
+ 2000392:	0ff7f793          	zext.b	a5,a5
+ 2000396:	45e5                	li	a1,25
+ 2000398:	8732                	mv	a4,a2
+ 200039a:	00f5e963          	bltu	a1,a5,20003ac <emit_player_tick+0x86>
+    *c = tone_q[q_tail]; q_tail = (q_tail + 1u) % TXQ_LEN; q_count--; return 1;
+ 200039e:	87b2                	mv	a5,a2
+ 20003a0:	a019                	j	20003a6 <emit_player_tick+0x80>
+    if      (ch == 'd') ch = 'c';
+ 20003a2:	06300793          	li	a5,99
+    char up = (ch >= 'a' && ch <= 'z') ? (char)(ch - 32) : ch;
+ 20003a6:	1781                	addi	a5,a5,-32
+ 20003a8:	0ff7f713          	zext.b	a4,a5
+    switch (up) {
+ 20003ac:	04200793          	li	a5,66
+ 20003b0:	02f70263          	beq	a4,a5,20003d4 <emit_player_tick+0xae>
+ 20003b4:	04300793          	li	a5,67
+ 20003b8:	00f70a63          	beq	a4,a5,20003cc <emit_player_tick+0xa6>
+ 20003bc:	04100593          	li	a1,65
+        case 'A': f2 = F_BIT0; break;   /* bit 0 -> bin39 */
+ 20003c0:	6785                	lui	a5,0x1
+ 20003c2:	df378793          	addi	a5,a5,-525 # df3 <rs_last_fill-0xfff20d>
+    switch (up) {
+ 20003c6:	00b70a63          	beq	a4,a1,20003da <emit_player_tick+0xb4>
+ 20003ca:	8082                	ret
+        case 'C': f2 = F_EOF;  break;   /* EOF   -> bin32 */
+ 20003cc:	6785                	lui	a5,0x1
+ 20003ce:	b7278793          	addi	a5,a5,-1166 # b72 <rs_last_fill-0xfff48e>
+ 20003d2:	a021                	j	20003da <emit_player_tick+0xb4>
+    switch (up) {
+ 20003d4:	6785                	lui	a5,0x1
+ 20003d6:	1e178793          	addi	a5,a5,481 # 11e1 <rs_last_fill-0xffee1f>
+    *word = ((uint32_t)f2 << 16) | (uint32_t)CARRIER_MASTER;   /* f2=dato, f1=carrier */
+ 20003da:	07c2                	slli	a5,a5,0x10
+ 20003dc:	7de7e793          	ori	a5,a5,2014
+                PWM10_TONES = word; p_t0 = now;
+ 20003e0:	50000737          	lui	a4,0x50000
+ 20003e4:	c35c                	sw	a5,4(a4)
+ 20003e6:	010007b7          	lui	a5,0x1000
+ 20003ea:	42d7a623          	sw	a3,1068(a5) # 100042c <p_t0>
+                p_warm = (ch == 'd' || ch == 'D');   /* EOF di warmup -> tono lungo */
+ 20003ee:	0df67793          	andi	a5,a2,223
+ 20003f2:	fbc78793          	addi	a5,a5,-68
+ 20003f6:	0017b793          	seqz	a5,a5
+ 20003fa:	01000737          	lui	a4,0x1000
+ 20003fe:	42f72423          	sw	a5,1064(a4) # 1000428 <p_warm>
+                pstate = P_TONE;
+ 2000402:	010007b7          	lui	a5,0x1000
+ 2000406:	4705                	li	a4,1
+ 2000408:	42e7a823          	sw	a4,1072(a5) # 1000430 <pstate>
+ 200040c:	8082                	ret
+            if (g_channel_busy) {
+ 200040e:	010007b7          	lui	a5,0x1000
+ 2000412:	4407a783          	lw	a5,1088(a5) # 1000440 <g_channel_busy>
+ 2000416:	cf99                	beqz	a5,2000434 <emit_player_tick+0x10e>
+                PWM10_STOPW = 1; p_t0 = now; pstate = P_SIL;
+ 2000418:	500007b7          	lui	a5,0x50000
+ 200041c:	4705                	li	a4,1
+ 200041e:	c798                	sw	a4,8(a5)
+ 2000420:	010007b7          	lui	a5,0x1000
+ 2000424:	42d7a623          	sw	a3,1068(a5) # 100042c <p_t0>
+ 2000428:	010007b7          	lui	a5,0x1000
+ 200042c:	4709                	li	a4,2
+ 200042e:	42e7a823          	sw	a4,1072(a5) # 1000430 <pstate>
+                break;
+ 2000432:	8082                	ret
+            if ((now - p_t0) >= ms_to_cycles(p_warm ? WARMUP_MS : TONE_MS)) {
+ 2000434:	010007b7          	lui	a5,0x1000
+ 2000438:	42c7a703          	lw	a4,1068(a5) # 100042c <p_t0>
+ 200043c:	40e68733          	sub	a4,a3,a4
+ 2000440:	010007b7          	lui	a5,0x1000
+ 2000444:	4287a783          	lw	a5,1064(a5) # 1000428 <p_warm>
+ 2000448:	0017b793          	seqz	a5,a5
+ 200044c:	40f007b3          	neg	a5,a5
+ 2000450:	f647f793          	andi	a5,a5,-156
+ 2000454:	12c78793          	addi	a5,a5,300
+    return c;
+}
+static inline uint32_t ms_to_cycles(uint32_t ms) { return ms * (CPU_HZ / 1000u); }
+ 2000458:	6629                	lui	a2,0xa
+ 200045a:	e3460613          	addi	a2,a2,-460 # 9e34 <rs_last_fill-0xff61cc>
+ 200045e:	02c787b3          	mul	a5,a5,a2
+ 2000462:	eef764e3          	bltu	a4,a5,200034a <emit_player_tick+0x24>
+                PWM10_STOPW = 1; p_t0 = now; pstate = P_SIL;
+ 2000466:	500007b7          	lui	a5,0x50000
+ 200046a:	4705                	li	a4,1
+ 200046c:	c798                	sw	a4,8(a5)
+ 200046e:	010007b7          	lui	a5,0x1000
+ 2000472:	42d7a623          	sw	a3,1068(a5) # 100042c <p_t0>
+ 2000476:	010007b7          	lui	a5,0x1000
+ 200047a:	4709                	li	a4,2
+ 200047c:	42e7a823          	sw	a4,1072(a5) # 1000430 <pstate>
+ 2000480:	8082                	ret
+            if ((now - p_t0) >= ms_to_cycles(SIL_MS)) {
+ 2000482:	010007b7          	lui	a5,0x1000
+ 2000486:	42c7a703          	lw	a4,1068(a5) # 100042c <p_t0>
+ 200048a:	40e68733          	sub	a4,a3,a4
+ 200048e:	00f737b7          	lui	a5,0xf73
+ 2000492:	13f78793          	addi	a5,a5,319 # f7313f <rs_last_fill-0x8cec1>
+ 2000496:	eae7fae3          	bgeu	a5,a4,200034a <emit_player_tick+0x24>
+                s_em++; pstate = P_IDLE;
+ 200049a:	01000737          	lui	a4,0x1000
+ 200049e:	44472783          	lw	a5,1092(a4) # 1000444 <s_em>
+ 20004a2:	0785                	addi	a5,a5,1
+ 20004a4:	44f72223          	sw	a5,1092(a4)
+ 20004a8:	010007b7          	lui	a5,0x1000
+ 20004ac:	4207a823          	sw	zero,1072(a5) # 1000430 <pstate>
+}
+ 20004b0:	8082                	ret
+
+020004b2 <emit_rx_count>:
+
+uint32_t emit_rx_count(void)  { return s_rx; }
+ 20004b2:	010007b7          	lui	a5,0x1000
+ 20004b6:	4487a503          	lw	a0,1096(a5) # 1000448 <s_rx>
+ 20004ba:	8082                	ret
+
+020004bc <emit_em_count>:
+uint32_t emit_em_count(void)  { return s_em; }
+ 20004bc:	010007b7          	lui	a5,0x1000
+ 20004c0:	4447a503          	lw	a0,1092(a5) # 1000444 <s_em>
+ 20004c4:	8082                	ret
+
+020004c6 <emit_queue_len>:
+unsigned emit_queue_len(void) { return q_count; }
+ 20004c6:	010007b7          	lui	a5,0x1000
+ 20004ca:	4347a503          	lw	a0,1076(a5) # 1000434 <q_count>
+ 20004ce:	8082                	ret
+
+020004d0 <emit_busy>:
+int      emit_busy(void)      { return pstate != P_IDLE; }
+ 20004d0:	010007b7          	lui	a5,0x1000
+ 20004d4:	4307a503          	lw	a0,1072(a5) # 1000430 <pstate>
+ 20004d8:	00a03533          	snez	a0,a0
+ 20004dc:	8082                	ret
+
+020004de <detect_bin>:
+ *   - massimo locale: centro >= tutti e 6 i vicini
+ *   - curvatura d = 2b - a - g > 0 (e' un picco verso l'alto)
+ *   - test parabolico vs soglia: 8*d*(b-THR) + (a-g)^2 > 0  (ampiezza interpolata > THR)
+ * Ritorna 1 se rilevato; *beta = magnitude del centro (per confronto forza). */
+static int detect_bin(const int16_t *re, int n, int bin, int *beta) {
+    if (bin < WINR || bin >= n - WINR) { *beta = 0; return 0; }
+ 20004de:	4789                	li	a5,2
+ 20004e0:	08c7d363          	bge	a5,a2,2000566 <detect_bin+0x88>
+ 20004e4:	15f5                	addi	a1,a1,-3
+ 20004e6:	08b65063          	bge	a2,a1,2000566 <detect_bin+0x88>
+static int detect_bin(const int16_t *re, int n, int bin, int *beta) {
+ 20004ea:	1101                	addi	sp,sp,-32
+ 20004ec:	1569                	addi	a0,a0,-6
+ 20004ee:	0606                	slli	a2,a2,0x1
+ 20004f0:	00c50733          	add	a4,a0,a2
+ 20004f4:	004c                	addi	a1,sp,4
+ 20004f6:	1008                	addi	a0,sp,32
+    return (v < 0) ? -v : v;
+ 20004f8:	00071603          	lh	a2,0(a4)
+ 20004fc:	863d                	srai	a2,a2,0xf
+ 20004fe:	00075783          	lhu	a5,0(a4)
+ 2000502:	8fb1                	xor	a5,a5,a2
+ 2000504:	8f91                	sub	a5,a5,a2
+ 2000506:	07c2                	slli	a5,a5,0x10
+ 2000508:	83c1                	srli	a5,a5,0x10
+ 200050a:	c19c                	sw	a5,0(a1)
+    int w[2 * WINR + 1];
+    for (int k = 0; k < 2 * WINR + 1; k++) w[k] = bin_mag(re, bin - WINR + k);
+ 200050c:	0709                	addi	a4,a4,2
+ 200050e:	0591                	addi	a1,a1,4
+ 2000510:	fea594e3          	bne	a1,a0,20004f8 <detect_bin+0x1a>
+    int b = w[WINR];
+ 2000514:	47c2                	lw	a5,16(sp)
+    *beta = b;
+ 2000516:	c29c                	sw	a5,0(a3)
+    if (!(b >= w[0] && b >= w[1] && b >= w[2] &&
+ 2000518:	4712                	lw	a4,4(sp)
+ 200051a:	04e7c363          	blt	a5,a4,2000560 <detect_bin+0x82>
+ 200051e:	4722                	lw	a4,8(sp)
+ 2000520:	04e7c063          	blt	a5,a4,2000560 <detect_bin+0x82>
+ 2000524:	4732                	lw	a4,12(sp)
+ 2000526:	02e7cd63          	blt	a5,a4,2000560 <detect_bin+0x82>
+          b >= w[4] && b >= w[5] && b >= w[6])) return 0;   /* massimo locale */
+ 200052a:	46d2                	lw	a3,20(sp)
+    if (!(b >= w[0] && b >= w[1] && b >= w[2] &&
+ 200052c:	02d7ca63          	blt	a5,a3,2000560 <detect_bin+0x82>
+          b >= w[4] && b >= w[5] && b >= w[6])) return 0;   /* massimo locale */
+ 2000530:	4662                	lw	a2,24(sp)
+ 2000532:	02c7c763          	blt	a5,a2,2000560 <detect_bin+0x82>
+    if (!(b >= w[0] && b >= w[1] && b >= w[2] &&
+ 2000536:	4672                	lw	a2,28(sp)
+ 2000538:	02c7c463          	blt	a5,a2,2000560 <detect_bin+0x82>
+    int a = w[WINR - 1], g = w[WINR + 1];
+    int d = 2 * b - a - g;                                  /* curvatura */
+ 200053c:	00179613          	slli	a2,a5,0x1
+ 2000540:	8e19                	sub	a2,a2,a4
+ 2000542:	8e15                	sub	a2,a2,a3
+    if (d <= 0) return 0;
+ 2000544:	00c05e63          	blez	a2,2000560 <detect_bin+0x82>
+    int diff = a - g;
+ 2000548:	8f15                	sub	a4,a4,a3
+    long test = 8L * (long)d * (long)(b - THRESHOLD) + (long)diff * (long)diff;
+ 200054a:	ffa78513          	addi	a0,a5,-6
+ 200054e:	02c50533          	mul	a0,a0,a2
+ 2000552:	050e                	slli	a0,a0,0x3
+ 2000554:	02e70733          	mul	a4,a4,a4
+ 2000558:	953a                	add	a0,a0,a4
+    return (test > 0);
+ 200055a:	00a02533          	sgtz	a0,a0
+ 200055e:	a011                	j	2000562 <detect_bin+0x84>
+    if (bin < WINR || bin >= n - WINR) { *beta = 0; return 0; }
+ 2000560:	4501                	li	a0,0
+}
+ 2000562:	6105                	addi	sp,sp,32
+ 2000564:	8082                	ret
+    if (bin < WINR || bin >= n - WINR) { *beta = 0; return 0; }
+ 2000566:	0006a023          	sw	zero,0(a3)
+ 200056a:	4501                	li	a0,0
+}
+ 200056c:	8082                	ret
+
+0200056e <decode_slave_carrier>:
+
+/* 1 se il carrier dello SLAVE (bin27) e' presente nel frame. Usato dalla logica del
+ * canale (main): il master non parla / si interrompe se sente lo slave. Indipendente
+ * dal proprio carrier (bin22) -> il master non si auto-rileva mentre emette. */
+int decode_slave_carrier(const int16_t *re, int n) {
+ 200056e:	1101                	addi	sp,sp,-32
+ 2000570:	ce06                	sw	ra,28(sp)
+    int beta;
+    return detect_bin(re, n, BIN_CS, &beta);
+ 2000572:	0074                	addi	a3,sp,12
+ 2000574:	466d                	li	a2,27
+ 2000576:	37a5                	jal	20004de <detect_bin>
+}
+ 2000578:	40f2                	lw	ra,28(sp)
+ 200057a:	6105                	addi	sp,sp,32
+ 200057c:	8082                	ret
+
+0200057e <decode_symbol>:
+
+rx_symbol_t decode_symbol(const int16_t *re, int n) {
+ 200057e:	7139                	addi	sp,sp,-64
+ 2000580:	de06                	sw	ra,60(sp)
+ 2000582:	dc22                	sw	s0,56(sp)
+ 2000584:	da26                	sw	s1,52(sp)
+ 2000586:	d84a                	sw	s2,48(sp)
+ 2000588:	d64e                	sw	s3,44(sp)
+ 200058a:	d452                	sw	s4,40(sp)
+ 200058c:	d256                	sw	s5,36(sp)
+ 200058e:	842a                	mv	s0,a0
+ 2000590:	84ae                	mv	s1,a1
+    rx_symbol_t r; r.channel = -1; r.sym = -1;
+
+    int bcm, bcs, bb0, bb1, beof;
+    int dcm = detect_bin(re, n, BIN_CM,  &bcm);
+ 2000592:	0854                	addi	a3,sp,20
+ 2000594:	4659                	li	a2,22
+ 2000596:	37a1                	jal	20004de <detect_bin>
+ 2000598:	89aa                	mv	s3,a0
+    int dcs = detect_bin(re, n, BIN_CS,  &bcs);
+ 200059a:	0814                	addi	a3,sp,16
+ 200059c:	466d                	li	a2,27
+ 200059e:	85a6                	mv	a1,s1
+ 20005a0:	8522                	mv	a0,s0
+ 20005a2:	3f35                	jal	20004de <detect_bin>
+ 20005a4:	8a2a                	mv	s4,a0
+    int d0  = detect_bin(re, n, BIN_B0,  &bb0);
+ 20005a6:	0074                	addi	a3,sp,12
+ 20005a8:	02700613          	li	a2,39
+ 20005ac:	85a6                	mv	a1,s1
+ 20005ae:	8522                	mv	a0,s0
+ 20005b0:	373d                	jal	20004de <detect_bin>
+ 20005b2:	892a                	mv	s2,a0
+    int d1  = detect_bin(re, n, BIN_B1,  &bb1);
+ 20005b4:	0034                	addi	a3,sp,8
+ 20005b6:	03200613          	li	a2,50
+ 20005ba:	85a6                	mv	a1,s1
+ 20005bc:	8522                	mv	a0,s0
+ 20005be:	3705                	jal	20004de <detect_bin>
+ 20005c0:	8aaa                	mv	s5,a0
+    int de  = detect_bin(re, n, BIN_EOF, &beof);
+ 20005c2:	0054                	addi	a3,sp,4
+ 20005c4:	02000613          	li	a2,32
+ 20005c8:	85a6                	mv	a1,s1
+ 20005ca:	8522                	mv	a0,s0
+ 20005cc:	3f09                	jal	20004de <detect_bin>
+
+    /* dato = il piu' forte tra bit0/bit1/EOF (solo se rilevato) */
+    int data_sym = -1, data_beta = 0;
+ 20005ce:	55fd                	li	a1,-1
+    if (d0 && bb0  > data_beta) { data_beta = bb0;  data_sym = 0; }
+ 20005d0:	00090663          	beqz	s2,20005dc <decode_symbol+0x5e>
+ 20005d4:	4932                	lw	s2,12(sp)
+ 20005d6:	4581                	li	a1,0
+ 20005d8:	05205063          	blez	s2,2000618 <decode_symbol+0x9a>
+    if (d1 && bb1  > data_beta) { data_beta = bb1;  data_sym = 1; }
+ 20005dc:	000a8763          	beqz	s5,20005ea <decode_symbol+0x6c>
+ 20005e0:	47a2                	lw	a5,8(sp)
+ 20005e2:	00f95463          	bge	s2,a5,20005ea <decode_symbol+0x6c>
+ 20005e6:	893e                	mv	s2,a5
+ 20005e8:	4585                	li	a1,1
+    if (de && beof > data_beta) { data_beta = beof; data_sym = 2; }
+ 20005ea:	c501                	beqz	a0,20005f2 <decode_symbol+0x74>
+ 20005ec:	4792                	lw	a5,4(sp)
+ 20005ee:	04f94b63          	blt	s2,a5,2000644 <decode_symbol+0xc6>
+
+    /* carrier = master XOR slave (se entrambi, il piu' forte) */
+    int chan = -1;
+    if      (dcm && !dcs) chan = 0;
+ 20005f2:	013036b3          	snez	a3,s3
+ 20005f6:	001a3793          	seqz	a5,s4
+ 20005fa:	8ff5                	and	a5,a5,a3
+ 20005fc:	e38d                	bnez	a5,200061e <decode_symbol+0xa0>
+    else if (dcs && !dcm) chan = 1;
+ 20005fe:	014037b3          	snez	a5,s4
+ 2000602:	0019b713          	seqz	a4,s3
+ 2000606:	8f7d                	and	a4,a4,a5
+ 2000608:	eb0d                	bnez	a4,200063a <decode_symbol+0xbc>
+    else if (dcm &&  dcs) chan = (bcm >= bcs) ? 0 : 1;
+ 200060a:	8efd                	and	a3,a3,a5
+ 200060c:	ca8d                	beqz	a3,200063e <decode_symbol+0xc0>
+ 200060e:	4552                	lw	a0,20(sp)
+ 2000610:	47c2                	lw	a5,16(sp)
+ 2000612:	00f52533          	slt	a0,a0,a5
+ 2000616:	a029                	j	2000620 <decode_symbol+0xa2>
+    int data_sym = -1, data_beta = 0;
+ 2000618:	4901                	li	s2,0
+ 200061a:	55fd                	li	a1,-1
+ 200061c:	b7c1                	j	20005dc <decode_symbol+0x5e>
+    if      (dcm && !dcs) chan = 0;
+ 200061e:	4501                	li	a0,0
+
+    if (data_sym >= 0 && chan >= 0) { r.channel = chan; r.sym = data_sym; }
+ 2000620:	0005d463          	bgez	a1,2000628 <decode_symbol+0xaa>
+    rx_symbol_t r; r.channel = -1; r.sym = -1;
+ 2000624:	55fd                	li	a1,-1
+ 2000626:	852e                	mv	a0,a1
+    return r;
+}
+ 2000628:	50f2                	lw	ra,60(sp)
+ 200062a:	5462                	lw	s0,56(sp)
+ 200062c:	54d2                	lw	s1,52(sp)
+ 200062e:	5942                	lw	s2,48(sp)
+ 2000630:	59b2                	lw	s3,44(sp)
+ 2000632:	5a22                	lw	s4,40(sp)
+ 2000634:	5a92                	lw	s5,36(sp)
+ 2000636:	6121                	addi	sp,sp,64
+ 2000638:	8082                	ret
+    else if (dcs && !dcm) chan = 1;
+ 200063a:	4505                	li	a0,1
+ 200063c:	b7d5                	j	2000620 <decode_symbol+0xa2>
+    rx_symbol_t r; r.channel = -1; r.sym = -1;
+ 200063e:	55fd                	li	a1,-1
+ 2000640:	852e                	mv	a0,a1
+ 2000642:	b7dd                	j	2000628 <decode_symbol+0xaa>
+    if      (dcm && !dcs) chan = 0;
+ 2000644:	013036b3          	snez	a3,s3
+ 2000648:	001a3793          	seqz	a5,s4
+ 200064c:	8ff5                	and	a5,a5,a3
+    if (de && beof > data_beta) { data_beta = beof; data_sym = 2; }
+ 200064e:	4589                	li	a1,2
+    if      (dcm && !dcs) chan = 0;
+ 2000650:	4501                	li	a0,0
+ 2000652:	fbf9                	bnez	a5,2000628 <decode_symbol+0xaa>
+    else if (dcs && !dcm) chan = 1;
+ 2000654:	014037b3          	snez	a5,s4
+ 2000658:	0019b713          	seqz	a4,s3
+ 200065c:	8f7d                	and	a4,a4,a5
+ 200065e:	4505                	li	a0,1
+ 2000660:	d74d                	beqz	a4,200060a <decode_symbol+0x8c>
+ 2000662:	b7d9                	j	2000628 <decode_symbol+0xaa>
+
+02000664 <decode_char>:
+
+char decode_char(const int16_t *re, int n) {
+ 2000664:	1101                	addi	sp,sp,-32
+ 2000666:	ce06                	sw	ra,28(sp)
+    rx_symbol_t s = decode_symbol(re, n);
+ 2000668:	3f19                	jal	200057e <decode_symbol>
+ 200066a:	c42a                	sw	a0,8(sp)
+ 200066c:	c62e                	sw	a1,12(sp)
+    if (s.sym < 0) return 0;
+ 200066e:	0005ce63          	bltz	a1,200068a <decode_char+0x26>
+    /* slave -> 'A'/'B'/'C' (ricevuto); master -> 'a'/'b'/'c' (loopback di se stesso) */
+    return (char)((s.channel == 1 ? 'A' : 'a') + s.sym);
+ 2000672:	157d                	addi	a0,a0,-1
+ 2000674:	00a03533          	snez	a0,a0
+ 2000678:	0516                	slli	a0,a0,0x5
+ 200067a:	04150513          	addi	a0,a0,65
+ 200067e:	952e                	add	a0,a0,a1
+ 2000680:	0ff57513          	zext.b	a0,a0
+}
+ 2000684:	40f2                	lw	ra,28(sp)
+ 2000686:	6105                	addi	sp,sp,32
+ 2000688:	8082                	ret
+    if (s.sym < 0) return 0;
+ 200068a:	4501                	li	a0,0
+ 200068c:	bfe5                	j	2000684 <decode_char+0x20>
+
+0200068e <read_sdram_tick>:
+volatile uint32_t g_b1_maxidx = 0;                  /* diag legacy (non piu' usato) */
+
+static uint32_t rs_last_fill = 0xFFFFFFFFu;
+
+void read_sdram_tick(void) {
+    if (g_sdram_ready) return;                 /* il main non ha ancora consumato */
+ 200068e:	010007b7          	lui	a5,0x1000
+ 2000692:	4587a783          	lw	a5,1112(a5) # 1000458 <g_sdram_ready>
+ 2000696:	e3ad                	bnez	a5,20006f8 <read_sdram_tick+0x6a>
+
+    uint32_t fc = S0_FILLCNT;
+ 2000698:	480007b7          	lui	a5,0x48000
+ 200069c:	0907a783          	lw	a5,144(a5) # 48000090 <_data_lma+0x45fff977>
+    if (fc == rs_last_fill) return;            /* nessun frame nuovo completato */
+ 20006a0:	01000737          	lui	a4,0x1000
+ 20006a4:	00072703          	lw	a4,0(a4) # 1000000 <rs_last_fill>
+ 20006a8:	04f70863          	beq	a4,a5,20006f8 <read_sdram_tick+0x6a>
+    rs_last_fill = fc;
+ 20006ac:	01000737          	lui	a4,0x1000
+ 20006b0:	00f72023          	sw	a5,0(a4) # 1000000 <rs_last_fill>
+
+    /* snapshot coerente: copia i 512 bin dalla BSRAM stabile (niente race) */
+    for (int i = 0; i < 512; i++)
+ 20006b4:	010007b7          	lui	a5,0x1000
+ 20006b8:	01478793          	addi	a5,a5,20 # 1000014 <g_sdram>
+ 20006bc:	40078613          	addi	a2,a5,1024
+    rs_last_fill = fc;
+ 20006c0:	48001737          	lui	a4,0x48001
+        g_sdram[i] = (int16_t)(FFT_BSRAM[i] & 0xFFFFu);
+ 20006c4:	4314                	lw	a3,0(a4)
+ 20006c6:	00d79023          	sh	a3,0(a5)
+    for (int i = 0; i < 512; i++)
+ 20006ca:	0711                	addi	a4,a4,4 # 48001004 <_data_lma+0x460008eb>
+ 20006cc:	0789                	addi	a5,a5,2
+ 20006ce:	fec79be3          	bne	a5,a2,20006c4 <read_sdram_tick+0x36>
+
+    g_catch_b0++; g_catch_b1++;                /* diag: 1 frame coerente copiato */
+ 20006d2:	01000737          	lui	a4,0x1000
+ 20006d6:	45472783          	lw	a5,1108(a4) # 1000454 <g_catch_b0>
+ 20006da:	0785                	addi	a5,a5,1
+ 20006dc:	44f72a23          	sw	a5,1108(a4)
+ 20006e0:	01000737          	lui	a4,0x1000
+ 20006e4:	45072783          	lw	a5,1104(a4) # 1000450 <g_catch_b1>
+ 20006e8:	0785                	addi	a5,a5,1
+ 20006ea:	44f72823          	sw	a5,1104(a4)
+    g_sdram_ready = 1;                          /* il main decodifica e azzera il flag */
+ 20006ee:	010007b7          	lui	a5,0x1000
+ 20006f2:	4705                	li	a4,1
+ 20006f4:	44e7ac23          	sw	a4,1112(a5) # 1000458 <g_sdram_ready>
+}
+ 20006f8:	8082                	ret
+ 20006fa:	0000                	unimp
+ 20006fc:	0a0d                	addi	s4,s4,3
+ 20006fe:	54535953          	.insn	4, 0x54535953
+ 2000702:	4d45                	li	s10,17
+ 2000704:	5520                	lw	s0,104(a0)
+ 2000706:	2050                	.insn	2, 0x2050
+ 2000708:	3376                	.insn	2, 0x3376
+ 200070a:	2034                	.insn	2, 0x2034
+ 200070c:	6528                	.insn	2, 0x6528
+ 200070e:	322d666f          	jal	a2,20d6a30 <_data_lma+0xd6317>
+ 2000712:	3734                	.insn	2, 0x3734
+ 2000714:	2932                	.insn	2, 0x2932
+ 2000716:	0a0d                	addi	s4,s4,3
+	...
