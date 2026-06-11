@@ -159,8 +159,13 @@ begin
             else
                 ack_o   <= '0';
                 stb_old <= stb_i;
-                if cyc_i = '1' and stb_i = '1' and stb_old = '0' then
-                    if we_i = '1' then
+                -- ack TENUTO alto finche' lo strobe e' attivo (come gli slave che
+                -- la CPU legge senza problemi): l'impulso singolo di 1 ciclo viene
+                -- perso dall'OPEN WB del PicoRV32 e una LETTURA resta appesa per
+                -- sempre (le scritture, posted, non se ne accorgevano).
+                -- Side-effect delle scritture solo sul fronte di stb (com'era).
+                if cyc_i = '1' and stb_i = '1' then
+                    if we_i = '1' and stb_old = '0' then
                         if adr_i = x"04" then
                             if start_r = '0' then
                                 f1_hz_r <= unsigned(dat_i(F_WIDTH - 1 downto 0));

@@ -5,6 +5,7 @@
  */
 #include <stdint.h>
 #include "norflash.h"
+#include "emit_tone.h"
 #include "../include/periphs.h"
 
 /* ---- mappa memoria (come flash_ctrl) ---- */
@@ -27,13 +28,34 @@
 
 static int g_head;                     /* prossimo slot da scrivere (0..511) */
 static int g_flash_present = 0;        /* 1 se il W25Q risponde al JEDEC (id[0]=0xEF) */
+static int g_chip_locked = 0;          /* 1 se BP/SRP ancora attivi dopo l'unlock */
+
+volatile int g_nor_debug = 0;          /* settings b[19]: gating dump diagnostici */
+
+int nor_present(void) { return g_flash_present; }
+int nor_locked(void)  { return g_chip_locked; }
+int nor_head(void)    { return g_head; }
+
+/* applica i campi dei settings che comandano il firmware (solo blob v2 valido) */
+static void settings_apply(const uint8_t *b) {
+    if (b[0] == 0xA5u && b[30] == 0x5Au) g_nor_debug = b[19] & 1;
+}
 
 /* =================== livello SPI (spi_master_generic, S8) =================== */
+static uint32_t g_spi_to = 0;            /* transfer SPI andati in timeout (diag) */
+
 static inline void nor_cs(int assert) { NORSPI_CTRL = assert ? 1u : 0u; } /* 1=CS basso */
+
+/* done e' PERSISTENTE (si azzera solo al TXDATA successivo): una lettura OPEN WB
+ * sporca del registro STATUS non lo perde piu', si limita a far ripetere il poll.
+ * Timeout a TEMPO (2 ms >> 13 us di un transfer a 633 kHz), non a iterazioni:
+ * se lo SPI e' morto il boot resta dell'ordine dei secondi, non delle ore. */
 static uint8_t nor_xfer(uint8_t b) {
-    uint32_t guard = 100000u;                /* >> 512 cicli di un transfer: evita hang infinito */
-    NORSPI_TXDATA = b;                       /* avvia il trasferimento di 1 byte   */
-    while (!(NORSPI_STATUS & 0x2u) && guard) guard--;  /* attendi done (bit1) con timeout */
+    uint32_t t0 = rdcycle32();
+    NORSPI_TXDATA = b;
+    while (!(NORSPI_STATUS & 0x2u)) {
+        if ((uint32_t)(rdcycle32() - t0) > ms_to_cycles(2)) { g_spi_to++; break; }
+    }
     return (uint8_t)(NORSPI_RXDATA & 0xFFu);
 }
 
@@ -43,13 +65,15 @@ static uint8_t rdsr1(void) {
     uint8_t r; nor_cs(1); nor_xfer(CMD_RDSR1); r = nor_xfer(0); nor_cs(0); return r;
 }
 
-/* poll WIP (bit0) finche' 0. guard ~60k iter (ogni iter ~1 ms con 2 transfer SPI) ->
- * ~1.5 s: copre un sector-erase reale (~400 ms) ma molla in fretta se il chip non
- * risponde (WIP bloccato a 1), invece di ~10 min che congelavano emit e nor_poll. */
+/* poll WIP (bit0) finche' 0, max 700 ms (sector erase reale ~400 ms, come il
+ * POLL_MAX di flash_ctrl). Molla subito se il chip e' assente o lo SPI e' morto. */
 static void wait_wip(void) {
-    uint32_t guard = 60000u;
-    if (!g_flash_present) return;        /* chip assente: non spinnare */
-    while ((rdsr1() & 0x01u) && guard) guard--;
+    uint32_t t0 = rdcycle32();
+    if (!g_flash_present) return;
+    while (rdsr1() & 0x01u) {
+        if ((uint32_t)(rdcycle32() - t0) > ms_to_cycles(700)) return;
+        if (g_spi_to > 16) return;
+    }
 }
 
 static void send_addr(uint32_t a) { nor_xfer(a >> 16); nor_xfer(a >> 8); nor_xfer(a); }
@@ -75,14 +99,40 @@ static void read_bytes(uint32_t a, uint8_t *d, int n) {
 }
 
 /* =================== UART comandi NOR (S7) =================== */
+/* lettura gated su STATUS (non distruttiva): la lettura di DATA consuma il byte
+ * e sul bus OPEN WB puo' tornare sporca, quindi si fa solo a rx_valid certo */
 static int noruart_getc_nb(void) {
-    uint32_t d = NORUART_DATA;               /* [8]=rx_valid, [7:0]=byte (lettura azzera) */
-    return (d & (1u << 8)) ? (int)(d & 0xFFu) : -1;
+    if (!(NORUART_STATUS & 0x2u)) return -1;     /* bit1 = rx_valid, non consuma */
+    return (int)(NORUART_DATA & 0xFFu);          /* bit8 race -> ignorato */
 }
-static int noruart_getc(void) { int c; do { c = noruart_getc_nb(); } while (c < 0); return c; }
+/* attende un byte di payload max ~200 ms; -1 su timeout (comando troncato) */
+static int noruart_getc_to(void) {
+    uint32_t t0 = rdcycle32();
+    for (;;) {
+        int c = noruart_getc_nb();
+        if (c >= 0) return c;
+        if ((uint32_t)(rdcycle32() - t0) > ms_to_cycles(200)) return -1;
+    }
+}
 static void noruart_putc(uint8_t c) {
-    while (NORUART_STATUS & 0x1u) { }        /* attendi tx non busy */
+    uint32_t t0 = rdcycle32();
+    while (NORUART_STATUS & 0x1u) {          /* attendi tx non busy, max 5 ms */
+        if ((uint32_t)(rdcycle32() - t0) > ms_to_cycles(5)) break;
+    }
     NORUART_DATA = c;
+}
+
+/* diag di boot sul canale $...\n della UART caratteri (S6): visibile come
+ * "[FPGA] NOR ..." sulla console USB dell'ESP32 */
+static void diag_u32(uint32_t v) {
+    char b[10]; int i = 0;
+    if (v == 0) { uartext_putchar('0'); return; }
+    while (v) { b[i++] = (char)('0' + (v % 10u)); v /= 10u; }
+    while (i) uartext_putchar(b[--i]);
+}
+static void diag_hh(uint8_t b) {
+    static const char H[] = "0123456789ABCDEF";
+    uartext_putchar(H[(b >> 4) & 0xF]); uartext_putchar(H[b & 0xF]);
 }
 
 /* =================== boot + scan =================== */
@@ -93,6 +143,8 @@ void nor_init(void) {
     NORUART_DIV   = 40500000u / 115200u;
     NORUART_CFG   = UARTEXT_CFG_PARITY_NONE | UARTEXT_CFG_BITS(8);
     NORUART_START = 1;
+
+    uartext_puts("$NOR init\n");
 
     /* unlock PRIMA DI TUTTO (come flash_ctrl.vhd "Works"): WRSR con SR2=0x02 (QE=1).
      * Su questa board /HOLD# e /WP# del W25Q sono SCOLLEGATI/flottanti: senza QE=1
@@ -107,12 +159,26 @@ void nor_init(void) {
     nor_cs(1); nor_xfer(CMD_GBU); nor_cs(0);
     wait_wip();
 
+    /* boot report 'S'+SR come flash_ctrl (l'ESP32 lo cerca in consume_boot_sr_report;
+     * se lo perde rilegge SR col comando 'T'). BP/SRP ancora set -> chip locked. */
+    {
+        uint8_t sr = rdsr1();
+        g_chip_locked = ((sr & 0x9Cu) != 0);
+        noruart_putc('S'); noruart_putc(sr);
+    }
+
     /* ORA il chip ignora /HOLD#,/WP# e risponde: JEDEC per confermare la presenza. */
+    uint8_t j0;
     nor_cs(1); nor_xfer(CMD_JEDEC);
-    { uint8_t j0 = nor_xfer(0); (void)nor_xfer(0); (void)nor_xfer(0);
-      g_flash_present = (j0 == 0xEFu) ? 1 : 0; }
+    j0 = nor_xfer(0); (void)nor_xfer(0); (void)nor_xfer(0);
+    g_flash_present = (j0 == 0xEFu) ? 1 : 0;
     nor_cs(0);
-    if (!g_flash_present) { g_head = 0; return; }
+    if (!g_flash_present) {
+        g_head = 0;
+        uartext_puts("$NOR ko id="); diag_hh(j0);
+        uartext_puts(" to="); diag_u32(g_spi_to); uartext_putchar('\n');
+        return;
+    }
 
     /* scan: byte 2 (type) di ogni slot; valido se in {B,R,P,N,E}; head = ultimo+1 */
     int last = -1;
@@ -122,6 +188,20 @@ void nor_init(void) {
         if (t == 'B' || t == 'R' || t == 'P' || t == 'N' || t == 'E') last = s;
     }
     g_head = (last + 1) % N_SLOTS;
+
+    /* settings persistiti -> applica subito il debug flag (b[19]) */
+    {
+        uint8_t s[SET_LEN];
+        read_bytes(SET_ADDR, s, SET_LEN);
+        settings_apply(s);
+    }
+
+    uartext_puts("$NOR ok id="); diag_hh(j0);
+    uartext_puts(" hd=");  diag_u32((uint32_t)g_head);
+    uartext_puts(" lk=");  diag_u32((uint32_t)g_chip_locked);
+    uartext_puts(" to=");  diag_u32(g_spi_to);
+    uartext_puts(" dbg="); diag_u32((uint32_t)g_nor_debug);
+    uartext_putchar('\n');
 }
 
 /* append: probe slot; se sporco o inizio settore -> erase; page program; head++ */
@@ -142,18 +222,27 @@ void nor_poll(void) {
     switch (c) {
         case 'L': {                                  /* append 16 B */
             uint8_t rec[REC_LEN];
-            for (unsigned i = 0; i < REC_LEN; i++) rec[i] = (uint8_t)noruart_getc();
-            if (!g_flash_present) { noruart_putc('E'); break; }   /* fail veloce, no blocco */
+            for (unsigned i = 0; i < REC_LEN; i++) {
+                int b = noruart_getc_to();
+                if (b < 0) return;                   /* payload troncato: niente ack, l'ESP32 ritenta */
+                rec[i] = (uint8_t)b;
+            }
+            if (!g_flash_present || g_chip_locked) { noruart_putc('E'); break; }   /* fail veloce */
             append_record(rec);
             noruart_putc('K');
             break;
         }
         case 'S': {                                  /* settings 32 B nel settore 0 */
             uint8_t s[SET_LEN];
-            for (unsigned i = 0; i < SET_LEN; i++) s[i] = (uint8_t)noruart_getc();
-            if (!g_flash_present) { noruart_putc('E'); break; }
+            for (unsigned i = 0; i < SET_LEN; i++) {
+                int b = noruart_getc_to();
+                if (b < 0) return;
+                s[i] = (uint8_t)b;
+            }
+            if (!g_flash_present || g_chip_locked) { noruart_putc('E'); break; }
             sector_erase(SET_ADDR);
             page_program(SET_ADDR, s, SET_LEN);
+            settings_apply(s);                       /* debug flag live, senza reboot */
             noruart_putc('K');
             break;
         }
@@ -164,8 +253,10 @@ void nor_poll(void) {
             break;
         }
         case 'G': {                                  /* read: slot(2) + n(1) -> n*16 B */
-            int shi = noruart_getc(), slo = noruart_getc(), n = noruart_getc();
-            int slot = (shi << 8) | slo;
+            int shi = noruart_getc_to(), slo = noruart_getc_to(), n = noruart_getc_to();
+            if (shi < 0 || slo < 0 || n < 0) return;
+            if (n > 4) n = 4;                        /* come flash_ctrl: gn max 4 */
+            int slot = ((shi << 8) | slo) % N_SLOTS;
             for (int k = 0; k < n; k++) {
                 uint8_t rec[REC_LEN];
                 read_bytes(LOG_ADDR + (uint32_t)((slot + k) % N_SLOTS) * REC_LEN, rec, REC_LEN);

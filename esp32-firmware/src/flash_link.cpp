@@ -235,6 +235,16 @@ bool flash_log_clear(void) {
     return ok;
 }
 
+/* Default dei campi v2 (b[19..30]): usati per blob invalidi o scritti dal
+ * firmware vecchio (marker b[30] != 0x5A). Colori = tema attuale della dashboard. */
+static void settings_defaults_v2(flash_settings_t *s) {
+    s->debug_log = 0;
+    s->col_main[0] = 0x4F; s->col_main[1] = 0x9D; s->col_main[2] = 0xFF;
+    s->col_text[0] = 0xE6; s->col_text[1] = 0xED; s->col_text[2] = 0xF3;
+    s->col_bg[0]   = 0x0E; s->col_bg[1]   = 0x11; s->col_bg[2]   = 0x16;
+    s->view_flags  = 0x7F;
+}
+
 bool flash_get_settings(flash_settings_t *s) {
     flush_in();
     uart_reg_write_byte(UART_REG_FLASH, 'Q');
@@ -263,6 +273,7 @@ bool flash_get_settings(flash_settings_t *s) {
         strcpy(s->name, "Master EFES");
         s->auto_presence_s = 0;
         s->presence_tries  = 6;
+        settings_defaults_v2(s);
         return true;
     }
     memset(s, 0, sizeof(*s));
@@ -270,6 +281,15 @@ bool flash_get_settings(flash_settings_t *s) {
     s->name[15] = 0;
     s->auto_presence_s = ((uint16_t)b[16] << 8) | b[17];
     s->presence_tries  = b[18];
+    if (b[30] == 0x5A) {
+        s->debug_log = b[19] & 1;
+        memcpy(s->col_main, &b[20], 3);
+        memcpy(s->col_text, &b[23], 3);
+        memcpy(s->col_bg,   &b[26], 3);
+        s->view_flags = b[29] & 0x7F;
+    } else {
+        settings_defaults_v2(s);     /* blob v1: campi nuovi ai default */
+    }
     return true;
 }
 
@@ -281,6 +301,12 @@ bool flash_set_settings(const flash_settings_t *s) {
     b[16] = (uint8_t)(s->auto_presence_s >> 8);
     b[17] = (uint8_t)(s->auto_presence_s & 0xFF);
     b[18] = s->presence_tries;
+    b[19] = s->debug_log & 1;
+    memcpy(&b[20], s->col_main, 3);
+    memcpy(&b[23], s->col_text, 3);
+    memcpy(&b[26], s->col_bg,   3);
+    b[29] = s->view_flags & 0x7F;
+    b[30] = 0x5A;                    /* marker v2 */
 
     /* Retry+verify identico a flash_log_append: il page program della pagina
      * settings ha gli stessi disturbi di SI delle write di log, e senza

@@ -83,7 +83,7 @@ table.detail_table th.label {  min-width: 8%; width: 8%; }
 </tr>
 <tr>
 <td class="label">Created Time</td>
-<td>Thu Jun 11 21:39:56 2026
+<td>Thu Jun 11 23:58:57 2026
 </td>
 </tr>
 <tr>
@@ -97,24 +97,24 @@ table.detail_table th.label {  min-width: 8%; width: 8%; }
 <tr>
 <td class="label">Place & Route Process</td>
 <td>Running placement:
-   Placement Phase 0: CPU time = 0h 0m 0.842s, Elapsed time = 0h 0m 0.861s
-   Placement Phase 1: CPU time = 0h 0m 0.179s, Elapsed time = 0h 0m 0.182s
-   Placement Phase 2: CPU time = 0h 0m 2s, Elapsed time = 0h 0m 2s
-   Placement Phase 3: CPU time = 0h 0m 3s, Elapsed time = 0h 0m 3s
-   Total Placement: CPU time = 0h 0m 6s, Elapsed time = 0h 0m 6s
+   Placement Phase 0: CPU time = 0h 0m 0.893s, Elapsed time = 0h 0m 1s
+   Placement Phase 1: CPU time = 0h 0m 0.203s, Elapsed time = 0h 0m 0.253s
+   Placement Phase 2: CPU time = 0h 0m 3s, Elapsed time = 0h 0m 3s
+   Placement Phase 3: CPU time = 0h 0m 4s, Elapsed time = 0h 0m 4s
+   Total Placement: CPU time = 0h 0m 8s, Elapsed time = 0h 0m 8s
 Running routing:
-   Routing Phase 0: CPU time = 0h 0m 0.002s, Elapsed time = 0h 0m 0.002s
-   Routing Phase 1: CPU time = 0h 0m 0.124s, Elapsed time = 0h 0m 0.127s
-   Routing Phase 2: CPU time = 0h 0m 23s, Elapsed time = 0h 0m 23s
+   Routing Phase 0: CPU time = 0h 0m 0.002s, Elapsed time = 0h 0m 0.003s
+   Routing Phase 1: CPU time = 0h 0m 0.145s, Elapsed time = 0h 0m 0.156s
+   Routing Phase 2: CPU time = 0h 0m 13s, Elapsed time = 0h 0m 13s
    Routing Phase 3: CPU time = 0h 0m 0s, Elapsed time = 0h 0m 0s
-   Total Routing: CPU time = 0h 0m 23s, Elapsed time = 0h 0m 23s
+   Total Routing: CPU time = 0h 0m 13s, Elapsed time = 0h 0m 13s
 Generate output files:
-   CPU time = 0h 0m 0.919s, Elapsed time = 0h 0m 0.923s
+   CPU time = 0h 0m 1s, Elapsed time = 0h 0m 1s
 </td>
 </tr>
 <tr>
 <td class="label">Total Time and Memory Usage</td>
-<td>CPU time = 0h 0m 30s, Elapsed time = 0h 0m 30s, Peak memory usage = 768MB</td>
+<td>CPU time = 0h 0m 22s, Elapsed time = 0h 0m 22s, Peak memory usage = 768MB</td>
 </tr>
 </table>
 <br/>
@@ -129,23 +129,23 @@ Generate output files:
 </tr>
 <tr>
 <td class="label">Logic</td>
-<td>12476/20736</td>
-<td>61%</td>
+<td>10836/20736</td>
+<td>53%</td>
 </tr>
 <tr>
 <td class="label">&nbsp &nbsp --LUT,ALU,ROM16</td>
-<td>10844(9813 LUT, 1031 ALU, 0 ROM16)</td>
+<td>9180(8163 LUT, 1017 ALU, 0 ROM16)</td>
 <td>-</td>
 </tr>
 <tr>
 <td class="label">&nbsp &nbsp --SSRAM(RAM16)</td>
-<td>272</td>
+<td>276</td>
 <td>-</td>
 </tr>
 <tr>
 <td class="label">Register</td>
-<td>5309/15915</td>
-<td>34%</td>
+<td>4588/15915</td>
+<td>29%</td>
 </tr>
 <tr>
 <td class="label">&nbsp &nbsp --Logic Register as Latch</td>
@@ -154,8 +154,8 @@ Generate output files:
 </tr>
 <tr>
 <td class="label">&nbsp &nbsp --Logic Register as FF</td>
-<td>5217/15552</td>
-<td>34%</td>
+<td>4495/15552</td>
+<td>29%</td>
 </tr>
 <tr>
 <td class="label">&nbsp &nbsp --I/O Register as Latch</td>
@@ -164,13 +164,13 @@ Generate output files:
 </tr>
 <tr>
 <td class="label">&nbsp &nbsp --I/O Register as FF</td>
-<td>92/363</td>
+<td>93/363</td>
 <td>26%</td>
 </tr>
 <tr>
 <td class="label">CLS</td>
-<td>8005/10368</td>
-<td>78%</td>
+<td>7174/10368</td>
+<td>70%</td>
 </tr>
 <tr>
 <td class="label">I/O Port</td>
@@ -179,12 +179,12 @@ Generate output files:
 </tr>
 <tr>
 <td class="label">I/O Buf</td>
-<td>22</td>
+<td>21</td>
 <td>-</td>
 </tr>
 <tr>
 <td class="label"> &nbsp &nbsp --Input Buf</td>
-<td>6</td>
+<td>5</td>
 <td>-</td>
 </tr>
 <tr>
@@ -256,8 +256,8 @@ Generate output files:
 </tr>
 <tr>
 <td class="label">PRIMARY</td>
-<td>3/8</td>
-<td>38%</td>
+<td>4/8</td>
+<td>50%</td>
 </tr>
 <tr>
 <td class="label">LW</td>
@@ -286,7 +286,7 @@ Generate output files:
 <tr>
 <td class="label">clk_i_d</td>
 <td>PRIMARY</td>
-<td> TR TL BR BL</td>
+<td> TR BL</td>
 </tr>
 <tr>
 <td class="label">clk_sdram</td>
@@ -297,6 +297,11 @@ Generate output files:
 <td class="label">O_sdram_clk_d</td>
 <td>PRIMARY</td>
 <td> TR</td>
+</tr>
+<tr>
+<td class="label">u_softcore/core/mem_xfer</td>
+<td>PRIMARY</td>
+<td> BR BL</td>
 </tr>
 <tr>
 <td class="label">irq_led_o_d</td>
@@ -314,12 +319,12 @@ Generate output files:
 <td> -</td>
 </tr>
 <tr>
-<td class="label">u_softcore/n519_5</td>
+<td class="label">u_dma/fft_inst_0/fft_top_inst/tf_inst/twBtfyParm_inst/slfRst_1</td>
 <td>LW</td>
 <td> -</td>
 </tr>
 <tr>
-<td class="label">u_softcore/core/mem_xfer</td>
+<td class="label">u_softcore/n519_5</td>
 <td>LW</td>
 <td> -</td>
 </tr>

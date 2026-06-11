@@ -17,11 +17,24 @@
 #ifndef NORFLASH_H
 #define NORFLASH_H
 
+/* Settings (32 B, settore 0): b[0]=0xA5 magic, b[1..15]=name, b[16..17]=auto_s,
+ * b[18]=tries, b[19]=debug_log, b[20..28]=colori main/text/bg RGB,
+ * b[29]=view flags (bit0 wave..bit6 txpkt), b[30]=0x5A marker v2. */
+
 /* Boot: sblocca il chip (WRSR clear BP/SRP + QE, Global Block Unlock) e fa lo scan
  * per trovare head. Da chiamare una volta dopo l'init delle UART. */
 void nor_init(void);
 
 /* Da chiamare nel loop principale: se c'e' un comando sull'UART NOR lo esegue. */
 void nor_poll(void);
+
+/* debug log on/off: viene dai settings in NOR (b[19]), aggiornato live quando la
+ * dashboard salva. main.c lo usa per gating dei dump diagnostici $...\n. */
+extern volatile int g_nor_debug;
+
+/* accessori per health.c */
+int nor_present(void);
+int nor_locked(void);
+int nor_head(void);
 
 #endif

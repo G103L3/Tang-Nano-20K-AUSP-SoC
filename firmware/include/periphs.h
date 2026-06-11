@@ -20,7 +20,8 @@
 // ============================================================
 
 // --- UART_GENERIC esterno (0x20000000) ---
-// +0x00 RD: bit[8]=rx_valid, bit[7:0]=dato RX (lettura azzera rx_valid)
+// +0x00 RD: bit[8]=rx_valid, bit[7:0]=dato RX (pop di 1 byte dalla FIFO RX da 16;
+//           il byte e' catturato al primo ciclo dell'accesso, bit[8] affidabile)
 // +0x00 WR: trasmetti byte (ignorato se tx_busy=1 o enabled=0)
 // +0x04 WR: abilita UART (start)   [word 1]
 // +0x08 WR: disabilita UART (stop)  [word 2]
@@ -157,9 +158,10 @@ static inline void gpio_set(uint32_t val) { GPIO_REG = val & 1u; }
 // --- SPI NOR engine (S8, 0x38000000): spi_master_generic verso il chip W25Q ---
 // La CPU manda i comandi SPI (WE/erase/page-program/poll/read) come faceva flash_ctrl.
 //   0x00 RD : RXDATA (ultimo byte ricevuto)
-//   0x04 WR : TXDATA (scrive un byte e avvia il trasferimento full-duplex)
+//   0x04 WR : TXDATA (scrive un byte e avvia il trasferimento; azzera done)
 //   0x08 WR : CTRL  bit0 = CS (1 = CS basso, tenuto tra i byte)
-//   0x0C RD : STATUS bit0 = busy, bit1 = done
+//   0x0C RD : STATUS bit0 = busy, bit1 = done (NON distruttiva: done resta fino
+//             al prossimo TXDATA, cosi' una lettura bus sporca non lo perde)
 #define NORSPI_BASE     0x38000000u
 #define NORSPI_RXDATA   (*(volatile uint32_t*)(NORSPI_BASE + 0x00))
 #define NORSPI_TXDATA   (*(volatile uint32_t*)(NORSPI_BASE + 0x04))

@@ -39,9 +39,13 @@ begin
             else
                 ack_o <= '0';
                 stb_old <= stb_i;
-                if cyc_i = '1' AND stb_i = '1' AND stb_old = '0' then 
+                -- ack tenuto alto finche' lo strobe e' attivo: l'impulso singolo
+                -- veniva perso dall'OPEN WB della CPU e le letture si piantavano.
+                if cyc_i = '1' AND stb_i = '1' then
                     if we_i = '1' then
-                        reg_out <= dat_i(NBIT-1 downto 0);
+                        if stb_old = '0' then
+                            reg_out <= dat_i(NBIT-1 downto 0);
+                        end if;
                     else
                         dat_o <= (others => '0');
                         dat_o(NBIT-1 downto 0) <= gpio_i;

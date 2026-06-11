@@ -192,27 +192,6 @@ architecture behavioral of top_system is
         );
     end component;
 
-    -- Blocco flash NOR HARDWARE (come commit "Works"): riceve i comandi dall'ESP32
-    -- sulla UART dedicata (pin 72/20) e pilota il W25Q via SPI (pin 42/41/51/48).
-    -- Indipendente dalla CPU.
-    component flash_ctrl
-        generic (
-            CLK_HZ  : integer := 27_000_000;
-            BAUD    : integer := 115200;
-            SPI_DIV : integer := 8
-        );
-        port (
-            clk_i        : in  std_logic;
-            rst_i        : in  std_logic;
-            fcmd_rx_i    : in  std_logic;
-            fresp_tx_o   : out std_logic;
-            flash_sck_o  : out std_logic;
-            flash_cs_o   : out std_logic;
-            flash_mosi_o : out std_logic;
-            flash_miso_i : in  std_logic
-        );
-    end component;
-
     component spi_master_generic
         generic (
             PRESCALER  : natural := 16;
@@ -871,8 +850,11 @@ begin
             pwm_o => pwm4_s
         );
 
+    -- Stesso clock del bus (niente CDC) e reset pll_lock come gli altri slave:
+    -- col bottone rst_i il GPIO era l'UNICA logica dipendente da quella linea e
+    -- se la linea sta bassa resta in reset -> ack mai -> lettura S4 appesa.
     u_gpio1: gpio_generic generic map (nbit => 1) port map (
-        clk_i => clk_i, rst_i => rst_i, cyc_i => s4_cyc, stb_i => s4_stb, we_i => s4_we,
+        clk_i => clk_sdram, rst_i => pll_lock, cyc_i => s4_cyc, stb_i => s4_stb, we_i => s4_we,
         adr_i => s4_adr(7 downto 0), dat_i => s4_wdata, dat_o => s4_rdata, ack_o => s4_ack, gpio_i => gpio_in_v, gpio_o => gpio_out_v
     );
 
@@ -948,40 +930,45 @@ begin
     -- ===== fine blocco spostato nel firmware =====
 
     -- =====================================================================
-    -- NOR flash W25Q64FV: SPI master generico (slave Wishbone, full-duplex).
-    -- PRESCALER=64 -> SCK ~633 kHz (40.5 MHz / 64). Vedi nota storica in fondo:
-    -- a 633 kHz ogni bit dura 1.58 us, setup/hold abbondanti sui filini volanti.
-    --
-    -- Cablato AGLI STESSI PIN della vecchia flash_ctrl (42 sck / 41 cs /
-    -- 51 mosi / 48 miso). L'interfaccia Wishbone slave e' presente ma per ORA
-    -- NON e' agganciata al crossbar (il bus e' pieno, nibble 0x1-0x7 tutti
-    -- occupati): cyc/stb tenuti a '0', quindi lo SPI resta inattivo (CS alto)
-    -- finche' un master non lo pilota. La logica del protocollo W25Q (la
-    -- vecchia flash_ctrl) verra' implementata NELLA CPU, che guidera' questo
-    -- SPI via i suoi registri. Per ora la flash NON scrive: e' lo scaffold.
-    -- Quando si aggancia al bus: liberare uno slot slave (candidati PWM4/LED
-    -- 0x6 o UART_GENERIC 0x2 se inutilizzati) o aggiungere un sotto-decoder.
+    -- NOR flash W25Q64FV gestito DALLA CPU (firmware norflash.c), niente piu'
+    -- flash_ctrl hardware. Catena: ESP32 -> UART comandi (S7, pin 72/20) ->
+    -- CPU -> SPI generico (S8, pin 42/41/51/48) -> chip W25Q.
     -- =====================================================================
-    -- FLASH NOR = blocco HARDWARE flash_ctrl (commit "Works", provato). L'ESP32 parla
-    -- DIRETTAMENTE qui via la UART comandi (pin 72/20); flash_ctrl pilota il W25Q col
-    -- proprio SPI (pin 42/41/51/48). La CPU NON e' coinvolta nel flash. QE=1 nella WRSR
-    -- (i pin /HOLD#,/WP# del chip sono flottanti). SPI_DIV=64 -> SCK ~633 kHz.
-    u_flash: flash_ctrl
-        generic map ( CLK_HZ => 40_500_000, BAUD => 115200, SPI_DIV => 64 )
+    -- UART comandi NOR = slave S7 (0x2800_0000), stessi pin della vecchia flash_ctrl.
+    u_nor_uart: UART_GENERIC
         port map (
-            clk_i        => clk_sdram,
-            rst_i        => pll_lock,
-            fcmd_rx_i    => flash_rx_i,
-            fresp_tx_o   => flash_tx_o,
-            flash_sck_o  => flash_sck_o,
-            flash_cs_o   => flash_cs_o,
-            flash_mosi_o => flash_mosi_o,
-            flash_miso_i => flash_miso_i
+            clk_i => clk_sdram,
+            rst_i => pll_lock,
+            cyc_i => s7_cyc,
+            stb_i => s7_stb,
+            we_i  => s7_we,
+            adr_i => s7_adr(7 downto 0),
+            dat_i => s7_wdata,
+            dat_o => s7_rdata,
+            ack_o => s7_ack,
+            TX_o  => flash_tx_o,
+            RX_i  => flash_rx_i
         );
-    -- S7 (UART NOR) e S8 (SPI NOR) non hanno piu' slave sul bus: la CPU non li usa.
-    -- Tieni gli ingressi dell'interconnect a 0 (niente driver flottanti).
-    s7_rdata <= (others => '0'); s7_ack <= '0';
-    s8_rdata <= (others => '0'); s8_ack <= '0';
+
+    -- SPI verso il W25Q = slave S8 (0x3800_0000). PRESCALER=64 -> SCK ~633 kHz
+    -- (40.5 MHz / 64), stesso clock e mode 0 del vecchio SPI_Flash in flash_ctrl.
+    u_nor_spi: spi_master_generic
+        generic map ( PRESCALER => 64, FRAME_BITS => 8 )
+        port map (
+            clk_i => clk_sdram,
+            rst_i => pll_lock,
+            cyc_i => s8_cyc,
+            stb_i => s8_stb,
+            we_i  => s8_we,
+            adr_i => s8_adr(7 downto 0),
+            dat_i => s8_wdata,
+            dat_o => s8_rdata,
+            ack_o => s8_ack,
+            MOSI  => flash_mosi_o,
+            MISO  => flash_miso_i,
+            SCK   => flash_sck_o,
+            CS    => flash_cs_o
+        );
 
     -- =====================================================================
     -- Soft core RISC-V (Gowin PicoRV32) + sua UART.
@@ -1032,53 +1019,12 @@ begin
             RX_i  => uart_ext_rx
         );
 
-    -- UART NOR sul bus: RIMOSSA. Il flash e' completamente hardware (flash_ctrl
-    -- riceve dall'ESP32 sui pin 72/20 e pilota il W25Q via SPI), indipendente dalla
-    -- CPU. Lo slot S7 del bus resta libero (s7 tied a 0 piu' sopra).
-
-    -- =====================================================================
-    -- LOGICA W25Q (ex flash_ctrl) -- DA IMPLEMENTARE NELLA CPU.
-    -- Promemoria del protocollo che la CPU dovra' eseguire pilotando
-    -- u_flash_spi via i registri 0x00 RXDATA / 0x04 TXDATA / 0x08 CTRL(CS) /
-    -- 0x0C STATUS(busy,done). Schema generale di una transazione:
-    --   1) CTRL <= 1        (assert CS basso)
-    --   2) per ogni byte:   TXDATA <= byte ; attendi STATUS.busy=0 ; (RXDATA)
-    --   3) CTRL <= 0        (rilascia CS alto)
-    --
-    -- Layout memoria (W25Q64FV, settori da 4 KB):
-    --   0x0000 SETTINGS : 32 B  (magic 0xA5, name[15], auto_s[2], tries[1], ...)
-    --   0x1000 LOG A    : 256 slot x 16 B
-    --   0x2000 LOG B    : 256 slot x 16 B   (ring buffer 512 slot)
-    --   record 16 B = seq[2] type[1] t_sec[4] val[1] text[8]
-    --   type in {B,R,P,N,E}
-    --
-    -- BOOT (una volta):
-    --   WE(0x06) -> WRSR(0x01,0x00,0x02)   SR1=0 (clear BP/SRP), SR2=0x02 (QE=1,
-    --       disabilita funzioni pin /HOLD e /WP che sulla nostra board flottano)
-    --   POLL fino a WIP=0
-    --   WE(0x06) -> Global Block Unlock(0x98) -> POLL
-    --   RDSR(0x05): se (SR1 and 0x9C)/=0 -> chip_locked (BP/SRP ancora attivi)
-    --   SCAN: leggi byte 2 (type) di tutti i 512 slot; valido se in {B,R,P,N,E};
-    --         head = (ultimo slot valido + 1) mod 512
-    --
-    -- APPEND record ('L' + 16 B):
-    --   PROBE: leggi byte0 dello slot a head (0x03 + addr)
-    --   se slot dirty (byte0/=0xFF) o head=0/256 -> WE + SECTOR ERASE(0x20) + POLL
-    --   WE(0x06) -> PAGE PROGRAM(0x02 + addr24 + 16 B) -> POLL fino a WIP=0
-    --   head <- head+1 ; rispondi 'K' (o 'E' se chip_locked)
-    --   POLL_MAX ~25e6 cicli (~620 ms): sector erase fino a 400 ms.
-    --
-    -- SETTINGS save ('S' + 32 B): come APPEND ma sul settore 0x0000.
-    -- READ ('G' slot,n): 0x03 + addr, clock out n*16 B.
-    -- READ HEAD ('H'): ritorna head (2 B).  READ SETTINGS ('Q'): 0x03 @0x0000.
-    -- JEDEC ('I'): 0x9F -> 3 B.  READ SR ('T'): 0x05 -> 1 B.
-    -- CLEAR ('C'): WE+ERASE 0x1000, POLL, WE+ERASE 0x2000, POLL, head<-0.
-    --
+    -- Logica W25Q (ex flash_ctrl): ora nel firmware, vedi firmware/src/norflash.c
+    -- (boot unlock QE=1 + scan head, comandi L/S/G/H/C/Q/I/T via S7, SPI via S8).
     -- (Storico SI: SCK a 633 kHz + 1uF+10uF decoupling locale + retry/verify
     --  lato host risolvono i drop di tensione del sector erase e il SI dei
     --  filini. I LED nudi su pin FPGA avvelenavano la massa: mettere sempre
     --  una resistenza serie ~330 ohm - 1 k.)
-    -- =====================================================================
 
     -- ===== MORTE (rimuovibili da git): irq_cnt, blink_led =====
     gen_dead_a : if false generate

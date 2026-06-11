@@ -11,6 +11,8 @@
 #include "emit_tone.h"      /* CPU_HZ, rdcycle32, ms_to_cycles, emit_* */
 #include "decoder.h"        /* decode_char */
 #include "read_sdram.h"     /* g_sdram[512], g_sdram_ready, read_sdram_collect */
+#include "norflash.h"       /* NOR W25Q dalla CPU: UART comandi S7 + SPI S8 */
+#include "health.h"         /* scan salute slave bus -> $HLT alla dashboard */
 
 #define BAUD  115200u
 
@@ -34,10 +36,9 @@ void irq_handler(void) { }
  * =========================================================================== */
 static uint32_t g_loops, g_sess, g_ok, g_to;
 
-/* debug_on: 1 = manda i dump diagnostici sul canale $...\n (DEC/PK, SYS/ACC, MAX/F...);
- * 0 = li tace, resta solo la sequenza dei caratteri ricevuti (A/B/C) e i log dell'ESP32.
- * Metterlo a 1 quando serve diagnosticare lo spettro/letture. */
-static int debug_on = 0;
+/* debug log: 1 = manda i dump diagnostici sul canale $...\n (DEC/PK, SYS/ACC, MAX/F...);
+ * 0 = li tace. Non e' piu' una costante: vive nei settings in NOR (b[19], g_nor_debug
+ * di norflash.c) e si cambia dalla dashboard (applicato al boot e a ogni save). */
 
 static void dbg_begin(void) { uartext_putchar('$'); }
 static void dbg_end(void)   { uartext_putchar('\n'); }
@@ -190,7 +191,7 @@ static void decode_step(void) {
         char d = decode_char(g_sdram, 512);
         g_ok++;
         if (d >= 'A' && d <= 'C') uartext_putchar(d);   /* SOLO RX dallo slave (maiuscole) */
-        if (debug_on) dbg_decode(1, d);
+        if (g_nor_debug) dbg_decode(1, d);
         g_sdram_ready = 0;                       /* consumato -> prossima cattura */
     }
     /* canale occupato se il carrier slave e' stato udito negli ultimi 3 s */
@@ -205,15 +206,19 @@ int main(void) {
     DMA_SETBASE = 0;       /* acceleratore audio: base + start (si auto-avvia comunque) */
     DMA_START   = 1;
 
+    nor_init();            /* NOR W25Q: unlock + scan head (UART S7 + SPI S8) */
+
     for (;;) {
         g_loops++;
         emit_capture();      /* TX */
         emit_player_tick();  /* TX */
         decode_step();       /* RX (polling + decoder) */
-        if (debug_on) {
+        nor_poll();          /* comandi NOR dall'ESP32 (S7) -> sequenze SPI (S8) */
+        if (g_nor_debug) {
             sys_tick();      /* diagnostica ~1/s */
             dbg_dump512();   /* dump 512 bin ~ogni 3s */
         }
+        health_tick();       /* scan salute slave + $HLT verso la dashboard */
     }
     return 0;
 }

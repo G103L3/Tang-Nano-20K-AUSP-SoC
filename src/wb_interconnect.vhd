@@ -90,7 +90,7 @@ entity wb_interconnect is
         s5_stb_o : out std_logic;
         s5_cyc_o : out std_logic;
         s5_ack_i : in  std_logic;
-        -- Slave 6 – reserved
+        -- Slave 6 – UART_GENERIC caratteri (pin 17/18)
         s6_adr_o : out std_logic_vector(31 downto 0);
         s6_dat_o : out std_logic_vector(31 downto 0);
         s6_dat_i : in  std_logic_vector(31 downto 0);
@@ -99,7 +99,7 @@ entity wb_interconnect is
         s6_stb_o : out std_logic;
         s6_cyc_o : out std_logic;
         s6_ack_i : in  std_logic;
-        -- Slave 7 – reserved
+        -- Slave 7 – UART_GENERIC comandi NOR dall'ESP32 (pin 72/20)
         s7_adr_o : out std_logic_vector(31 downto 0);
         s7_dat_o : out std_logic_vector(31 downto 0);
         s7_dat_i : in  std_logic_vector(31 downto 0);

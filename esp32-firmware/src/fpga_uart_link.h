@@ -29,6 +29,12 @@ void fpga_uart_init(void);
 void fpga_uart_tick(void);                              /* RX */
 void fpga_uart_send_pattern(int first_bit, int length); /* TX */
 
+/* Callback per le righe diagnostiche "$...\n" della FPGA: riceve la riga
+ * completa SENZA '$' ne' '\n' (es. "HLT m=1FF adc=1 ..."). Usata da web_link
+ * per inoltrare la salute del SoC alla dashboard. */
+typedef void (*fpga_diag_cb_t)(const char *line);
+void fpga_uart_set_diag_cb(fpga_diag_cb_t cb);
+
 #ifdef __cplusplus
 }
 #endif

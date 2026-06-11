@@ -81,6 +81,7 @@ void setup() {
     protocol_set_status_callback(web_link_status);
     protocol_set_event_callback(web_link_event);
     protocol_set_presence_callback(web_link_presence);
+    fpga_uart_set_diag_cb(web_link_diag_line);   /* $HLT -> salute SoC in dashboard */
 
     /* NAND flash (FSM su FPGA via Serial1): impostazioni + log eventi */
     flash_link_init();

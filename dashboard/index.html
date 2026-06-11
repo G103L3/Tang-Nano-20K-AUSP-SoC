@@ -1,124 +1,316 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>EFES — Master Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=5" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AUSP Dashboard</title>
+  <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="ausp-interface">
   <header class="topbar">
     <div class="brand">
-      <span class="logo">📡</span>
       <div>
-        <h1>EFES — Master</h1>
+        <h1>AUSP Dashboard</h1>
         <p class="subtitle">Comunicazione acustica FPGA ⇄ Slave</p>
       </div>
     </div>
+    <nav class="navbar">
+      <a href="#health-sec">Salute SoC</a>
+      <a href="#node-sec">Stato & Presenza</a>
+      <a href="#traffic-sec">Traffico</a>
+      <a href="#mem-sec">Memoria</a>
+      <a href="#settings-sec">Configurazione</a>
+    </nav>
     <div class="conn">
       <span id="serverDot" class="dot dot--off"></span>
       <span id="serverText">Server: …</span>
     </div>
   </header>
 
-  <main class="grid">
-    <!-- Stato aggancio -->
-    <section class="card">
-      <h2>Stato aggancio</h2>
-      <div class="pairing">
-        <span id="pairBadge" class="badge badge--off">Non agganciato</span>
-        <p id="pairDetail" class="muted">Nessuno slave registrato.</p>
-      </div>
-      <div class="device-line">
-        <span id="deviceDot" class="dot dot--off"></span>
-        <span id="deviceText" class="muted">Master non connesso al server</span>
-      </div>
-    </section>
-
-    <!-- Presenza -->
-    <section class="card card--presence">
-      <h2>Presenza</h2>
-      <div class="bulb-wrap">
-        <!-- lampadina: la classe su #bulb cambia in is-on / is-off / is-unknown -->
-        <svg id="bulb" class="bulb is-unknown" viewBox="0 0 120 160" aria-hidden="true">
-          <g class="bulb-glass">
-            <path d="M60 8 C32 8 14 30 14 56 c0 18 10 31 21 41 6 5 9 10 9 17 h32
-                     c0-7 3-12 9-17 11-10 21-23 21-41 C106 30 88 8 60 8 Z"/>
-          </g>
-          <line class="filament" x1="46" y1="64" x2="54" y2="48"/>
-          <line class="filament" x1="54" y1="48" x2="66" y2="48"/>
-          <line class="filament" x1="66" y1="48" x2="74" y2="64"/>
-          <rect class="bulb-base" x="44" y="120" width="32" height="10" rx="2"/>
-          <rect class="bulb-base" x="46" y="132" width="28" height="9"  rx="2"/>
-          <rect class="bulb-base" x="48" y="143" width="24" height="9"  rx="2"/>
-        </svg>
-        <p id="presenceText" class="presence-text">In attesa…</p>
-      </div>
-      <button id="askBtn" class="btn" disabled>Chiedi presenza</button>
-    </section>
-
-    <!-- Log -->
-    <section class="card card--log">
-      <div class="log-head">
-        <h2>Traffico</h2>
-        <button id="clearBtn" class="btn btn--ghost">Pulisci</button>
-      </div>
-      <ul id="log" class="log"></ul>
-    </section>
-
-    <!-- Memoria (flash) -->
-    <section class="card card--mem">
-      <div class="log-head">
+  <main class="main-grid">
+    <section id="health-sec" class="diagnostic-hub full-span">
+      <div class="diagnostic-overlay">
         <div class="head-title">
-          <h2>Memoria</h2>
-          <p class="card-sub">Log persistente sulla flash NOR (FSM su FPGA) <span id="memStats" class="stats"></span></p>
+          <h2>Salute del SoC</h2>
+          <p class="diag-sub">Monitoraggio hardware via bus <span id="socStats" class="stats"></span></p>
         </div>
-        <div class="mem-actions">
-          <button id="memLoadBtn" class="btn btn--ghost">Aggiorna</button>
-          <button id="memClearBtn" class="btn btn--ghost">Svuota</button>
+        <div class="diag-controls">
+          <div class="legend">
+            <span class="lg"><span class="dot dot--on"></span> OK</span>
+            <span class="lg"><span class="dot dot--bad"></span> KO</span>
+            <span class="lg"><span class="dot dot--off"></span> N/D</span>
+          </div>
         </div>
       </div>
-      <div class="note-row">
-        <input id="noteInput" class="input" type="text" maxlength="8" placeholder="Scrivi una nota (max 8 caratteri)" />
-        <button id="noteBtn" class="btn">Aggiungi nota</button>
+      <div class="diag-visualizer">
+        <div class="diag-screen">
+          <div class="svg-container">
+            <svg id="soc" class="soc" viewBox="0 0 760 340">
+              <g id="hb-esp" class="hb hb--unk">
+                <rect x="8" y="128" width="104" height="64" rx="6"/>
+                <text x="60" y="150" class="hb-name">ESP32</text>
+                <text x="60" y="170" class="hb-sub">master esterni</text>
+              </g>
+              <line class="lnk" x1="112" y1="144" x2="130" y2="144"/>
+              <text x="121" y="136" class="lnk-lbl">UART 17/18</text>
+              <line class="lnk" x1="112" y1="178" x2="130" y2="178"/>
+              <text x="121" y="196" class="lnk-lbl">UART 72/20</text>
+              <rect class="fpga-frame" x="130" y="10" width="560" height="320" rx="10"/>
+              <text x="148" y="32" class="frame-lbl">FPGA GW2AR-18 · ARCHITETTURA SoC</text>
+              <g id="hb-cpu" class="hb hb--unk">
+                <rect x="170" y="48" width="180" height="58" rx="8"/>
+                <text x="260" y="70" class="hb-name">CPU PicoRV32</text>
+                <text x="260" y="88" class="hb-sub">master M0</text>
+              </g>
+              <g id="hb-m1" class="hb hb--unk">
+                <rect x="390" y="48" width="150" height="58" rx="8"/>
+                <text x="465" y="70" class="hb-name">DMA · FFT</text>
+                <text x="465" y="88" class="hb-sub">master M1</text>
+              </g>
+              <line class="lnk" x1="260" y1="106" x2="260" y2="152"/>
+              <line class="lnk" x1="465" y1="106" x2="465" y2="152"/>
+              <g id="hb-bus" class="hb hb--unk">
+                <rect class="busbar" x="160" y="152" width="510" height="18" rx="5"/>
+                <text x="415" y="165" class="hb-sub bus-lbl">Wishbone Interconnect · Interconnessione Canali Slave</text>
+              </g>
+              <line class="lnk" x1="188" y1="170" x2="188" y2="212"/>
+              <line class="lnk" x1="245" y1="170" x2="245" y2="212"/>
+              <line class="lnk" x1="302" y1="170" x2="302" y2="212"/>
+              <line class="lnk" x1="359" y1="170" x2="359" y2="212"/>
+              <line class="lnk" x1="416" y1="170" x2="416" y2="212"/>
+              <line class="lnk" x1="473" y1="170" x2="473" y2="212"/>
+              <line class="lnk" x1="530" y1="170" x2="530" y2="212"/>
+              <line class="lnk" x1="587" y1="170" x2="587" y2="212"/>
+              <line class="lnk" x1="644" y1="170" x2="644" y2="212"/>
+              <g id="hb-s0" class="hb hb--unk">
+                <rect x="162" y="212" width="52" height="56" rx="6"/>
+                <text x="188" y="230" class="hb-name">S0</text>
+                <text x="188" y="250" class="hb-sub">SDRAM</text>
+              </g>
+              <g id="hb-s1" class="hb hb--unk">
+                <rect x="219" y="212" width="52" height="56" rx="6"/>
+                <text x="245" y="230" class="hb-name">S1</text>
+                <text x="245" y="250" class="hb-sub">ADC</text>
+              </g>
+              <g id="hb-s2" class="hb hb--unk">
+                <rect x="276" y="212" width="52" height="56" rx="6"/>
+                <text x="302" y="230" class="hb-name">S2</text>
+                <text x="302" y="250" class="hb-sub">PWM10</text>
+              </g>
+              <g id="hb-s3" class="hb hb--unk">
+                <rect x="333" y="212" width="52" height="56" rx="6"/>
+                <text x="359" y="230" class="hb-name">S3</text>
+                <text x="359" y="250" class="hb-sub">PWM4</text>
+              </g>
+              <g id="hb-s4" class="hb hb--unk">
+                <rect x="390" y="212" width="52" height="56" rx="6"/>
+                <text x="416" y="230" class="hb-name">S4</text>
+                <text x="416" y="250" class="hb-sub">GPIO</text>
+              </g>
+              <g id="hb-s5" class="hb hb--unk">
+                <rect x="447" y="212" width="52" height="56" rx="6"/>
+                <text x="473" y="230" class="hb-name">S5</text>
+                <text x="473" y="250" class="hb-sub">DMA</text>
+              </g>
+              <g id="hb-s6" class="hb hb--unk">
+                <rect x="504" y="212" width="52" height="56" rx="6"/>
+                <text x="530" y="230" class="hb-name">S6</text>
+                <text x="530" y="250" class="hb-sub">UART</text>
+              </g>
+              <g id="hb-s7" class="hb hb--unk">
+                <rect x="561" y="212" width="52" height="56" rx="6"/>
+                <text x="587" y="230" class="hb-name">S7</text>
+                <text x="587" y="250" class="hb-sub">U-NOR</text>
+              </g>
+              <g id="hb-s8" class="hb hb--unk">
+                <rect x="618" y="212" width="52" height="56" rx="6"/>
+                <text x="644" y="230" class="hb-name">S8</text>
+                <text x="644" y="250" class="hb-sub">SPI</text>
+              </g>
+              <line class="lnk" x1="670" y1="240" x2="700" y2="240"/>
+              <g id="hb-nor" class="hb hb--unk">
+                <rect x="700" y="212" width="52" height="56" rx="6"/>
+                <text x="726" y="230" class="hb-name">W25Q</text>
+                <text x="726" y="250" class="hb-sub">NOR</text>
+              </g>
+            </svg>
+          </div>
+          <div class="diag-data-overlay">
+            <p id="socInfo" class="diag-info-text">In attesa di dati dalla FPGA…</p>
+          </div>
+        </div>
       </div>
-      <ul id="memList" class="memlist"><li class="empty">In attesa di connessione al master…</li></ul>
     </section>
 
-    <!-- Impostazioni -->
-    <section class="card card--settings">
-      <div class="log-head">
+    <div class="col-wrap data-stream">
+      <section id="node-sec" class="card node-panel">
+        <div class="node-header">
+          <h2>Stato Aggancio & Presenza</h2>
+        </div>
+        <div class="pairing">
+          <span id="pairBadge" class="status-badge status-badge--off">Non agganciato</span>
+          <p id="pairDetail" class="data-detail">Nessuno slave registrato.</p>
+        </div>
+        <div class="device-line">
+          <span id="deviceDot" class="dot dot--off"></span>
+          <span id="deviceText" class="data-detail">Master non connesso al server</span>
+        </div>
+        <div class="presence-inline">
+          <div class="bulb-wrapper">
+            <svg id="bulb" class="bulb is-unknown" viewBox="0 0 120 160">
+              <g class="bulb-glass">
+                <path d="M60 8 C32 8 14 30 14 56 c0 18 10 31 21 41 6 5 9 10 9 17 h32 c0-7 3-12 9-17 11-10 21-23 21-41 C106 30 88 8 60 8 Z"/>
+              </g>
+              <line class="filament" x1="46" y1="64" x2="54" y2="48"/>
+              <line class="filament" x1="54" y1="48" x2="66" y2="48"/>
+              <line class="filament" x1="66" y1="48" x2="74" y2="64"/>
+              <rect class="bulb-base" x="44" y="120" width="32" height="10" rx="2"/>
+              <rect class="bulb-base" x="46" y="132" width="28" height="9" rx="2"/>
+              <rect class="bulb-base" x="48" y="143" width="24" height="9" rx="2"/>
+            </svg>
+          </div>
+          <div class="presence-ctrl">
+            <p id="presenceText" class="presence-text">In attesa…</p>
+            <button id="askBtn" class="btn btn--primary" disabled>Chiedi presenza</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="quality-sec" class="card channel-panel">
+        <div class="channel-header">
+          <h2>Qualità Canale</h2>
+        </div>
+        <div class="rings-container">
+          <div class="ring-wrapper">
+            <svg viewBox="0 0 100 100">
+              <circle class="ring-bg" cx="50" cy="50" r="40"></circle>
+              <circle id="rxRing" class="ring-fg ring-rx" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="251.2"></circle>
+            </svg>
+            <div class="ring-content">
+              <span class="ring-title">RX</span>
+              <span id="rxVal" class="ring-val">0</span>
+            </div>
+          </div>
+          <div class="ring-wrapper">
+            <svg viewBox="0 0 100 100">
+              <circle class="ring-bg" cx="50" cy="50" r="40"></circle>
+              <circle id="txRing" class="ring-fg ring-tx" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="251.2"></circle>
+            </svg>
+            <div class="ring-content">
+              <span class="ring-title">TX</span>
+              <span id="txVal" class="ring-val">0</span>
+            </div>
+          </div>
+          <div class="ring-wrapper">
+            <svg viewBox="0 0 100 100">
+              <circle class="ring-bg" cx="50" cy="50" r="40"></circle>
+              <circle id="totRing" class="ring-fg ring-tot" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="251.2"></circle>
+            </svg>
+            <div class="ring-content">
+              <span class="ring-title">TOT</span>
+              <span id="totVal" class="ring-val">0</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="col-wrap data-logs">
+      <section id="traffic-sec" class="card log-panel flex-col">
+        <div class="log-header">
+          <h2>Traffico Dati</h2>
+          <button id="clearBtn" class="btn btn--ghost">Pulisci Buffer</button>
+        </div>
+        <div class="log-feed">
+          <ul id="log" class="data-log-list"></ul>
+        </div>
+      </section>
+
+      <section id="mem-sec" class="card mem-panel flex-col">
+        <div class="mem-header">
+          <div class="head-title">
+            <h2>Memoria Persistente</h2>
+            <p class="diag-sub">Registri stabili su flash NOR <span id="memStats" class="stats"></span></p>
+          </div>
+          <div class="mem-actions">
+            <button id="memLoadBtn" class="btn btn--ghost">Sincronizza</button>
+            <button id="memClearBtn" class="btn btn--ghost btn--danger">Svuota</button>
+          </div>
+        </div>
+        <div class="note-input-row">
+          <input id="noteInput" class="input input--hex" type="text" maxlength="8" placeholder="Scrivi nota rapida..."/>
+          <button id="noteBtn" class="btn">Invia</button>
+        </div>
+        <div class="mem-feed">
+          <ul id="memList" class="mem-list"><li class="empty">In attesa di dati…</li></ul>
+        </div>
+      </section>
+    </div>
+
+    <section id="settings-sec" class="config-panel full-span">
+      <div class="config-header">
         <div class="head-title">
-          <h2>Impostazioni</h2>
-          <p class="card-sub">Salvate sull'FPGA, applicate al volo <span id="setFeedback" class="stats"></span></p>
+          <h2>Configurazione Sistema</h2>
+          <p class="diag-sub">Parametri applicati <span id="setFeedback" class="stats"></span></p>
         </div>
-        <div class="mem-actions">
-          <button id="setReloadBtn" class="btn btn--ghost">Aggiorna</button>
+        <button id="setReloadBtn" class="btn btn--ghost">Ricarica</button>
+      </div>
+      
+      <div class="config-settings-grid">
+        <div class="config-column">
+          <label class="input-group">
+            <span class="lbl">ID Master</span>
+            <input id="setName" class="input input--hex" type="text" maxlength="15" placeholder="AUSP Master"/>
+          </label>
+          <label class="input-group">
+            <span class="lbl">Auto-Presenza (s)</span>
+            <input id="setAuto" class="input input--hex" type="number" min="0" max="3600" step="1"/>
+          </label>
+          <label class="input-group">
+            <span class="lbl">Tentativi</span>
+            <input id="setTries" class="input input--hex" type="number" min="1" max="20" step="1"/>
+          </label>
+        </div>
+
+        <div class="color-control-hub">
+          <div class="color-inputs-column">
+            <label class="color-picker-wrapper"><span class="lbl">Main</span><input id="setColMain" class="color-swatch" type="color" value="#38bdf8"/></label>
+            <label class="color-picker-wrapper"><span class="lbl">Text</span><input id="setColText" class="color-swatch" type="color" value="#f8fafc"/></label>
+            <label class="color-picker-wrapper"><span class="lbl">Bg</span><input id="setColBg" class="color-swatch" type="color" value="#030712"/></label>
+          </div>
+          <div class="futuristic-wheel-wrapper">
+            <div class="futuristic-wheel-core"></div>
+          </div>
+        </div>
+
+        <div class="views-panel-column">
+          <div class="views-settings-controls">
+            <div class="view-settings-control-block">
+              <span class="lbl">Log Debug</span>
+              <div class="switch-control-area">
+                <input id="setDebug" type="checkbox" class="switch-toggle-input"/>
+                <span class="hint">Stream $DEC/PK/SYS</span>
+              </div>
+            </div>
+          </div>
+          <div class="view-chk-grid">
+            <label class="view-chk-control"><input id="vWave" type="checkbox"/><span>Onda</span></label>
+            <label class="view-chk-control"><input id="vLogs" type="checkbox"/><span>Logs</span></label>
+            <label class="view-chk-control"><input id="vSlaves" type="checkbox"/><span>Slaves</span></label>
+            <label class="view-chk-control"><input id="vDmairq" type="checkbox"/><span>IRQ DMA</span></label>
+            <label class="view-chk-control"><input id="vPeaks" type="checkbox"/><span>Peaks</span></label>
+            <label class="view-chk-control"><input id="vRxpkt" type="checkbox"/><span>RX Pkt</span></label>
+            <label class="view-chk-control"><input id="vTxpkt" type="checkbox"/><span>TX Pkt</span></label>
+          </div>
         </div>
       </div>
-      <div class="settings-grid">
-        <label>
-          <span class="lbl">Nome dispositivo</span>
-          <input id="setName" class="input" type="text" maxlength="15" placeholder="Master EFES" />
-          <span class="hint">Mostrato in dashboard. Max 15 caratteri.</span>
-        </label>
-        <label>
-          <span class="lbl">Auto-presenza</span>
-          <input id="setAuto" class="input" type="number" min="0" max="3600" step="1" placeholder="0" />
-          <span class="hint">Secondi tra le richieste presenza. 0 = disattivato.</span>
-        </label>
-        <label>
-          <span class="lbl">Tentativi presenza</span>
-          <input id="setTries" class="input" type="number" min="1" max="20" step="1" placeholder="6" />
-          <span class="hint">Ritrasmissioni di REQ_PRESENCE prima di mollare.</span>
-        </label>
-      </div>
-      <div class="settings-actions">
-        <button id="setSaveBtn" class="btn">Salva impostazioni</button>
+
+      <div class="config-actions">
+        <button id="setSaveBtn" class="btn btn--primary">Applica Configurazione</button>
       </div>
     </section>
   </main>
 
-  <script src="app.js?v=5"></script>
+  <script src="app.js"></script>
 </body>
 </html>

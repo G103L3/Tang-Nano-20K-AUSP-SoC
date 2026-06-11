@@ -10,9 +10,12 @@ use IEEE.NUMERIC_STD.ALL;
 -- Register map (byte address on adr_i):
 --   0x00 R : RXDATA  - last received frame in bits (FRAME_BITS-1 downto 0)
 --   0x04 W : TXDATA  - write a frame to (FRAME_BITS-1 downto 0) -> starts a transfer
+--                      (clears the done flag)
 --   0x08 W : CTRL    - bit0: CS control (1 = assert CS low/active, 0 = release CS high)
---   0x0C R : STATUS  - bit0 = busy, bit1 = done (set when a transfer completes,
---                      cleared on read)
+--   0x0C R : STATUS  - bit0 = busy, bit1 = done. NON-destructive read: done stays
+--                      set until the next TXDATA write. (Le letture OPEN WB della
+--                      CPU possono tornare sporche: un done azzerato alla lettura
+--                      andava perso per sempre e il polling restava appeso.)
 --
 -- Generics:
 --   PRESCALER  - SCK = clk_i / PRESCALER (must be even, >= 2)
@@ -87,6 +90,7 @@ begin
                                 if active = '0' then
                                     shift_tx <= dat_i(FRAME_BITS - 1 downto 0);
                                     start    <= '1';
+                                    done_s   <= '0';
                                 end if;
                             when x"08" =>
                                 cs_r <= not dat_i(0);
@@ -101,7 +105,6 @@ begin
                                 dat_o    <= (others => '0');
                                 dat_o(0) <= active;
                                 dat_o(1) <= done_s;
-                                done_s   <= '0';
                             when others =>
                                 dat_o <= (others => '0');
                         end case;

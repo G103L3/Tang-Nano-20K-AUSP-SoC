@@ -53,6 +53,9 @@ static int  rx_last   = -1;            /* ultimo bit dati (per check alternanza)
 static bool rx_alt    = true;          /* il pattern e' strettamente alternato? */
 static unsigned long rx_last_sym_ms = 0;
 
+static fpga_diag_cb_t diag_cb = NULL;
+void fpga_uart_set_diag_cb(fpga_diag_cb_t cb) { diag_cb = cb; }
+
 void fpga_uart_init(void) {
     uart_reg_init(UART_REG_FPGA, FPGA_UART_RX_PIN, FPGA_UART_TX_PIN, FPGA_UART_BAUD);
 }
@@ -73,8 +76,11 @@ static void rx_finish_pattern(void) {
 
 void fpga_uart_tick(void) {
     /* Canale DEBUG della FPGA: righe "$....\n" inoltrate verbatim su USB (anche i
-     * caratteri che fuori da qui sarebbero filtrati/decodificati), fino a '\n'. */
+     * caratteri che fuori da qui sarebbero filtrati/decodificati), fino a '\n'.
+     * La riga viene anche accumulata e passata a diag_cb (salute SoC -> dashboard). */
     static bool dbg_mode = false;
+    static char dbg_line[120];
+    static size_t dbg_len = 0;
 
     while (uart_reg_available(UART_REG_FPGA)) {
         int rb = uart_reg_read(UART_REG_FPGA);
@@ -82,11 +88,18 @@ void fpga_uart_tick(void) {
         char c = (char)rb;
 
         if (dbg_mode) {
-            if (c == '\n')      { Serial.write('\n'); dbg_mode = false; }
-            else if (c != '\r') { Serial.write((uint8_t)c); }
+            if (c == '\n') {
+                Serial.write('\n');
+                dbg_mode = false;
+                dbg_line[dbg_len] = 0;
+                if (diag_cb && dbg_len > 0) diag_cb(dbg_line);
+            } else if (c != '\r') {
+                Serial.write((uint8_t)c);
+                if (dbg_len < sizeof(dbg_line) - 1) dbg_line[dbg_len++] = c;
+            }
             continue;
         }
-        if (c == '$') { dbg_mode = true; Serial.print("\n[FPGA] "); continue; }
+        if (c == '$') { dbg_mode = true; dbg_len = 0; Serial.print("\n[FPGA] "); continue; }
 
         /* MAIUSCOLE A/B/C = carrier SLAVE (quello che il master riceve). */
         if (c == 'A' || c == 'B' || c == 'C') {

@@ -18,10 +18,17 @@
 extern "C" {
 #endif
 
+/* view_flags: bit0=onda audio, bit1=logs, bit2=stato slaves, bit3=irq dma,
+ * bit4=peaks bin, bit5=pacchetto ricevuto, bit6=pacchetto in emissione */
 typedef struct {
     char     name[16];
     uint16_t auto_presence_s;
     uint8_t  presence_tries;
+    uint8_t  debug_log;          /* dump diagnostici FPGA on/off (b[19]) */
+    uint8_t  col_main[3];        /* colore principale RGB (b[20..22]) */
+    uint8_t  col_text[3];        /* colore testo RGB (b[23..25]) */
+    uint8_t  col_bg[3];          /* colore sfondo RGB (b[26..28]) */
+    uint8_t  view_flags;         /* b[29], default tutti on (0x7F) */
 } flash_settings_t;
 
 typedef struct {

@@ -51,16 +51,74 @@ static void send_json(const char *json) {
     ws.sendTXT(json);            /* no-op se non connesso */
 }
 
+static void rgb_to_hex(const uint8_t rgb[3], char out[8]) {
+    snprintf(out, 8, "#%02x%02x%02x", rgb[0], rgb[1], rgb[2]);
+}
+
+static bool hex_to_rgb(const char *hex, uint8_t rgb[3]) {
+    if (!hex || hex[0] != '#' || strlen(hex) != 7) return false;
+    unsigned v = (unsigned)strtoul(hex + 1, NULL, 16);
+    rgb[0] = (v >> 16) & 0xFF; rgb[1] = (v >> 8) & 0xFF; rgb[2] = v & 0xFF;
+    return true;
+}
+
 static void send_settings(void) {
     flash_settings_t s;
     if (!flash_get_settings(&s)) return;
+    char cm[8], ct[8], cb[8];
+    rgb_to_hex(s.col_main, cm); rgb_to_hex(s.col_text, ct); rgb_to_hex(s.col_bg, cb);
     JsonDocument d;
     d["t"]     = "settings";
     d["name"]  = s.name;
     d["auto"]  = s.auto_presence_s;
     d["tries"] = s.presence_tries;
+    d["debug"] = s.debug_log ? 1 : 0;
+    d["cm"]    = cm;
+    d["ct"]    = ct;
+    d["cb"]    = cb;
+    d["views"] = s.view_flags;
     String out; serializeJson(d, out);
     ws.sendTXT(out);
+}
+
+/* ---- salute SoC dalla FPGA ($HLT ...) ---- */
+static char          s_health[120] = "";
+static unsigned long s_health_ms   = 0;
+
+/* "key=" -> valore numerico (base 10 o 16); -1 se assente */
+static long hlt_val(const char *line, const char *key, int base) {
+    const char *p = strstr(line, key);
+    if (!p) return -1;
+    return (long)strtoul(p + strlen(key), NULL, base);
+}
+
+static void send_health(void) {
+    if (!s_health_ms) return;
+    long m   = hlt_val(s_health, "m=",   16);
+    long adc = hlt_val(s_health, "adc=", 10);
+    long fft = hlt_val(s_health, "fft=", 10);
+    long nor = hlt_val(s_health, "nor=", 10);
+    long lk  = hlt_val(s_health, "lk=",  10);
+    long hd  = hlt_val(s_health, "hd=",  10);
+    JsonDocument d;
+    d["t"]   = "health";
+    d["m"]   = (m   < 0) ? 0 : m;
+    d["adc"] = (adc < 0) ? 0 : adc;
+    d["fft"] = (fft < 0) ? 0 : fft;
+    d["nor"] = (nor < 0) ? 0 : nor;
+    d["lk"]  = (lk  < 0) ? 0 : lk;
+    d["hd"]  = (hd  < 0) ? 0 : hd;
+    d["age"] = (uint32_t)((millis() - s_health_ms) / 1000);
+    String out; serializeJson(d, out);
+    ws.sendTXT(out);
+}
+
+void web_link_diag_line(const char *line) {
+    if (strncmp(line, "HLT ", 4) != 0) return;
+    strncpy(s_health, line + 4, sizeof(s_health) - 1);
+    s_health[sizeof(s_health) - 1] = 0;
+    s_health_ms = millis();
+    send_health();
 }
 
 static void send_flash_log(void) {
@@ -160,14 +218,22 @@ static void on_command(const char *payload) {
         send_flash_log();
     } else if (!strcmp(cmd, "settings_get")) {
         send_settings();
+    } else if (!strcmp(cmd, "health_get")) {
+        send_health();
     } else if (!strcmp(cmd, "settings_set")) {
         flash_settings_t s;
+        memset(&s, 0, sizeof(s));
         const char *nm = d["name"] | "Master EFES";
         strncpy(s.name, nm, 15); s.name[15] = 0;
         s.auto_presence_s = d["auto"]  | 0;
         s.presence_tries  = d["tries"] | 6;
-        Serial.printf("[web] settings_set name='%s' auto=%u tries=%u\n",
-                      s.name, s.auto_presence_s, s.presence_tries);
+        s.debug_log       = (d["debug"] | 0) ? 1 : 0;
+        if (!hex_to_rgb(d["cm"] | "", s.col_main)) { s.col_main[0]=0x4F; s.col_main[1]=0x9D; s.col_main[2]=0xFF; }
+        if (!hex_to_rgb(d["ct"] | "", s.col_text)) { s.col_text[0]=0xE6; s.col_text[1]=0xED; s.col_text[2]=0xF3; }
+        if (!hex_to_rgb(d["cb"] | "", s.col_bg))   { s.col_bg[0]=0x0E;   s.col_bg[1]=0x11;   s.col_bg[2]=0x16; }
+        s.view_flags      = (uint8_t)(d["views"] | 0x7F) & 0x7F;
+        Serial.printf("[web] settings_set name='%s' auto=%u tries=%u debug=%u views=0x%02X\n",
+                      s.name, s.auto_presence_s, s.presence_tries, s.debug_log, s.view_flags);
         bool ok = flash_set_settings(&s);
         Serial.printf("[web] flash_set_settings -> %s\n", ok ? "OK" : "FAIL");
         protocol_set_presence_tries(s.presence_tries);
@@ -191,7 +257,7 @@ static void on_ws_event(WStype_t type, uint8_t *payload, size_t length) {
             Serial.println("[web] WebSocket disconnesso");
             break;
         case WStype_TEXT: {
-            char buf[160];
+            char buf[384];   /* settings_set con colori+views supera i vecchi 160 */
             size_t n = (length < sizeof(buf) - 1) ? length : sizeof(buf) - 1;
             memcpy(buf, payload, n); buf[n] = 0;
             Serial.printf("[web] RX (%u): %s\n", (unsigned)length, buf);

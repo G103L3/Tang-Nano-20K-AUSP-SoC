@@ -26,7 +26,9 @@ SRCS    = src/crt0.S \
           src/main.c \
           src/emit_tone.c \
           src/decoder.c \
-          src/read_sdram.c
+          src/read_sdram.c \
+          src/norflash.c \
+          src/health.c
 TARGET  = firmware
 
 # ITCM size = 32 KB -> 8192 parole da 32 bit

@@ -25,6 +25,11 @@ void web_link_event(const char *dir, const char *msg);
 void web_link_presence(bool present);
 void web_link_push_flashlog(void);
 
+/* riga diagnostica "$...\n" della FPGA (senza '$' e '\n'): le righe "HLT ..."
+ * (salute SoC) vengono parsate e inoltrate alla dashboard come {"t":"health"}.
+ * Da registrare con fpga_uart_set_diag_cb(). */
+void web_link_diag_line(const char *line);
+
 #ifdef __cplusplus
 }
 #endif
