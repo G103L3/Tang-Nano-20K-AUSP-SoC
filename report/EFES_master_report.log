@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.25)  11 JUN 2026 01:37
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.25)  11 JUN 2026 16:27
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -949,50 +949,48 @@ p/pdftex.map}])
 \tf@toc=\write5
 \openout5 = `EFES_master_report.toc'.
 
- [2] [3] [4]
-LaTeX Font Info:    Font shape `T1/cmtt/bx/n' in size <10> not available
-(Font)              Font shape `T1/cmtt/m/n' tried instead on input line 449.
-
-Overfull \hbox (6.47415pt too wide) in paragraph at lines 449--449
- [][]\T1/cmr/m/n/8 spi_raw_buf 
- []
-
-[5] [6] [7]
-Overfull \hbox (2.12445pt too wide) in paragraph at lines 557--571
+ [2] [3] [4] [5] [6] [7]
+Overfull \hbox (2.12445pt too wide) in paragraph at lines 626--640
  [][] 
  []
 
-[8] [9] [10]
+[8] [9] [10] [11] [12]
 LaTeX Font Info:    Font shape `T1/cmtt/bx/n' in size <10.95> not available
-(Font)              Font shape `T1/cmtt/m/n' tried instead on input line 889.
- [11] [12] [13] [14] [15] [16] [17] [18] [19] [20] [21]
-(./EFES_master_report.aux)
+(Font)              Font shape `T1/cmtt/m/n' tried instead on input line 1126.
+ [13] [14] [15] [16] [17] [18] [19] [20] [21] [22]
+[23] [24] [25]
+Overfull \hbox (7.02225pt too wide) in paragraph at lines 2062--2067
+[]\T1/cmr/m/n/10.95 The next step is al-ready scaf-folded but not wired: mov-in
+g the flash pro-to-col from the \T1/cmtt/m/n/10.95 flash_ctrl
+ []
+
+[26] [27] (./EFES_master_report.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
  ***********
 Package rerunfilecheck Info: File `EFES_master_report.out' has not changed.
-(rerunfilecheck)             Checksum: 0C05280710D9DD68C8C2B9BA11BED38E;7269.
+(rerunfilecheck)             Checksum: FFFCBF66EEA99049C4BC31C0EED0E298;8930.
  ) 
 Here is how much of TeX's memory you used:
- 28921 strings out of 469006
- 558918 string characters out of 5454813
- 1047963 words of memory out of 5000000
- 57062 multiletter control sequences out of 15000+600000
- 653150 words of font info for 103 fonts, out of 8000000 for 9000
+ 29179 strings out of 469006
+ 563415 string characters out of 5454813
+ 1071396 words of memory out of 5000000
+ 57304 multiletter control sequences out of 15000+600000
+ 652391 words of font info for 102 fonts, out of 8000000 for 9000
  319 hyphenation exceptions out of 8191
- 102i,11n,107p,1417b,1005s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 102i,11n,107p,2956b,1005s stack positions out of 10000i,1000n,20000p,200000b,200000s
  </Users/gioelegiunta/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jkn
-appen/ec/ecrm0600.600pk> </Users/gioelegiunta/Library/texlive/2026basic/texmf-v
-ar/fonts/pk/ljfour/jknappen/ec/tcrm1095.600pk> </Users/gioelegiunta/Library/tex
-live/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt0900.600pk> </Users/gi
-oelegiunta/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx
-0900.600pk> </Users/gioelegiunta/Library/texlive/2026basic/texmf-var/fonts/pk/l
-jfour/jknappen/ec/ectt1095.600pk> </Users/gioelegiunta/Library/texlive/2026basi
+appen/ec/tcrm1095.600pk> </Users/gioelegiunta/Library/texlive/2026basic/texmf-v
+ar/fonts/pk/ljfour/jknappen/ec/ectt0900.600pk> </Users/gioelegiunta/Library/tex
+live/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx0900.600pk> </Users/gi
+oelegiunta/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt
+1095.600pk> </Users/gioelegiunta/Library/texlive/2026basic/texmf-var/fonts/pk/l
+jfour/jknappen/ec/ecrm0600.600pk> </Users/gioelegiunta/Library/texlive/2026basi
 c/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt0800.600pk> </Users/gioelegiunta/Li
-brary/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm0800.600pk> <
+brary/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt1000.600pk> <
 /Users/gioelegiunta/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappe
-n/ec/ectt1000.600pk> </Users/gioelegiunta/Library/texlive/2026basic/texmf-var/f
+n/ec/ecrm0800.600pk> </Users/gioelegiunta/Library/texlive/2026basic/texmf-var/f
 onts/pk/ljfour/jknappen/ec/ecss0800.600pk> </Users/gioelegiunta/Library/texlive
 /2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecsx1095.600pk> </Users/gioele
 giunta/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm0900
@@ -1021,10 +1019,10 @@ m/cmr8.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts
 ts/cm/cmsy10.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/am
 sfonts/cm/cmsy8.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public
 /amsfonts/cm/cmsy9.pfb>
-Output written on EFES_master_report.pdf (21 pages, 428728 bytes).
+Output written on EFES_master_report.pdf (27 pages, 479786 bytes).
 PDF statistics:
- 1266 PDF objects out of 1440 (max. 8388607)
- 458 compressed objects within 5 object streams
- 91 named destinations out of 1000 (max. 500000)
- 325 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 1419 PDF objects out of 1440 (max. 8388607)
+ 532 compressed objects within 6 object streams
+ 107 named destinations out of 1000 (max. 500000)
+ 373 words of extra memory for PDF output out of 10000 (max. 10000000)
 

@@ -156,12 +156,12 @@
     "InstLine" : 998,
     "InstName" : "u_softcore",
     "ModuleFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/gowin_picorv32/gowin_picorv32.v",
-    "ModuleLine" : 26798,
+    "ModuleLine" : 26701,
     "ModuleName" : "Gowin_PicoRV32_Top",
     "SubInsts" : [
      {
       "InstFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/gowin_picorv32/gowin_picorv32.v",
-      "InstLine" : 28465,
+      "InstLine" : 28368,
       "InstName" : "core",
       "ModuleFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/gowin_picorv32/gowin_picorv32.v",
       "ModuleLine" : 23,
@@ -169,7 +169,7 @@
      },
      {
       "InstFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/gowin_picorv32/gowin_picorv32.v",
-      "InstLine" : 28574,
+      "InstLine" : 28477,
       "InstName" : "u_dm",
       "ModuleFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/gowin_picorv32/gowin_picorv32.v",
       "ModuleLine" : 20433,
@@ -177,7 +177,7 @@
      },
      {
       "InstFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/gowin_picorv32/gowin_picorv32.v",
-      "InstLine" : 28647,
+      "InstLine" : 28550,
       "InstName" : "itcm",
       "ModuleFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/gowin_picorv32/gowin_picorv32.v",
       "ModuleLine" : 24349,
@@ -185,34 +185,34 @@
      },
      {
       "InstFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/gowin_picorv32/gowin_picorv32.v",
-      "InstLine" : 28657,
+      "InstLine" : 28560,
       "InstName" : "dtcm",
       "ModuleFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/gowin_picorv32/gowin_picorv32.v",
-      "ModuleLine" : 24861,
+      "ModuleLine" : 24764,
       "ModuleName" : "picosoc_dtcm"
      },
      {
       "InstFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/gowin_picorv32/gowin_picorv32.v",
-      "InstLine" : 28670,
+      "InstLine" : 28573,
       "InstName" : "simpleuart",
       "ModuleFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/gowin_picorv32/gowin_picorv32.v",
-      "ModuleLine" : 25127,
+      "ModuleLine" : 25030,
       "ModuleName" : "simpleuart"
      },
      {
       "InstFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/gowin_picorv32/gowin_picorv32.v",
-      "InstLine" : 28707,
+      "InstLine" : 28610,
       "InstName" : "wb",
       "ModuleFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/gowin_picorv32/gowin_picorv32.v",
-      "ModuleLine" : 26205,
+      "ModuleLine" : 26108,
       "ModuleName" : "wishbone_bus"
      },
      {
       "InstFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/gowin_picorv32/gowin_picorv32.v",
-      "InstLine" : 28731,
+      "InstLine" : 28634,
       "InstName" : "wb_intercon",
       "ModuleFile" : "/Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/src/gowin_picorv32/gowin_picorv32.v",
-      "ModuleLine" : 26520,
+      "ModuleLine" : 26423,
       "ModuleName" : "wisbhone_intercon"
      }
     ]
