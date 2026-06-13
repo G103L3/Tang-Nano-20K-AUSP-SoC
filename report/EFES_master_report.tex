@@ -108,11 +108,12 @@ the bus and the CPU, and a phase shifted copy of it for the SDRAM die).
 The \textbf{Gowin FFT} core sits inside the hardware accelerator that I built
 around it to turn microphone samples into a spectrum.
 
-Everything else on the FPGA is custom VHDL that I wrote: a generic UART module, a
+Everything else on the FPGA is custom VHDL that I wrote: a generic UART module
+(instantiated twice, for the protocol characters and for the storage commands), a
 generic SPI byte engine used to talk to the NOR flash, a second SPI master
-specialised and timed for receiving audio from the ADC, a generic GPIO peripheral
-that switches the indicator LEDs, and a PWM peripheral that generates the output
-tones for the speaker.
+specialised and timed for receiving audio from the ADC, a third, transmit only
+SPI that drives a small TFT display, a generic GPIO peripheral, and a PWM
+peripheral that generates the output tones for the speaker.
 
 On the ESP32 side, the board connects to the FPGA through two independent UART
 links, so four wires in total (two TX and two RX), accessed at register level.
@@ -125,7 +126,9 @@ top of it.
 
 \subsection{The hardware I used}
 
-For persistent storage I used a W25Q64 NOR flash (64\,Mbit, 8\,MByte). The
+For persistent storage I used a W25Q64 NOR flash (64\,Mbit, 8\,MByte). The local
+display is a 2 inch IPS TFT, a GMT020-02-7P with the usual ST7789 controller,
+$240\times320$, driven over SPI. The
 microphone is an ordinary electret condenser capsule. Its signal is amplified by
 an MCP6022 operational amplifier and digitised by an MCP3201 12-bit ADC, which the
 FPGA reads over SPI. The speaker is an ordinary 8\,$\Omega$ speaker driven from
@@ -191,11 +194,11 @@ the acoustic protocol.
 
 Inside the master, three units split the work: the FPGA fabric, the soft core (a
 PicoRV32 inside the FPGA), and the ESP32. The fabric does everything that is timing
-critical or sample rate bound: it reads the ADC, computes the FFT, copies the
-spectrum into an on chip snapshot, generates the output PWM tone, and stores the log
-on the NOR flash. The soft core does the per frame work that is not sample bound: it
-reads the spectrum snapshot over the bus, decodes the tones, and decides whether the
-channel is free before emitting. The ESP32 does everything that is decision bound: it
+critical or sample rate bound: it reads the ADC, computes the FFT, copies the spectrum into an on chip snapshot, generates the output PWM tone, and shifts the raw
+SPI frames to the NOR flash and the TFT. The soft core does the per frame work that
+is not sample bound: it reads the spectrum snapshot over the bus, decodes the tones,
+decides whether the channel is free before emitting, runs the W25Q storage protocol
+and draws the display. The ESP32 does everything that is decision bound: it
 runs the protocol state machine, talks to the dashboard, and tells the soft core
 which tones to emit. Table~\ref{tab:partition} lists the split operation by operation.
 The units are joined by two UARTs, one carrying the decoded and to be emitted acoustic
@@ -218,7 +221,8 @@ Move samples to SDRAM (DMA)              & FPGA fabric        & hardware \\
 Store spectrum in SDRAM                  & FPGA fabric        & hardware \\
 Copy spectrum to BSRAM snapshot          & FPGA fabric        & hardware \\
 Two tone generation (DDS, sine sum)      & FPGA fabric        & hardware \\
-NOR flash storage                        & FPGA fabric        & hardware \\
+NOR flash storage (W25Q protocol)        & soft core          & software \\
+TFT dashboard rendering                  & soft core          & software \\
 Read snapshot over the Wishbone bus      & soft core          & software \\
 Tone decode (carrier + bit)              & soft core          & software \\
 Carrier sense, emit gating (CSMA)        & soft core          & software \\
@@ -244,7 +248,7 @@ top level block diagram.
 
 \begin{figure}[H]
 \centering
-\resizebox{0.87\textwidth}{!}{%
+\resizebox{0.86\textwidth}{!}{%
 \begin{tikzpicture}[
     every node/.style={font=\small},
     blk/.style={draw, line width=0.8pt, fill=white, minimum width=3.7cm, minimum height=1.7cm, align=center, text width=3.5cm},
@@ -253,7 +257,9 @@ top level block diagram.
     pin/.style={circle, draw, fill=white, line width=0.6pt, inner sep=1pt, minimum size=5pt},
     lbl/.style={font=\scriptsize},
     sig/.style={line width=0.6pt},
-    clk/.style={-{Stealth[length=5pt]}, line width=0.7pt, dashed}
+    clk/.style={-{Stealth[length=5pt]}, line width=0.7pt, dashed},
+    rstl/.style={line width=0.7pt, dashed},
+    rstdot/.style={circle, draw, line width=0.7pt, fill=white, inner sep=0pt, minimum size=4.5pt}
 ]
 
 % ==============================================================================
@@ -299,10 +305,10 @@ top level block diagram.
 % ==============================================================================
 % BUS CENTRALE
 % ==============================================================================
-\draw[fill=white, line width=1.2pt] 
-    (-0.5, -8.6) -- (-0.5, 14.2) -- (-0.9, 14.2) -- (0, 15.4) --
-    (0.9, 14.2) -- (0.5, 14.2) -- (0.5, -8.6) -- (0.9, -8.6) --
-    (0, -9.6) -- (-0.9, -8.6) -- cycle;
+\draw[fill=white, line width=1.2pt]
+    (-0.5, -9.5) -- (-0.5, 14.2) -- (-0.9, 14.2) -- (0, 15.4) --
+    (0.9, 14.2) -- (0.5, 14.2) -- (0.5, -9.5) -- (0.9, -9.5) --
+    (0, -10.2) -- (-0.9, -9.5) -- cycle;
 \node[rotate=90, font=\bfseries\sffamily] at (0, 2.1) {On Chip Bus (Wishbone, 32 bit)};
 
 
@@ -344,11 +350,22 @@ top level block diagram.
 \fatL{\Ledge}{\BusL}{-0.5}{S0 control}
 \fatL{\Ledge}{\BusL}{-0.5-0.55}{S0 address}
 
-\node[blk] (L4) at (-7.0, -2.8) {\textbf{NOR flash controller}\\\scriptsize \texttt{flash\_ctrl} (hardware)\\\scriptsize off bus --- SPI side};
-\node[preblk] (preL4) at (-7.0, -4.6) {SPI $\div$64\\633 kHz};
+% SPI NOR = slave S8: la CPU esegue le sequenze W25Q in firmware (norflash.c).
+\node[blk] (L4) at (-7.0, -2.8) {\textbf{SPI master generic}\\slave S8 (0x38)\\NOR flash (W25Q)};
+\node[preblk] (preL4) at (-7.0, -4.45) {SPI $\div$64\\633 kHz};
 \draw[clk] (L4.south) -- (preL4.north);
-% NON sul bus: flash_ctrl e' un blocco hardware indipendente dalla CPU (nessuna
-% freccia verso il bus). Il suo lato SPI pilota il W25Q (pin a sinistra).
+\fatBidir{\Ledge}{\BusL}{-2.8+0.55}{S8 data}
+\fatL{\Ledge}{\BusL}{-2.8}{S8 control}
+\fatL{\Ledge}{\BusL}{-2.8-0.55}{S8 address}
+
+% Display TFT ST7789 = slave S9 (0x5800_0000), SPI mode 3 TX-only, ~6.75 MHz.
+% Prescaler fisso /6 separato sotto il blocco, come tutti gli altri divisori.
+\node[blk] (disp) at (-7.0, -6.0) {\textbf{SPI display}\\slave S9 (0x58)\\\scriptsize TFT ST7789, mode 3};
+\node[preblk] (preDisp) at (-7.0, -7.55) {SPI $\div$6\\6.75 MHz};
+\draw[clk] (disp.south) -- (preDisp.north);
+\fatBidir{\Ledge}{\BusL}{-6.0+0.55}{S9 data}
+\fatL{\Ledge}{\BusL}{-6.0}{S9 control}
+\fatL{\Ledge}{\BusL}{-6.0-0.55}{S9 address}
 
 
 % ==============================================================================
@@ -394,41 +411,19 @@ top level block diagram.
 \node[blk, minimum width=3.0cm, minimum height=1.1cm] (mem) at (-7.0,12.0) {\textbf{ITCM + DTCM}\\block RAM (BSRAM)};
 \draw[{Stealth[length=7pt,width=7pt]}-{Stealth[length=7pt,width=7pt]}, line width=1.5pt] (mem.south) -- (L1.north) node[midway, right, lbl]{local bus};
 
-\node[blk, minimum width=3.2cm, minimum height=1.2cm] (pll) at (-7.0,-7.4) {\textbf{rPLL}\\clkout 40.5 MHz\\clkoutp $+1.54$ ns};
+\node[blk, minimum width=3.2cm, minimum height=1.2cm] (pll) at (-7.0,-9.2) {\textbf{rPLL}\\clkout 40.5 MHz\\clkoutp $+1.54$ ns};
 
-% ── Reti di clock (tratteggiate, un cavo per clock) ──────────────────────────
-% clkout 40.5 MHz: rail sinistra (mem, CPU, accel, SIP, fetch, fill_cnt/BSRAM,
-% flash_ctrl) e rail destra (UART NOR, UART char, SPI ADC, PWM speaker).
-\draw[clk] (pll.south) -- (-7.0,-8.55) -- (-10.4,-8.55) -- (-10.4,12.0) -- (-8.5,12.0);
-\draw[clk] (-10.4,9.2) -- (-8.85,9.2);
-\draw[clk] (-10.4,5.7) -- (-10.17,5.7);
-\draw[clk] (-10.4,2.3) -- (-8.85,2.3);
-\draw[clk] (-10.4,0.75) -- (-8.85,0.75);
-\draw[clk] (-10.4,-0.5) -- (-10.15,-0.5);
-\draw[clk] (-10.4,-2.1) -- (-8.85,-2.1);
-\node[lbl, rotate=90] at (-10.65,6.4) {clkout 40.5 MHz};
-\draw[clk] (pll.east) -- (-5.0,-7.4) -- (-5.0,-7.7) -- (9.45,-7.7) -- (9.45,13.5) -- (8.85,13.5);
-\draw[clk] (9.45,9.2) -- (8.85,9.2);
-\draw[clk] (9.45,5.2) -- (8.85,5.2);
-\draw[clk] (9.45,1.6) -- (8.85,1.6);
-\node[lbl, fill=white, inner sep=1pt] at (-2.5,-7.95) {clkout 40.5 MHz};
-% clkoutp (+1.54 ns): SOLO il die SDRAM (centra la finestra di campionamento).
-\draw[clk] ($(pll.west)+(0,0.3)$) -- (-11.0,-7.1) -- (-11.0,0.9) -- (-12.6,0.9) -- (-12.6,1.35);
-\node[lbl, anchor=east] at (-11.15,-5.0) {clkoutp $+1.54$ ns};
-% clk_i 27 MHz grezzo: PWM LED e GPIO (presi dal ramo prima del PLL).
-\draw[clk] (-9.9,-7.4) -- (-9.9,-8.3) -- (9.15,-8.3) -- (9.15,-3.3) -- (8.85,-3.3);
-\draw[clk] (9.15,-6.2) -- (8.85,-6.2);
-\node[lbl, fill=white, inner sep=1pt] at (3.2,-8.55) {clk\_i 27 MHz};
+% Le reti di clock sono disegnate come ALBERO radicato nel bus, dopo che tutti
+% i blocchi e i pin sono stati definiti (sezione "CLOCK TREE" in fondo).
 
-% Seconda UART verso l'ESP32 (link comandi memoria, ex flash_ctrl, pin 72/20),
-% disegnata come l'altra: UART generic, numero slave, sul bus, prescaler sotto.
-% NB: slot S7 (porto riservato del wb_interconnect) e baud div 234 (27MHz/115200)
-% dai generics di flash_ctrl. La posizione e' un placeholder: la colonna e' piena.
-\node[blk] (R0) at (7.0, 13.0) {\textbf{UART generic}\\NOR flash UART\\\scriptsize off bus --- \texttt{flash\_ctrl} side};
+% UART comandi NOR = slave S7: la CPU riceve da qui gli opcode storage
+% dell'ESP32 (pin 72/20) e li esegue sullo SPI S8.
+\node[blk] (R0) at (7.0, 13.0) {\textbf{UART generic}\\slave S7 (0x28)\\NOR cmds (to ESP32)};
 \node[preblk] (preR0) at (7.0, 11.2) {baud $\div$352\\115200};
 \draw[clk] (R0.south) -- (preR0.north);
-% NON sul bus: stesso blocco flash_ctrl di L4 (lato UART verso l'ESP32, pin 72/20).
-% Nessuna freccia verso il bus.
+\fatBidir{\BusR}{\Redge}{13.0+0.55}{S7 data}
+\fatR{\BusR}{\Redge}{13.0}{S7 control}
+\fatR{\BusR}{\Redge}{13.0-0.55}{S7 address}
 
 % ── Audio accelerator: contenitore con i MODULI FISICI veri (dma.vhd) ────────
 % dma_proc (FSM cattura, master M1) -> spi_raw_buf (BSRAM ping-pong);
@@ -453,18 +448,20 @@ top level block diagram.
 % (sdr_own), NON via bus -> la freccia entra nel blocco SIP.
 % IRQ frame-done: da fft_proc, avvia la fetch FSM (la stessa linea va anche a
 % irq[20] della CPU, che pero' fa polling su fill_cnt).
-\draw[-{Stealth}, line width=0.9pt] (resbuf.south) -- (-6.6,2.47);
+\draw[-{Stealth}, line width=0.9pt] (resbuf.south) -- (L3.north -| resbuf.south);
 \node[lbl, anchor=west] at (-6.4, 2.72) {drain (write port)};
-\draw[-{Stealth}, line width=0.7pt, dashed] (fftproc.south) -- (-9.2,1.35) -- (-8.3,1.35) -- (-8.3,1.12);
+\draw[-{Stealth}, line width=0.7pt, dashed] (fftproc.south) -- (-9.2,1.35) -- (-8.3,1.35) -- (fetchN.north -| -8.3,0);
 \node[lbl, fill=white, inner sep=1pt] at (-9.2,3.6) {IRQ frame done};
 
 
 % ==============================================================================
 % SDRAM DIE (Spostato fuori per evitare sovrapposizioni)
 % ==============================================================================
-\node[blk, minimum width=2.6cm, minimum height=1.3cm] (die) at (-13.0,2.0) {\textbf{SDRAM die}\\ \footnotesize 8 MB, 32-bit};
+\node[blk, minimum width=2.6cm, minimum height=1.3cm] (die) at (-15.0,2.0) {\textbf{SDRAM die}\\ \footnotesize 8 MB, 32-bit};
 \draw[{Stealth[length=6pt,width=6pt]}-{Stealth[length=6pt,width=6pt]}, line width=1.2pt] (die.east) -- (L3.west);
-\node[lbl, font=\tiny] at (-13.0,1.05) {A[10:0], DQ[31:0], RAS/CAS/WE/CS, CKE, DQM};
+% Etichetta dei segnali del die: appesa SOTTO il tratto ESTERNO della
+% connessione SIP<->die (fuori dal bounding box del SoC, lontano dall'IRQ).
+\node[lbl, font=\tiny, align=center] at (-12.3,1.0) {A[10:0],\\DQ[31:0],\\RAS/CAS/WE/CS,\\CKE, DQM};
 
 
 % ==============================================================================
@@ -474,7 +471,12 @@ top level block diagram.
   \node[pin] (fp\i) at (-12.5,\y){}; \node[lbl,anchor=east] at (fp\i.west){\nm};
   \draw[sig] (fp\i) -- (fp\i -| L4.west);
 }
-\node[pin] (xt) at (-12.5,-7.4){}; \node[lbl,anchor=east] at (xt.west){clk\_i = pin 4 (27 MHz)}; \draw[sig](xt)--(pll.west);
+% pin del display TFT (ex pin dei LED di debug 49/53/71/86 + 52 libero)
+\foreach \i/\y/\nm in {1/-5.3/{TFT SCL = pin 49}, 2/-5.55/{TFT SDA = pin 53}, 3/-5.8/{TFT DC = pin 71}, 4/-6.05/{TFT RST = pin 86}, 5/-6.3/{TFT CS = pin 52}}{
+  \node[pin] (dp\i) at (-12.5,\y){}; \node[lbl,anchor=east] at (dp\i.west){\nm};
+  \draw[sig] (dp\i) -- (dp\i -| disp.west);
+}
+\node[pin] (xt) at (-12.5,-9.2){}; \node[lbl,anchor=east] at (xt.west){clk\_i = pin 4 (27 MHz)}; \draw[sig](xt)--(pll.west);
 
 \foreach \i/\y/\nm in {1/9.5/{UART char TX = pin 17}, 2/8.9/{UART char RX = pin 18}}{
   \node[pin] (up\i) at (12.2,\y){}; \node[lbl,anchor=west] at (up\i.east){\nm};
@@ -495,17 +497,64 @@ top level block diagram.
 
 
 % ==============================================================================
+% CLOCK TREE: il rPLL inietta i clock nel bus, da li' un ramo per blocco.
+% Convenzione grafica: il bus fa da dorsale di distribuzione; ogni ramo
+% tratteggiato porta scritto il SUO clock. Niente rotaie laterali.
+% ==============================================================================
+% Iniezioni nella dorsale (in basso): clkout+clkoutp dal rPLL, clk_i dal tap
+% PRE-PLL (pallino sul filo del quarzo).
+\draw[clk] (pll.east) -- (\BusL,-9.2);
+\node[lbl, fill=white, inner sep=1pt, align=center] at (-2.9,-9.2) {clkout 40.5 MHz\\clkoutp $+1.54$ ns};
+\fill (-10.5,-9.2) circle (1.6pt);
+\draw[clk] (-10.5,-9.2) -- (-10.5,-8.2) -- (\BusL,-8.2);
+\node[lbl, fill=white, inner sep=1pt] at (-2.9,-8.2) {clk\_i 27 MHz};
+% Rami colonna SINISTRA (clkout 40.5 MHz).
+\draw[clk] (\BusL,12.0) -- (mem.east);
+\node[lbl, fill=white, inner sep=1pt] at (-2.9,12.0) {clkout 40.5 MHz};
+\draw[clk] (\BusL,10.5) -| ([xshift=6mm]L1.north);
+\node[lbl, fill=white, inner sep=1pt] at (-2.9,10.5) {clkout 40.5 MHz};
+\draw[clk] (\BusL,3.3) -- (L2.east |- 0,3.3);
+\node[lbl, fill=white, inner sep=1pt] at (-2.9,3.3) {clkout 40.5 MHz};
+\draw[clk] (\BusL,2.0) -- (L3.east);
+\node[lbl, fill=white, inner sep=1pt] at (-2.9,2.0) {clkout 40.5 MHz};
+\draw[clk] (\BusL,0.75) -- (fetchN.east);
+\node[lbl, fill=white, inner sep=1pt] at (-2.9,0.75) {clkout 40.5 MHz};
+\draw[clk] (\BusL,-1.7) -| ([xshift=19mm]s0box.south);
+\node[lbl, fill=white, inner sep=1pt] at (-2.9,-1.7) {clkout 40.5 MHz};
+\draw[clk] (\BusL,-3.9) -| ([xshift=6mm]L4.south);
+\node[lbl, fill=white, inner sep=1pt] at (-2.9,-3.9) {clkout 40.5 MHz};
+\draw[clk] (\BusL,-4.95) -| ([xshift=6mm]disp.north);
+\node[lbl, fill=white, inner sep=1pt] at (-2.9,-4.95) {clkout 40.5 MHz};
+% Ramo per il die SDRAM (clkoutp): esce dalla dorsale in alto e scende al die.
+\draw[clk] (\BusL,13.4) -| (die.north);
+\node[lbl, fill=white, inner sep=1pt] at (-5.6,13.4) {clkoutp $+1.54$ ns};
+% Rami colonna DESTRA: clkout per S7/S6/S1/S2, clk_i 27 MHz per LED e GPIO.
+\draw[clk] (\BusR,11.8) -| ([xshift=-6mm]R0.south);
+\node[lbl, fill=white, inner sep=1pt] at (3.0,11.8) {clkout 40.5 MHz};
+\draw[clk] (\BusR,8.05) -| ([xshift=-6mm]R1.south);
+\node[lbl, fill=white, inner sep=1pt] at (3.0,8.05) {clkout 40.5 MHz};
+\draw[clk] (\BusR,4.0) -| ([xshift=-6mm]R2.south);
+\node[lbl, fill=white, inner sep=1pt] at (3.0,4.0) {clkout 40.5 MHz};
+\draw[clk] (\BusR,0.0) -| ([xshift=-6mm]R3.south);
+\node[lbl, fill=white, inner sep=1pt] at (3.0,0.0) {clkout 40.5 MHz};
+\draw[clk] (\BusR,-3.95) -| ([xshift=-6mm]R4.south);
+\node[lbl, fill=white, inner sep=1pt] at (3.0,-3.95) {clk\_i 27 MHz};
+\draw[clk] (\BusR,-5.45) -| ([xshift=-6mm]R5.north);
+\node[lbl, fill=white, inner sep=1pt] at (3.0,-5.45) {clk\_i 27 MHz};
+
+
+% ==============================================================================
 % BOUNDING BOX DEL SOC (Ora sagomato sui blocchi interni)
 % ==============================================================================
 \begin{scope}[on background layer]
 % Il rettangolo usa i nodi più esterni INTERNI per fittare, escludendo die e pin
-\node[draw, line width=1.2pt, fit=(mem)(L2)(L4)(preL4)(pll)(R0)(preR0)(R1)(preR1)(R5)(preR4), inner sep=20pt, rounded corners=3pt] (socbox){};
+\node[draw, line width=1.2pt, fit=(mem)(L2)(L4)(preL4)(disp)(pll)(R0)(preR0)(R1)(preR1)(R5)(preR4), inner sep=20pt, rounded corners=3pt] (socbox){};
 \end{scope}
 \node[anchor=south east, font=\bfseries\large] at (socbox.south east) {SoC\ \ };
 
 \end{tikzpicture}%
 }
-\caption{SoC top level (black and white). Each block reaches the central 32 bit Wishbone bus with three thick arrows: \emph{data} is bidirectional, while \emph{control} and \emph{address} arrows point toward the bus for the two masters (PicoRV32, audio accelerator) and toward the block for the slaves, indicating signal direction. The audio accelerator is both a master (M1, to read the ADC) and a slave (S5, for its control registers), so it reaches the bus with \emph{two} sets of arrows: the M1 set drawn in the master direction and the S5 set drawn in the slave direction, like every other slave. Inside it the real modules of \texttt{dma.vhd} are drawn: the capture FSM (\texttt{dma\_proc}, the M1 master) filling the ping-pong sample BSRAM, and the drain FSM (\texttt{fft\_proc}) feeding the Gowin FFT core and collecting into the result BSRAM. Its spectrum \emph{drain} does not cross the bus at all, it owns a dedicated write port of the SDRAM controller, which is why the solid drain arrow enters the \emph{SIP} block directly. The SDRAM port is drawn as its real pieces: the SDRC\_HS SIP (the controller that speaks to the die and owns the write port), the \emph{fetch FSM} (\texttt{tst\_} in the RTL), and the two things the bus actually sees as slave S0, the BSRAM snapshot and the \texttt{fill\_cnt} frame counter. The dashed arrow is the frame done IRQ: in hardware it starts the fetch FSM, which reads the new spectrum back through the SIP, fills the BSRAM and finally bumps \texttt{fill\_cnt}; the same line also reaches the PicoRV32 as \texttt{irq[20]}, but the firmware ignores it and polls \texttt{fill\_cnt} over the bus instead (Section~\ref{sec:sdram}). The thin dashed nets are the clocks, one wire per clock: \texttt{clkout} (40.5\,MHz) from the rPLL feeds both columns, \texttt{clkoutp} ($+1.54$\,ns) goes only to the SDRAM die, and the raw 27\,MHz crystal, tapped before the PLL, feeds the LED PWM and the GPIO. ITCM and DTCM are CPU local block RAM, not on the Wishbone. The character UART generic slave S6 (\texttt{0x2}) reaches the ESP32 on pins 17 and 18 and carries the protocol characters plus the \texttt{\$} diagnostic lines; the pin is driven by this UART alone (the legacy boot banner and hardware decoder drivers are detached). The \textbf{NOR flash controller} (\texttt{flash\_ctrl}) is a self contained hardware block, \emph{not} on the Wishbone bus and with no CPU in the loop: its UART side talks to the ESP32 on pins 72 and 20 (storage commands), and its SPI side drives the W25Q chip on pins 42, 41, 51, 48. The two \texttt{flash\_ctrl} boxes (top right, lower left) are the \emph{same} block drawn at its two pin groups. Every external connection carries its real FPGA pin number from the constraints file.}
+\caption{SoC top level (black and white). Each block reaches the central 32 bit Wishbone bus with three thick arrows: \emph{data} is bidirectional, while \emph{control} and \emph{address} arrows point toward the bus for the two masters (PicoRV32, audio accelerator) and toward the block for the slaves, indicating signal direction. The audio accelerator is both a master (M1, to read the ADC) and a slave (S5, for its control registers), so it reaches the bus with \emph{two} sets of arrows: the M1 set drawn in the master direction and the S5 set drawn in the slave direction, like every other slave. Inside it the real modules of \texttt{dma.vhd} are drawn: \texttt{dma\_proc} (the M1 master) filling the sample BSRAM, \texttt{fft\_proc} feeding the FFT core and collecting into the result BSRAM. Its spectrum \emph{drain} does not cross the bus at all, it owns a dedicated write port of the SDRAM controller, which is why the solid drain arrow enters the \emph{SIP} block directly. The SDRAM port is drawn as its real pieces: the SDRC\_HS SIP (the controller that speaks to the die and owns the write port), the \emph{fetch FSM} (\texttt{tst\_} in the RTL), and the two things the bus actually sees as slave S0, the BSRAM snapshot and the \texttt{fill\_cnt} frame counter. The dashed arrow is the frame done IRQ: in hardware it starts the fetch FSM, which reads the new spectrum back through the SIP, fills the BSRAM and finally bumps \texttt{fill\_cnt}; the same line also reaches the PicoRV32 as \texttt{irq[20]}, but the firmware ignores it and polls \texttt{fill\_cnt} over the bus instead (Section~\ref{sec:sdram}). The thin dashed nets are the clocks, drawn as a distribution tree rooted in the bus column to keep the routing readable: at the bottom the rPLL injects \texttt{clkout} (40.5\,MHz) and \texttt{clkoutp} ($+1.54$\,ns) into the spine, and the raw 27\,MHz crystal, tapped before the PLL (the dot on the \texttt{clk\_i} wire), enters next to it; each block then receives its own labelled branch, \texttt{clkout} for all the SoC logic, \texttt{clk\_i} (27\,MHz) for the LED PWM and the GPIO, and \texttt{clkoutp} only for the SDRAM die, leaving the SoC at the top left. These dashed branches are clock routing only, not Wishbone connections. ITCM and DTCM are CPU local block RAM, not on the Wishbone. The character UART generic slave S6 (\texttt{0x2}) reaches the ESP32 on pins 17 and 18 and carries the protocol characters plus the \texttt{\$} diagnostic lines; the pin is driven by this UART alone (the legacy boot banner and hardware decoder drivers are detached). The \textbf{NOR flash} path now runs through the CPU: the storage commands from the ESP32 land on the S7 UART (pins 72/20, top right), the firmware executes the W25Q sequences on the S8 generic SPI engine (pins 42, 41, 51, 48, left), and the old \texttt{flash\_ctrl} hardware block is retired (Section~\ref{sec:flashctrl}). The \textbf{SPI display} slave S9 (\texttt{spi\_display.vhd}) drives the ST7789 TFT on the five pins freed by the old debug LEDs plus pin 52, through its fixed $\div6$ prescaler (6.75\,MHz) drawn below the block like every other peripheral divider (Section~\ref{sec:display}). Every external connection carries its real FPGA pin number from the constraints file.}
 \label{fig:soc}
 \end{figure}
 
@@ -513,9 +562,10 @@ top level block diagram.
 \subsection{The on chip bus and the address map}
 
 The interconnect (\texttt{wb\_interconnect.vhd}) is a shared bus crossbar with
-\textbf{two masters and nine slave ports}, of which seven are live today (the two
-spare ports, S7 and S8, are tied off and reserved for the planned CPU driven
-flash path, Section~\ref{sec:flashctrl}). The two masters are the PicoRV32 CPU
+\textbf{two masters and ten slaves}, all live: the two ports that earlier
+revisions kept reserved for the flash migration (S7, S8) now carry it
+(Section~\ref{sec:flashctrl}), and a tenth port (S9) was added for the TFT
+display (Section~\ref{sec:display}). The two masters are the PicoRV32 CPU
 (port M0) and the audio accelerator (port M1). When both request the bus in the
 same cycle, M1 wins: the accelerator is sample rate bound and must not be
 stalled, while the CPU can wait a cycle. The slave that answers a transaction is
@@ -527,21 +577,19 @@ as \emph{internal} (its ITCM, DTCM and native UART): an external read there neve
 completes, it just stalls the core. The SDRAM slave therefore lives at
 \texttt{0x4800\_0000} (\texttt{addr[31:29]=010}) and not at \texttt{0x1000\_0000};
 since that base falls on a half nibble, with bit 27 set, the decoder needs the
-fifth bit to tell it apart from the ADC SPI at \texttt{0x4000\_0000}. The NOR flash
-is \textbf{not on this bus at all}: it is a self contained hardware block
-(\texttt{flash\_ctrl}) that receives storage commands from the ESP32 on its own UART
-(pins 72 and 20) and drives the W25Q over its own SPI (pins 42, 41, 51, 48), with no
-CPU in the loop, exactly as it worked before the soft core was added.
-Table~\ref{tab:addrmap} is the real map from the RTL.
+fifth bit to tell it apart from the ADC SPI at \texttt{0x4000\_0000}. The NOR
+flash reaches the bus through two slaves with the CPU in between: S7 is the UART
+that receives the storage commands from the ESP32 (pins 72 and 20), S8 is the
+SPI engine that drives the W25Q (pins 42, 41, 51, 48); the firmware turns one
+into the other (Section~\ref{sec:flashctrl}). Table~\ref{tab:addrmap} is the
+real map from the RTL.
 
 \begin{table}[H]
 \centering
-\caption{Address map, decoded from \texttt{addr[31:27]} (five bits). The NOR flash is
-\emph{not} on this bus: it is an independent hardware block (\texttt{flash\_ctrl}),
-so the CPU map has seven live slaves. The S7 and S8 windows exist in the decoder
-but their ports are tied off: they are the landing slots for the planned CPU
-driven flash path (a second UART for the storage commands and a generic SPI
-engine for the W25Q). SDRAM sits at \texttt{0x4800\_0000}, not in the
+\caption{Address map, decoded from \texttt{addr[31:27]} (five bits). All ten slaves
+are live; the NOR flash is reached through two of them (S7 carries the storage
+commands from the ESP32, S8 is the SPI engine that drives the chip), with the
+firmware in between. SDRAM sits at \texttt{0x4800\_0000}, not in the
 \texttt{0x0}--\texttt{0x1} range, because that range is the soft core's own
 internal space (see text).}
 \label{tab:addrmap}
@@ -551,11 +599,12 @@ internal space (see text).}
 \midrule
 \texttt{0x4800\_0000} & \texttt{01001} & S0 & SDRAM fetch FSM + BSRAM snapshot \\
 \texttt{0x2000\_0000} & \texttt{00100} & S6 & UART generic (characters, pins 17/18) \\
-\texttt{0x2800\_0000} & \texttt{00101} & S7 & \emph{reserved} (UART, NOR commands) \\
+\texttt{0x2800\_0000} & \texttt{00101} & S7 & UART generic (NOR commands, pins 72/20) \\
 \texttt{0x3000\_0000} & \texttt{00110} & S5 & Audio accelerator control registers \\
-\texttt{0x3800\_0000} & \texttt{00111} & S8 & \emph{reserved} (SPI engine, NOR chip) \\
+\texttt{0x3800\_0000} & \texttt{00111} & S8 & SPI master generic (NOR chip W25Q) \\
 \texttt{0x4000\_0000} & \texttt{01000} & S1 & SPI master (reads the ADC) \\
 \texttt{0x5000\_0000} & \texttt{01010} & S2 & PWM 10 bit (speaker tone) \\
+\texttt{0x5800\_0000} & \texttt{01011} & S9 & SPI display (TFT ST7789) \\
 \texttt{0x6000\_0000} & \texttt{01100} & S3 & PWM 4 bit (LED) \\
 \texttt{0x7000\_0000} & \texttt{01110} & S4 & GPIO 1 bit \\
 \bottomrule
@@ -571,7 +620,7 @@ internal space (see text).}
 \node at (7.4,0.5) {register / offset inside the device};
 \node[anchor=south] at (1.4,1.05) {bits [31:27]};
 \node[anchor=south] at (7.4,1.05) {bits [26:0]};
-\node[anchor=north, font=\scriptsize] at (1.4,-0.05) {picks one of 9 slaves};
+\node[anchor=north, font=\scriptsize] at (1.4,-0.05) {picks one of 10 slaves};
 \node[anchor=north, font=\scriptsize] at (7.4,-0.05) {128\,MB window, only low bits used};
 \end{tikzpicture}
 \caption{The 32 bit address is split in two. The top five bits \texttt{addr[31:27]}
@@ -588,7 +637,7 @@ but only routes \texttt{stb} and \texttt{cyc} to the one slave selected by
 \texttt{addr[31:27]}; the read data and the \texttt{ack} are multiplexed back from
 that same slave. A peripheral therefore needs to do nothing more than raise
 \texttt{ack} for one cycle when it is addressed. The decode is purely combinational
-on five bits, and any address that matches none of the nine windows falls to a sink
+on five bits, and any address that matches none of the ten windows falls to a sink
 that returns zero with no ack.
 
 \subsection{Arbitration}
@@ -614,6 +663,41 @@ and never for long enough to matter. The heavy transfer, draining the 512
 spectrum words to SDRAM, does not cross this bus at all: the accelerator owns a
 dedicated write port on the SDRAM controller (Section~\ref{sec:sdram}), so the
 drain and the CPU never compete.
+
+\subsection{Three rules the OPEN WB taught the slaves}
+\label{sec:wbrules}
+
+The PicoRV32's external bus (Gowin calls it OPEN WB) is undocumented at the
+cycle level, and the slaves in this design went through three rounds of bench
+debugging before converging on a house style. The three rules below are now
+applied to every slave, and the newest peripherals (the NOR SPI engine and the
+display SPI) were born with them already in place.
+
+\textbf{Hold the ack while the strobe is up.} My slaves originally pulsed
+\texttt{ack} for exactly one cycle, which is legal Wishbone. The OPEN WB master
+misses that pulse often enough that a \emph{read} hangs forever (writes are
+posted, so they never noticed). The fix is to keep \texttt{ack} asserted for as
+long as \texttt{cyc \& stb} is, while still edge gating the \emph{side effects}
+of a write on the strobe's rising edge so a held strobe does not re-trigger
+them. The GPIO and the two PWMs were retrofitted this way; before the fix,
+reading them froze the CPU.
+
+\textbf{Never clear on read.} A register that self-clears when read assumes the
+read that cleared it was also delivered intact, and on this bus that is not a
+safe assumption. It bit twice: the character UART's \texttt{rx\_valid}
+(Section~\ref{sec:fetch} tells the same story for \texttt{fill\_cnt}), and the
+SPI engine's \texttt{done} flag, which a dirty STATUS read would consume,
+leaving the firmware polling for a completion that had already happened. Both
+are now non destructive: \texttt{done} stays set until the \emph{next} TXDATA
+write, and status registers can be read any number of times.
+
+\textbf{Put a FIFO behind anything that streams.} The character UART held its
+last received byte in a single register; a multi byte burst (the 16 byte NOR
+append payload is the worst case) overwrote it while the CPU was busy
+elsewhere. The receive side now has a 16 entry FIFO; the read of the data
+register pops one byte, with the popped value captured into a holding register
+on the first cycle of the access, because the master samples the data a cycle
+after the pointer has already moved.
 
 \subsection{The simple slaves: UART and GPIO register maps}
 
@@ -679,6 +763,7 @@ reach its I/O rate.
 \midrule
 SPI for NOR flash & 40.5 MHz & $\div 64$ & 633 kHz SCK, 1 bit $=1.58\,\mu$s (slow on purpose, Sec.~\ref{sec:si}) \\
 SPI for ADC       & 40.5 MHz & $\div 54$ & 750 kHz SCK; 16 SCK $=864$ cyc/sample $\to$ 46.875 kHz \\
+SPI for display   & 40.5 MHz & $\div 6$ & 6.75 MHz SCK, mode 3 (TFT ST7789) \\
 UART              & 40.5 MHz & $\div 352$ & 115{,}057 baud (115200 within 0.1\,\%) \\
 Audio accelerator & 40.5 MHz & paced by ADC & one sample per conversion, 46.875 kHz \\
 SDRAM controller  & 40.5 MHz & none & die clocked by \texttt{clkoutp} ($+1.54$ ns) \\
@@ -1437,22 +1522,36 @@ processing one symbol before the next arrives (a special warm up symbol holds th
 tone for 300\,ms instead, Section~\ref{sec:protocol}).
 
 % =====================================================================
-\section{NOR flash controller}
+\section{NOR flash storage: from hardware block to firmware driver}
 \label{sec:flashctrl}
 % =====================================================================
 
-The flash controller is the largest block by line count and the one that caused the
-most trouble on the bench. It takes high level requests from the ESP32 over a
-dedicated UART (append a 16 byte record, save the 32 byte settings, read a slot,
-clear the log) and turns each one into the right sequence of SPI commands to the
-external W25Q64 chip.
+The flash subsystem has lived two lives. It started as \texttt{flash\_ctrl.vhd},
+the largest VHDL block by line count and the one that caused the most trouble on
+the bench: a self contained hardware state machine that took high level requests
+from the ESP32 over a dedicated UART (append a 16 byte record, save the 32 byte
+settings, read a slot, clear the log) and turned each one into the right sequence
+of SPI commands to the external W25Q64 chip, with no CPU in the loop. Once the
+soft core and its bus rules (Section~\ref{sec:wbrules}) proved solid, I retired
+the hardware block and ported its state machine into firmware
+(\texttt{norflash.c}): the ESP32 still speaks the same one character opcodes, but
+they now land on a plain UART slave (S7, pins 72/20), the CPU runs the W25Q
+sequences in C, and the SPI frames go out through the generic byte engine (S8,
+pins 42/41/51/48). The protocol, the memory map and the SPI sequences below are
+unchanged between the two lives; what changed is who issues them. The VHDL
+original stays in the tree as a disabled reference, like the decoder and the
+emitter before it.
 
 \subsection{Memory layout}
 
 I use the first 12\,KB of the chip, three 4\,KB sectors (4\,KB is the natural erase
-granularity of the part). Sector 0 at \texttt{0x0000} holds the 32 byte settings
-(a \texttt{0xA5} magic byte, a 15 byte device name, a 2 byte auto presence interval,
-a 1 byte retry count, and padding). Sector 1 at \texttt{0x1000} and sector 2 at
+granularity of the part). Sector 0 at \texttt{0x0000} holds the 32 byte settings:
+a \texttt{0xA5} magic byte, a 15 byte device name, a 2 byte auto presence
+interval, a 1 byte retry count, and, added with the display, a debug flag byte,
+the three RGB theme colours (9 bytes), a view flags byte that selects what the
+TFT zones show, and a second marker byte \texttt{0x5A} that distinguishes this
+extended layout from the old one (a blob without it keeps safe defaults for the
+new fields). Sector 1 at \texttt{0x1000} and sector 2 at
 \texttt{0x2000} hold the log, 256 slots of 16 bytes each, so 512 slots together,
 managed as a ring buffer. Each 16 byte record is: 2 bytes sequence number, 1 byte
 type character (\texttt{B} boot, \texttt{R} registration, \texttt{P} presence,
@@ -1485,22 +1584,37 @@ text. Figure~\ref{fig:flash-map} draws this map.
 \node[cell, minimum width=2.0cm] (f3) at (-0.6,-1.6) {t\_sec\\4 B};
 \node[cell, minimum width=1.0cm] (f4) at (0.9,-1.6) {val\\1 B};
 \node[cell, minimum width=3.0cm] (f5) at (2.9,-1.6) {text (ASCII)\\8 B};
-% zoom: settings fields
-\node[font=\footnotesize] at (0,-3.0) {settings (sector 0, first 19 B used):};
-\node[cell, minimum width=1.2cm] (g1) at (-3.4,-3.9) {magic\\\texttt{0xA5}};
-\node[cell, minimum width=3.0cm] (g2) at (-1.3,-3.9) {device name\\15 B};
-\node[cell, minimum width=1.6cm] (g3) at (0.9,-3.9) {auto int.\\2 B};
-\node[cell, minimum width=1.2cm] (g4) at (2.5,-3.9) {retry\\1 B};
-\node[cell, minimum width=1.6cm] (g5) at (4.1,-3.9) {pad};
+% zoom: settings fields (v2: + debug, colori, view flags, marker 0x5A)
+\node[font=\footnotesize] at (0,-3.0) {settings (sector 0, first 31 B used):};
+\node[cell, minimum width=1.1cm] (g1) at (-4.6,-3.9) {magic\\\texttt{0xA5}};
+\node[cell, minimum width=2.4cm] (g2) at (-2.8,-3.9) {device name\\15 B};
+\node[cell, minimum width=1.3cm] (g3) at (-0.9,-3.9) {auto\\2 B};
+\node[cell, minimum width=1.0cm] (g4) at (0.3,-3.9) {retry\\1 B};
+\node[cell, minimum width=1.0cm] (g5) at (1.3,-3.9) {dbg\\1 B};
+\node[cell, minimum width=1.9cm] (g6) at (2.8,-3.9) {colours RGB\\$3{\times}3$ B};
+\node[cell, minimum width=1.2cm] (g7) at (4.4,-3.9) {views\\1 B};
+\node[cell, minimum width=1.1cm] (g8) at (5.6,-3.9) {v2\\\texttt{0x5A}};
 \end{tikzpicture}%
 }
 \caption{Flash memory map (low 12\,KB). Three 4\,KB sectors: sector 0 holds the 32
 byte settings, sectors 1 and 2 hold the 512 slot log ring buffer. Below, the 16 byte
-record and the settings sector are cut into their byte fields.}
+record and the settings sector are cut into their byte fields; the debug flag, the
+TFT theme colours, the view flags and the \texttt{0x5A} v2 marker are the fields
+added with the display.}
 \label{fig:flash-map}
 \end{figure}
 
-\subsection{State machine}
+\subsection{The state machine, and its firmware mirror}
+
+Figure~\ref{fig:flashctrl-fsm} is the state machine as it existed in
+\texttt{flash\_ctrl.vhd}; the firmware mirrors it almost mechanically. The boot
+chain on the top row became \texttt{nor\_init()}, the IDLE hub became the
+\texttt{nor\_poll()} call in the main loop (one non blocking peek at the S7 UART
+per pass), and each opcode handler on the bottom row became a \texttt{case} in
+its dispatch \texttt{switch}. Porting a state machine that was already debugged
+in hardware meant the firmware worked against the real chip almost immediately;
+the bugs that did appear were all in the bus plumbing, and they are the ones
+that produced the rules of Section~\ref{sec:wbrules}.
 
 \begin{figure}[H]
 \centering
@@ -1547,7 +1661,8 @@ record and the settings sector are cut into their byte fields.}
 \draw[b] (idle)-- node[al,sloped,above]{'T'}(t);
 \end{tikzpicture}%
 }
-\caption{flash\_ctrl state machine. At power up it unlocks the chip (WRSR clears the
+\caption{The storage state machine (drawn from \texttt{flash\_ctrl.vhd}; the
+firmware port keeps the same shape). At power up it unlocks the chip (WRSR clears the
 protection bits BP0..BP2 and SRP and sets QE, then a Global Block Unlock), reads the
 status register back, reports it unsolicited over the UART (\texttt{'S'} plus the SR
 byte; in practice the ESP32 boots too late to catch it and asks again with
@@ -1607,47 +1722,194 @@ erased slot, or garbage from an aborted write) counts as empty. The head becomes
 \texttt{0xFF}, which I tried first: that version stopped at any hole, even when valid
 records sat past the hole, which is exactly what a failed retry leaves behind.
 
-\subsection{Unlocking the chip and the polling timeout}
+\subsection{Unlocking the chip, strictly first}
 
-Two settings in this block came directly from bench failures, both documented with
-their numbers in Section~\ref{sec:si}. At boot the controller issues a write enable,
-a WRSR that writes \texttt{0x00} to status register 1 (clearing the block protect
-bits BP0..BP2 and the SRP bit) and \texttt{0x02} to status register 2 (setting QE,
-which on this part also disables the \texttt{/HOLD\#} and \texttt{/WP\#} pin
-functions), then a Global Block Unlock (\texttt{0x98}). The polling timeout that
-waits for WIP to clear is set to 25 million bus cycles, about 620\,ms, because a
-sector erase on this part can take up to 400\,ms and the first version timed out at
-5\,ms and silently abandoned every erase.
+The boot order is not negotiable, and the reason is a hardware one. On my board
+the \texttt{/HOLD\#} and \texttt{/WP\#} pins of the W25Q are unconnected, and a
+floating \texttt{/HOLD\#} picks up every SCK edge capacitively: the chip pauses
+itself mid frame, MISO floats, and \emph{every} read returns \texttt{0xFF},
+including the JEDEC id. So the intuitive plan, ``read the id first to check the
+chip is there'', cannot work: the very first frames at boot must be the blind
+write enable plus WRSR that sets QE$=1$ in status register 2 (QE disables the
+\texttt{/HOLD\#}/\texttt{/WP\#} pin functions on this part) and clears the
+protection bits in status register 1, then the Global Block Unlock
+(\texttt{0x98}). Only after that does the chip answer, and only then does the
+firmware read the JEDEC id to set its \emph{presence} flag (first byte
+\texttt{0xEF} $=$ Winbond). If the id is wrong the flag stays low and every
+later storage opcode fails fast with \texttt{'E'} instead of hammering timeouts.
 
-\subsection{Status, and the planned move onto the bus}
+The timeouts themselves changed nature in the port. The hardware counted
+cycles (25 million, $\approx 620$\,ms); the firmware counts \emph{time} on
+\texttt{rdcycle}, because a C loop iteration has no fixed duration: 2\,ms per
+SPI byte transfer (a transfer at 633\,kHz takes 13\,$\mu$s, so this only trips
+if the engine is dead), 700\,ms on the WIP poll (a sector erase can take
+400\,ms), 200\,ms per payload byte from the ESP32 (a truncated command aborts
+without acknowledging, and the ESP32's own retry takes over). A dead SPI or an
+absent chip therefore costs a bounded few seconds at boot, not a hang.
 
-The block described above is hardware, self contained, and is the path in use:
-the ESP32 talks to \texttt{flash\_ctrl} directly and the CPU is not in the loop.
-The next step, already scaffolded, is to move this logic into the soft core so
-that the storage protocol too becomes firmware. Three pieces exist for it: a
-generic, register driven SPI byte engine (\texttt{spi\_master\_generic.vhd},
-written and simulated but not yet instantiated), two reserved slave windows on
-the interconnect (S7 at \texttt{0x2800\_0000} for the command UART, S8 at
-\texttt{0x3800\_0000} for the SPI engine, both currently tied off), and the
-firmware driver (\texttt{norflash.c}, which re-implements the unlock / probe /
-erase before program / poll sequence against the register map below, written but
-not yet compiled in). The W25Q sequence itself would be unchanged; what changes
-is who issues it.
+\subsection{The bus side: S7 commands in, S8 frames out}
+
+The two slaves that replaced \texttt{flash\_ctrl} are deliberately dumb. S7 is a
+second instance of the same UART generic used for the characters, on the same
+FPGA pins (72/20) the hardware block used, so the ESP32 did not change a wire or
+a byte of its protocol. S8 is the generic SPI byte engine: one byte per
+transfer, chip select held by a register bit across bytes so a multi byte W25Q
+frame is just a CS assert, $n$ TXDATA writes, a CS release. Its \texttt{done}
+flag is persistent, cleared by the next TXDATA write rather than by reading
+STATUS, for the reason of Section~\ref{sec:wbrules}; and the S7 UART is the
+peripheral that motivated the 16 entry receive FIFO, because a 16 byte append
+payload arrives back to back at 115200 baud while the CPU may be mid way through
+a display chunk or a spectrum copy.
 
 \begin{table}[H]
 \centering
-\caption{Generic SPI engine register map (the planned S8 slave).}
+\caption{Generic SPI engine register map (slave S8, base \texttt{0x3800\_0000}).}
 \begin{tabular}{lll}
 \toprule
 \textbf{Offset} & \textbf{Dir} & \textbf{Function} \\
 \midrule
 \texttt{0x00} & R & RXDATA, the last received byte \\
-\texttt{0x04} & W & TXDATA, write a byte and start a full duplex transfer \\
+\texttt{0x04} & W & TXDATA, write a byte and start a full duplex transfer (clears \texttt{done}) \\
 \texttt{0x08} & W & CTRL, bit 0 = chip select (1 asserts CS low, held across bytes) \\
-\texttt{0x0C} & R & STATUS, bit 0 = busy, bit 1 = done \\
+\texttt{0x0C} & R & STATUS, bit 0 = busy, bit 1 = done (non destructive read) \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+One behavioural addition came free with the port: the firmware applies the
+settings it loads. At boot, and again on every \texttt{S} save, it parses the 32
+byte blob and immediately adopts the debug flag (which gates all the \texttt{\$}
+diagnostic traffic, so verbosity is now a dashboard switch instead of a
+recompile), the TFT theme colours and the view flags; a settings epoch counter
+ticks on every apply, and the display manager redraws when it sees it change
+(Section~\ref{sec:display}). The boot also prints a one line summary on the
+diagnostic channel (\texttt{\$NOR ok id=EF hd=... lk=0}), which replaced a whole
+debugging session's worth of guessing about the state of the chip.
+
+% =====================================================================
+\section{The TFT display: a fourth SPI and a mini dashboard}
+\label{sec:display}
+% =====================================================================
+
+Until this point the only way to see what the master was doing was the UART
+console or the web dashboard, both of which need a laptop. The last addition is
+a 2 inch IPS panel (a GMT020-02-7P, ST7789 controller, $240\times320$) wired
+straight to the FPGA, on which the soft core draws its own mini dashboard. The
+five wires it needs came at zero cost: four are the pins that used to drive the
+debug LEDs (49, 53, 71, 86), which had been idle since the resistorless LED
+purge of Section~\ref{sec:si}, plus the free pin 52 for chip select.
+
+\subsection{The \texttt{spi\_display} slave}
+
+The panel is driven by a fourth SPI master, and it is the simplest of the four
+because the ST7789 in this wiring never talks back: \texttt{spi\_display.vhd}
+is transmit only (no MISO pin at all). It runs SPI mode 3, which is what the
+panel expects: SCK idles \emph{high}, the data line changes on the falling edge
+and the panel samples it on the rising edge, MSB first. The prescaler is
+$\div6$, so SCK is $40.5/6 = 6.75$\,MHz, by far the fastest SPI in the design;
+it can afford to be, because the panel sits centimetres from the FPGA on its
+own wires, with none of the shared ground drama that capped the NOR at
+633\,kHz. The three panel control pins are register bits: DC (the ST7789
+command/data select), RST (the panel reset) and CS. Being the newest slave, it
+was written with the Section~\ref{sec:wbrules} rules from the first line: ack
+held while the strobe is up, and a busy flag whose read is non destructive.
+
+\begin{table}[H]
+\centering
+\caption{\texttt{spi\_display} register map (slave S9, base \texttt{0x5800\_0000}).}
+\begin{tabular}{lll}
+\toprule
+\textbf{Offset} & \textbf{Dir} & \textbf{Function} \\
+\midrule
+\texttt{0x00} & W & TXDATA: write a byte and start the shift (ignored while busy) \\
+\texttt{0x04} & W & CTRL: bit 0 = DC (0 command, 1 data), bit 1 = RST pin, bit 2 = CS assert \\
+\texttt{0x08} & R & STATUS: bit 0 = busy (non destructive read) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    every node/.style={font=\footnotesize},
+    st/.style={rounded rectangle, draw, line width=0.6pt, fill=white, minimum width=2.0cm, minimum height=0.8cm, align=center, inner sep=3pt},
+    a/.style={-{Stealth}, line width=0.6pt},
+    al/.style={font=\scriptsize, fill=white, inner sep=1pt}
+]
+\node[st] (idle) at (0,0)   {IDLE\\ \tiny SCK high};
+\node[st] (lo)   at (4.2,0) {DRIVE\\ \tiny SCK low, bit on SDA};
+\node[st] (hi)   at (8.4,0) {SAMPLE\\ \tiny SCK high, panel reads};
+\draw[a] (idle) -- node[al,above]{TXDATA write} (lo);
+\draw[a] (lo) -- node[al,above]{$\div6$ half period} (hi);
+\draw[a] (hi.south) to[bend left=25] node[al,below]{bit $<7$: shift, next bit} (lo.south);
+\draw[a] (hi.north) to[bend right=20] node[al,above]{bit $=7$: done} (idle.north);
+\end{tikzpicture}
+\caption{The \texttt{spi\_display} shifter. A TXDATA write loads the byte and
+pulls SCK low with the MSB already on SDA; each bit then spends half a $\div6$
+period low (data driven) and half high (panel samples, mode 3); after the
+eighth bit SCK parks high, which \emph{is} the mode 3 idle, so byte boundaries
+need no extra states.}
+\label{fig:disp-fsm}
+\end{figure}
+
+\subsection{Bring up: the ST7789 init sequence}
+
+After releasing the panel reset (RST low 20\,ms, then high, then 150\,ms of
+patience), the firmware sends the seven command init that the datasheet
+prescribes, each with its mandated delay: SWRESET (150\,ms), SLPOUT (120\,ms),
+COLMOD $=$ \texttt{0x55} (16 bit RGB565 pixels), MADCTL $=$ \texttt{0x60}
+(landscape, so the $240\times320$ panel becomes $320\times240$), INVON (this
+IPS panel wants inverted polarity, without it colours come out negative), NORON
+and DISPON. From then on drawing is just three commands: CASET and RASET to
+declare a rectangular window, RAMWR followed by $w\times h$ RGB565 pixels.
+
+\subsection{\texttt{display\_manager}: drawing without blocking}
+
+A full screen is $320\times240\times2 = 153{,}600$ bytes, which at 6.75\,MHz is
+$\approx180$\,ms of solid pushing. The main loop cannot disappear for 180\,ms:
+the tone player would stutter and, worse, the S7 FIFO would overflow mid
+append. So the display manager never draws synchronously. Drawing requests
+become \emph{jobs} (fill this rectangle, write this text) in a 48 entry queue,
+and each \texttt{display\_tick()} call executes at most one small chunk of the
+current job: 64 pixels of a fill, or one glyph of a text (a $5\times7$ font,
+scaled in integer steps). A chunk is 128 to 384 SPI bytes, $150$--$450\,\mu$s,
+which is invisible next to the 10.9\,ms audio frame; the screen simply
+assembles itself over a few dozen loop passes.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.022, every node/.style={font=\scriptsize}]
+\draw[line width=1.0pt] (0,0) rectangle (320,240);
+\draw[line width=0.7pt] (96,0) -- (96,240);
+\draw[line width=0.7pt] (224,0) -- (224,240);
+\draw[line width=0.7pt] (96,120) -- (224,120);
+\node[align=center] at (48,120) {\textbf{zone 0}\\SLAVES\\\emph{or} TX PKT};
+\node[align=center] at (160,180) {\textbf{zone 1}\\spectrum\\\emph{or} PEAKS};
+\node[align=center] at (160,60) {\textbf{zone 2}\\LOGS};
+\node[align=center] at (272,120) {\textbf{zone 3}\\RX PKT\\\emph{or} IRQ count};
+\node[anchor=south west, font=\tiny] at (2,242) {$320\times240$ landscape, RGB565};
+\end{tikzpicture}
+\caption{The four fixed zones of the on screen dashboard. What each zone shows
+is chosen by the view flags byte of the NOR settings (each zone has a priority
+list, first enabled flag wins), and the three theme colours come from the same
+settings, so the dashboard restyles the TFT remotely; a save bumps the settings
+epoch and the display redraws from scratch.}
+\label{fig:disp-zones}
+\end{figure}
+
+The zone contents are all data the firmware already had. SLAVES renders the
+health mask of Section~\ref{sec:firmware} as a green/red OK/KO list, one row
+per bus slave plus the NOR presence flag. The spectrum view draws one bar per
+FFT bin in the band the decoder cares about (bins 16 to 55), straight out of
+the same \texttt{g\_sdram[]} snapshot the decoder reads, with the protocol bins
+in the accent colour, so the panel shows the tones arriving in real time; PEAKS
+is its numeric twin (the two strongest bins with their frequency and the symbol
+they would decode to). RX and TX show the last decoded character and counters
+from the emitter; IRQ shows the accelerator frame counter; LOGS is a six line
+ring of short firmware events (NOR appends, clears, settings saves). Beyond the
+init delays, the manager is a flat round robin: one zone's content is marked
+dirty every 1.5\,s and redrawn in chunks, and a settings epoch change marks
+everything dirty at once.
 
 % =====================================================================
 \section{Signal integrity and decoupling}
@@ -1745,7 +2007,7 @@ to 1\,k$\Omega$) on an LED driven from a logic pin.
 \label{sec:firmware}
 % =====================================================================
 
-The firmware on the PicoRV32 is small on purpose: five C files and a startup
+The firmware on the PicoRV32 is still compact: seven C files and a startup
 assembly file, compiled with the RISC-V GCC toolchain for \texttt{rv32imc} at
 \texttt{-O1}. The linker script places code and constants in the 32\,KB ITCM at
 \texttt{0x0200\_0000} and data, BSS and stack in the 16\,KB DTCM at
@@ -1760,9 +2022,17 @@ garbage; the flat format is the one that works.)
 The structure is a single main loop with no operating system and, deliberately, no
 interrupts (Section~\ref{sec:fetch}): each pass calls the transmit side
 (\texttt{emit\_capture}, \texttt{emit\_player\_tick}), the receive side
-(\texttt{decode\_step}), and, when a debug flag is set, the diagnostic dumps. Every
-function is non blocking, so each loop pass is short and every flag gets polled
-within microseconds.
+(\texttt{decode\_step}), the NOR command dispatcher (\texttt{nor\_poll},
+Section~\ref{sec:flashctrl}), the bus health scan (\texttt{health\_tick}, below),
+the display renderer (\texttt{display\_tick}, Section~\ref{sec:display}) and,
+when the debug flag is set, the diagnostic dumps. Every function is non
+blocking, so each loop pass is short and every flag gets polled within
+microseconds; the two costliest passes, a 512 word spectrum copy and a display
+chunk, are each a few hundred microseconds and cannot happen back to back often
+enough to matter. The debug flag itself is no longer a compile time constant:
+it is bit \texttt{b[19]} of the NOR settings, loaded at boot and re-applied
+live on every save, so verbosity is toggled from the web dashboard without
+touching the toolchain.
 
 \subsection{Transmit: from UART character to tone pair}
 
@@ -1801,19 +2071,46 @@ the full decode, a dedicated check on bin 27 alone (the slave carrier) refreshes
 the channel busy timestamp, so carrier sense works even when no complete symbol
 is recognisable.
 
+\subsection{The health scan}
+
+With ten slaves on the bus, ``the system stopped working'' has ten boring
+explanations before any interesting one, so the firmware checks them itself.
+Every 15 seconds \texttt{health\_tick} reads one \emph{safe} register from each
+slave, applies a sanity check to the value (the fetch FSM status must show a
+legal burst and index, a PWM data read must return its wired zero, a UART
+status must have its reserved bits at zero), and assembles a bit mask, S0
+through S8. Two slaves need indirection: the ADC SPI (S1) is never read
+directly, because its data register only acks when a sample is ready and the
+accelerator, which outranks the CPU, consumes every sample, so its health is
+inferred from the accelerator's sample counter advancing; and the FFT chain is
+judged the same way from the frame counter. The mask is OR-ed with the previous
+scan before reporting, so a single dirty read cannot flag a healthy slave, and
+the result goes out on the diagnostic channel as a \texttt{\$HLT} line that the
+ESP32 forwards to the dashboard, which renders the per slave OK/KO lights; the
+same mask feeds the SLAVES zone of the TFT. The failure mode is deliberately
+informative: if a slave stops acking, the CPU hangs on that read, the
+\texttt{\$HLT} heartbeat disappears, and the dashboard marks the system as
+lost, while the first scan after boot prints a probe marker before each first
+touch (\texttt{\$HP s2}, \texttt{\$HP s3}, \dots), so the last marker printed
+names the slave that killed the CPU. That trick found the GPIO ack bug of
+Section~\ref{sec:wbrules} in minutes.
+
 \subsection{The diagnostic channel}
 
 Printable diagnostics share the one character UART with the protocol traffic, so
 they are framed: every diagnostic line starts with \texttt{\$} and ends with a
 newline, and the ESP32 forwards anything between those two verbatim to the USB
-console instead of feeding it to the protocol parser. Behind a compile time flag
-the firmware emits, on this channel, a once per second system line (loop count,
-queue depth, the three hardware counters of Table~\ref{tab:s0map}), a per decode
-line with the magnitudes of the five protocol bins, and every three seconds a
-dump of all 512 bins from the snapshot. That last dump is how I distinguished
-``the FFT is not running'' from ``the FFT runs but the CPU reads garbage'' more
-than once; with the flag off, the channel carries nothing and the protocol has
-the UART to itself.
+console instead of feeding it to the protocol parser. Behind the settings debug
+flag the firmware emits, on this channel, a once per second system line (loop
+count, queue depth, the three hardware counters of Table~\ref{tab:s0map}), a per
+decode line with the magnitudes of the five protocol bins, and every three
+seconds a dump of all 512 bins from the snapshot. That last dump is how I
+distinguished ``the FFT is not running'' from ``the FFT runs but the CPU reads
+garbage'' more than once. Two lines ignore the flag because they are cheap and
+load bearing: the one shot \texttt{\$NOR} boot summary and the 15 second
+\texttt{\$HLT} heartbeat, which the ESP32 always forwards to the dashboard but
+echoes on the USB console only when debug is on, so a quiet console stays
+quiet.
 
 % =====================================================================
 \section{ESP32 firmware}
@@ -1822,7 +2119,9 @@ the UART to itself.
 The ESP32 firmware is split into small modules. \texttt{uart\_reg} is a register
 level driver for the ESP32 UART1 and UART2 peripherals, with no Arduino
 HardwareSerial layer: UART2 (ESP32 pins 27/14) is the character link to the FPGA's
-S6 UART, UART1 (pins 32/33) is the storage command link to \texttt{flash\_ctrl}.
+S6 UART, UART1 (pins 32/33) is the storage command link, which now lands on the
+FPGA's S7 UART and is served by the soft core (the ESP32 never noticed the
+hardware block behind it being swapped for firmware).
 \texttt{flash\_link} performs the high level flash operations
 against the FPGA controller, with retry and verify and a 60 record RAM cache for the
 dashboard. \texttt{fpga\_uart\_link} is the codebook layer that turns decoded
@@ -1865,6 +2164,15 @@ returning: the magic byte must be \texttt{0xA5}, the retry count must be between
 and 30, and the name must be printable ASCII; if any check fails it returns safe
 defaults, so the dashboard never shows a garbled name or an absurd count even when
 the NOR has a half written sector.
+
+The settings blob grew with the display: alongside name, auto presence interval
+and retry count, the dashboard now edits the debug flag, the three TFT theme
+colours (sent to the browser as hex strings, stored as raw RGB bytes) and the
+view flags that choose what the TFT zones show. The ESP32 is a pure courier for
+these fields, it stores and forwards them without interpreting anything except
+the debug flag, which it also applies to itself: the \texttt{\$HLT} health lines
+from the FPGA always reach the dashboard, but they are echoed on the USB console
+only when debug is on.
 
 % =====================================================================
 \section{The acoustic protocol}
@@ -2044,7 +2352,10 @@ interrupt is wired to the core and the ISR plumbing exists, but polling won on
 simplicity and the IRQ now only triggers hardware. The tone emitter and the tone
 decoder both started as RTL state machines and were both ported to firmware once
 the soft core was up; the RTL versions are still in the tree, disabled, as
-references. Driving the UART pin to the ESP32 through a three way AND of banner,
+references. The flash controller followed the same path last: once the bus rules
+of Section~\ref{sec:wbrules} held, \texttt{flash\_ctrl} was retired and its
+state machine re-emerged as \texttt{norflash.c}, behind the same ESP32 protocol.
+Driving the UART pin to the ESP32 through a three way AND of banner,
 hardware decoder and CPU UART broke the line in subtle ways, so the pin now
 belongs to the CPU's UART alone. The
 $\pm 1$ decoder neighbourhood was too strict and was widened to $\pm 3$. The plain
@@ -2059,11 +2370,13 @@ what I had on hand. And the very first status register read after power up somet
 returns \texttt{0xFF} before the chip is ready, which makes the firmware print a
 false "chip locked" warning that clears on the next read.
 
-The next step is already scaffolded but not wired: moving the flash protocol from
-the \texttt{flash\_ctrl} hardware block into the soft core, through the two
-reserved bus windows S7/S8, the generic SPI engine, and the firmware driver that
-already exists for them (Section~\ref{sec:flashctrl}). And one cosmetic debt: the
-fetch FSM still carries its bring up name \texttt{tst\_} in the RTL.
+The migration that closed the loop is done: the flash protocol lives in the soft
+core (S7 in, S8 out, Section~\ref{sec:flashctrl}), and the freed debug pins now
+drive a TFT that shows the system state without a laptop
+(Section~\ref{sec:display}). What remains is cleanup debt: the fetch FSM still
+carries its bring up name \texttt{tst\_} in the RTL, and the retired blocks
+(\texttt{flash\_ctrl}, the hardware decoder and emitter) still sit in the
+project file as disabled references waiting to be dropped.
 
 % =====================================================================
 \section{Conclusions}
@@ -2071,7 +2384,8 @@ fetch FSM still carries its bring up name \texttt{tst\_} in the RTL.
 
 The master node is a working integration of a custom SoC on the Gowin GW2AR-18, an
 acoustic receive pipeline from analog microphone through a 12 bit ADC, a 512 point
-FFT and a tone decoder, a NOR flash store driven over SPI, and an ESP32 that runs my
+FFT and a tone decoder, a NOR flash store whose protocol runs in the soft core, a
+TFT dashboard drawn by the same core, and an ESP32 that runs my
 AUSP protocol on top and bridges it to a web dashboard. The single most useful
 lesson was that for the mixed signal parts the datasheet number is where the problem
 starts, not where it ends: the simple relation $\Delta V = I\,t/C$ explained a
@@ -2097,14 +2411,16 @@ Tone bins & 22, 27, 32, 39, 50 (2014 / 2472 / 2930 / 3571 / 4577 Hz) \\
 Spectrum snapshot & BSRAM at S0 \texttt{0x4800\_1000}; poll \texttt{fill\_cnt} at \texttt{0x90} \\
 Tone pacing & 144 ms tone + 400 ms silence; warm up EOF 300 ms \\
 PWM carrier & speaker 158.2 kHz (40.5 MHz / 256); LED 105.5 kHz (27 MHz / 256) \\
-NOR SPI clock & 633 kHz (divide by 64) \\
+NOR SPI clock & 633 kHz (divide by 64), via slave S8 \\
 ADC SPI clock & 750 kHz (divide by 54) \\
-UART baud & 115200 (divide by 352) \\
+Display SPI clock & 6.75 MHz (divide by 6, mode 3, TX only) \\
+UART baud & 115200 (divide by 352); RX FIFO 16 deep \\
 W25Q64 JEDEC ID & EF 40 17 \\
 Sector erase / page program & up to 400 ms / up to 3 ms \\
-Flash poll timeout & 25e6 cycles ($\approx$ 620 ms) \\
+Flash timeouts (firmware) & 2 ms / byte, 700 ms WIP poll, 200 ms / payload byte \\
 Decoupling at the flash & 1 $\mu$F + 10 $\mu$F \\
-Log record / settings & 16 B / 32 B, 512 ring slots \\
+Log record / settings & 16 B / 32 B v2 (marker \texttt{0x5A}), 512 ring slots \\
+Health heartbeat & \texttt{\$HLT} every 15 s; TFT zone refresh every 1.5 s \\
 Protocol retries & presence: every 8 s, 6 tries (configurable); SET: 30--40 s \\
 Carrier sense & soft core: 3 s hold; ESP32: 1 s quiet per byte, 15 s cap \\
 \bottomrule

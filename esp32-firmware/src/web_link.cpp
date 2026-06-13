@@ -10,6 +10,7 @@
 #include "web_link.h"
 #include "protocol.h"
 #include "flash_link.h"
+#include "fpga_uart_link.h"
 
 /* ---- configurazione (override via build_flags) ---- */
 #ifndef WIFI_SSID
@@ -67,6 +68,7 @@ static void send_settings(void) {
     if (!flash_get_settings(&s)) return;
     char cm[8], ct[8], cb[8];
     rgb_to_hex(s.col_main, cm); rgb_to_hex(s.col_text, ct); rgb_to_hex(s.col_bg, cb);
+    fpga_uart_set_diag_echo(s.debug_log != 0);   /* riallinea l'echo HLT al flag */
     JsonDocument d;
     d["t"]     = "settings";
     d["name"]  = s.name;

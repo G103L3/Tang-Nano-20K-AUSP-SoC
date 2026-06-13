@@ -167,3 +167,12 @@ static inline void gpio_set(uint32_t val) { GPIO_REG = val & 1u; }
 #define NORSPI_TXDATA   (*(volatile uint32_t*)(NORSPI_BASE + 0x04))
 #define NORSPI_CTRL     (*(volatile uint32_t*)(NORSPI_BASE + 0x08))
 #define NORSPI_STATUS   (*(volatile uint32_t*)(NORSPI_BASE + 0x0C))
+
+// --- Display TFT ST7789 (S9, 0x58000000): spi_display, SPI mode 3 ~6.75 MHz ---
+//   0x00 WR : TXDATA (byte -> trasferimento; ignorato se busy)
+//   0x04 WR : CTRL  bit0=DC (0=cmd,1=dato), bit1=RST pin (0=reset), bit2=CS (1=assert)
+//   0x08 RD : STATUS bit0=busy (lettura NON distruttiva)
+#define DISP_BASE       0x58000000u
+#define DISP_TXDATA     (*(volatile uint32_t*)(DISP_BASE + 0x00))
+#define DISP_CTRL       (*(volatile uint32_t*)(DISP_BASE + 0x04))
+#define DISP_STATUS     (*(volatile uint32_t*)(DISP_BASE + 0x08))

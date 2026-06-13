@@ -35,6 +35,10 @@ void fpga_uart_send_pattern(int first_bit, int length); /* TX */
 typedef void (*fpga_diag_cb_t)(const char *line);
 void fpga_uart_set_diag_cb(fpga_diag_cb_t cb);
 
+/* echo su USB delle righe periodiche "HLT" (default off): segue il flag
+ * debug_log dei settings. Le righe arrivano comunque al diag_cb. */
+void fpga_uart_set_diag_echo(bool on);
+
 #ifdef __cplusplus
 }
 #endif

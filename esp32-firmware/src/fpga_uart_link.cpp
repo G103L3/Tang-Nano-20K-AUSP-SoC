@@ -56,6 +56,11 @@ static unsigned long rx_last_sym_ms = 0;
 static fpga_diag_cb_t diag_cb = NULL;
 void fpga_uart_set_diag_cb(fpga_diag_cb_t cb) { diag_cb = cb; }
 
+/* echo su USB delle righe periodiche HLT: solo col flag debug dei settings.
+ * Le righe vanno COMUNQUE al diag_cb (la dashboard riceve sempre la salute). */
+static bool diag_echo_hlt = false;
+void fpga_uart_set_diag_echo(bool on) { diag_echo_hlt = on; }
+
 void fpga_uart_init(void) {
     uart_reg_init(UART_REG_FPGA, FPGA_UART_RX_PIN, FPGA_UART_TX_PIN, FPGA_UART_BAUD);
 }
@@ -89,17 +94,20 @@ void fpga_uart_tick(void) {
 
         if (dbg_mode) {
             if (c == '\n') {
-                Serial.write('\n');
                 dbg_mode = false;
                 dbg_line[dbg_len] = 0;
+                bool is_hlt = (strncmp(dbg_line, "HLT", 3) == 0);
+                if (!is_hlt || diag_echo_hlt) {
+                    Serial.print("\n[FPGA] ");
+                    Serial.println(dbg_line);
+                }
                 if (diag_cb && dbg_len > 0) diag_cb(dbg_line);
             } else if (c != '\r') {
-                Serial.write((uint8_t)c);
                 if (dbg_len < sizeof(dbg_line) - 1) dbg_line[dbg_len++] = c;
             }
             continue;
         }
-        if (c == '$') { dbg_mode = true; dbg_len = 0; Serial.print("\n[FPGA] "); continue; }
+        if (c == '$') { dbg_mode = true; dbg_len = 0; continue; }
 
         /* MAIUSCOLE A/B/C = carrier SLAVE (quello che il master riceve). */
         if (c == 'A' || c == 'B' || c == 'C') {

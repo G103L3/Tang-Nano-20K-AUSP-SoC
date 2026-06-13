@@ -13,6 +13,7 @@ use ieee.std_logic_1164.all;
 --   0x3800_0000  00111  S8  spi_master_generic (SPI verso chip NOR, pin 42/41/51/48)
 --   0x4000_0000  01000  S1  SPI Master (ADC)
 --   0x5000_0000  01010  S2  PWM 10-bit
+--   0x5800_0000  01011  S9  spi_display (TFT ST7789, pin 49/53/71/86/77)
 --   0x6000_0000  01100  S3  PWM 4-bit
 --   0x7000_0000  01110  S4  GPIO
 -- La CPU riceve i comandi storage da S7 (UART) e li esegue su S8 (SPI), come flash_ctrl.
@@ -116,7 +117,16 @@ entity wb_interconnect is
         s8_sel_o : out std_logic_vector(3 downto 0);
         s8_stb_o : out std_logic;
         s8_cyc_o : out std_logic;
-        s8_ack_i : in  std_logic
+        s8_ack_i : in  std_logic;
+        -- Slave 9 – spi_display (TFT ST7789)
+        s9_adr_o : out std_logic_vector(31 downto 0);
+        s9_dat_o : out std_logic_vector(31 downto 0);
+        s9_dat_i : in  std_logic_vector(31 downto 0);
+        s9_we_o  : out std_logic;
+        s9_sel_o : out std_logic_vector(3 downto 0);
+        s9_stb_o : out std_logic;
+        s9_cyc_o : out std_logic;
+        s9_ack_i : in  std_logic
     );
 end wb_interconnect;
 
@@ -130,16 +140,16 @@ architecture behavioral of wb_interconnect is
     signal sel_cyc : std_logic;
     signal sel_m1  : std_logic;
 
-    -- Slave index (0-8) decoded from address bits [31:27] (5 bit -> 9 slaves + sink).
-    -- 9 slave non stanno in 7 nibble (4 bit, CPU raggiunge 0x1..0x7): un bit in piu'
-    -- spezza ogni nibble in due finestre da 128 MB. Index 9 = sink non mappato.
-    signal slv_idx : integer range 0 to 9;
+    -- Slave index (0-9) decoded from address bits [31:27] (5 bit -> 10 slaves + sink).
+    -- Un bit in piu' dei 4 nibble spezza ogni nibble in due finestre da 128 MB.
+    -- Index 10 = sink non mappato.
+    signal slv_idx : integer range 0 to 10;
 
     signal slv_dat : std_logic_vector(31 downto 0);
     signal slv_ack : std_logic;
 
-    type dat_array_t is array(0 to 9) of std_logic_vector(31 downto 0);
-    type ack_array_t is array(0 to 9) of std_logic;
+    type dat_array_t is array(0 to 10) of std_logic_vector(31 downto 0);
+    type ack_array_t is array(0 to 10) of std_logic;
     signal slv_dat_arr : dat_array_t;
     signal slv_ack_arr : ack_array_t;
 
@@ -167,9 +177,10 @@ begin
             when "00111" => slv_idx <= 8;  -- 0x3800_0000  spi_master_generic (SPI NOR)
             when "01000" => slv_idx <= 1;  -- 0x4000_0000  SPI (ADC)
             when "01010" => slv_idx <= 2;  -- 0x5000_0000  PWM10
+            when "01011" => slv_idx <= 9;  -- 0x5800_0000  spi_display (TFT)
             when "01100" => slv_idx <= 3;  -- 0x6000_0000  PWM4
             when "01110" => slv_idx <= 4;  -- 0x7000_0000  GPIO
-            when others  => slv_idx <= 9;  -- non mappato -> sink
+            when others  => slv_idx <= 10; -- non mappato -> sink
         end case;
     end process;
 
@@ -183,6 +194,7 @@ begin
     s6_adr_o <= sel_adr; s6_dat_o <= sel_dat; s6_we_o <= sel_we; s6_sel_o <= sel_sel;
     s7_adr_o <= sel_adr; s7_dat_o <= sel_dat; s7_we_o <= sel_we; s7_sel_o <= sel_sel;
     s8_adr_o <= sel_adr; s8_dat_o <= sel_dat; s8_we_o <= sel_we; s8_sel_o <= sel_sel;
+    s9_adr_o <= sel_adr; s9_dat_o <= sel_dat; s9_we_o <= sel_we; s9_sel_o <= sel_sel;
 
     s0_stb_o <= sel_stb when slv_idx = 0 else '0';
     s0_cyc_o <= sel_cyc when slv_idx = 0 else '0';
@@ -202,6 +214,8 @@ begin
     s7_cyc_o <= sel_cyc when slv_idx = 7 else '0';
     s8_stb_o <= sel_stb when slv_idx = 8 else '0';
     s8_cyc_o <= sel_cyc when slv_idx = 8 else '0';
+    s9_stb_o <= sel_stb when slv_idx = 9 else '0';
+    s9_cyc_o <= sel_cyc when slv_idx = 9 else '0';
 
     -- Slave read-data/ack arrays for clean mux
     slv_dat_arr(0) <= s0_dat_i; slv_ack_arr(0) <= s0_ack_i;
@@ -213,7 +227,8 @@ begin
     slv_dat_arr(6) <= s6_dat_i; slv_ack_arr(6) <= s6_ack_i;
     slv_dat_arr(7) <= s7_dat_i; slv_ack_arr(7) <= s7_ack_i;
     slv_dat_arr(8) <= s8_dat_i; slv_ack_arr(8) <= s8_ack_i;
-    slv_dat_arr(9) <= (others => '0'); slv_ack_arr(9) <= '0';  -- sink non mappato
+    slv_dat_arr(9) <= s9_dat_i; slv_ack_arr(9) <= s9_ack_i;
+    slv_dat_arr(10) <= (others => '0'); slv_ack_arr(10) <= '0';  -- sink non mappato
 
     slv_dat <= slv_dat_arr(slv_idx);
     slv_ack <= slv_ack_arr(slv_idx);

@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "norflash.h"
 #include "emit_tone.h"
+#include "display_manager.h"
 #include "../include/periphs.h"
 
 /* ---- mappa memoria (come flash_ctrl) ---- */
@@ -29,16 +30,31 @@
 static int g_head;                     /* prossimo slot da scrivere (0..511) */
 static int g_flash_present = 0;        /* 1 se il W25Q risponde al JEDEC (id[0]=0xEF) */
 static int g_chip_locked = 0;          /* 1 se BP/SRP ancora attivi dopo l'unlock */
+static uint32_t g_log_epoch = 0;       /* cambia a ogni append/clear: il display rilegge */
 
 volatile int g_nor_debug = 0;          /* settings b[19]: gating dump diagnostici */
 
-int nor_present(void) { return g_flash_present; }
-int nor_locked(void)  { return g_chip_locked; }
-int nor_head(void)    { return g_head; }
+/* colori (b[20..28], default = tema dashboard) e view flags (b[29]) per il display */
+static uint8_t  g_cols[9] = { 0x4F, 0x9D, 0xFF,  0xE6, 0xED, 0xF3,  0x0E, 0x11, 0x16 };
+static uint8_t  g_views = 0x7F;
+static uint32_t g_set_epoch = 0;       /* incrementa a ogni apply: il display ridisegna */
+
+int nor_present(void)        { return g_flash_present; }
+int nor_locked(void)         { return g_chip_locked; }
+int nor_head(void)           { return g_head; }
+uint32_t nor_log_epoch(void) { return g_log_epoch; }
+
+const uint8_t *nor_colors(void)       { return g_cols; }
+uint8_t        nor_views(void)        { return g_views; }
+uint32_t       nor_settings_epoch(void) { return g_set_epoch; }
 
 /* applica i campi dei settings che comandano il firmware (solo blob v2 valido) */
 static void settings_apply(const uint8_t *b) {
-    if (b[0] == 0xA5u && b[30] == 0x5Au) g_nor_debug = b[19] & 1;
+    if (b[0] != 0xA5u || b[30] != 0x5Au) return;
+    g_nor_debug = b[19] & 1;
+    for (int i = 0; i < 9; i++) g_cols[i] = b[20 + i];
+    g_views = b[29] & 0x7Fu;
+    g_set_epoch++;
 }
 
 /* =================== livello SPI (spi_master_generic, S8) =================== */
@@ -177,6 +193,7 @@ void nor_init(void) {
         g_head = 0;
         uartext_puts("$NOR ko id="); diag_hh(j0);
         uartext_puts(" to="); diag_u32(g_spi_to); uartext_putchar('\n');
+        dm_log("NOR ASSENTE");
         return;
     }
 
@@ -202,6 +219,17 @@ void nor_init(void) {
     uartext_puts(" to=");  diag_u32(g_spi_to);
     uartext_puts(" dbg="); diag_u32((uint32_t)g_nor_debug);
     uartext_putchar('\n');
+    dm_log("NOR PRONTA");
+}
+
+/* legge il record 'back' posizioni dietro head (0 = piu' recente); 1 se valido.
+ * Usato dal display per mostrare la memoria persistente senza passare dall'ESP32. */
+int nor_log_get(int back, uint8_t rec[16]) {
+    if (!g_flash_present) return 0;
+    int slot = (g_head - 1 - back + 2 * N_SLOTS) % N_SLOTS;
+    read_bytes(LOG_ADDR + (uint32_t)slot * REC_LEN, rec, REC_LEN);
+    uint8_t t = rec[2];
+    return (t == 'B' || t == 'R' || t == 'P' || t == 'N' || t == 'E');
 }
 
 /* append: probe slot; se sporco o inizio settore -> erase; page program; head++ */
@@ -212,6 +240,7 @@ static void append_record(const uint8_t *rec) {
     if (b0 != 0xFF || g_head == 0 || g_head == 256) sector_erase(a);
     page_program(a, rec, REC_LEN);
     g_head = (g_head + 1) % N_SLOTS;
+    g_log_epoch++;
 }
 
 /* =================== dispatch comandi =================== */
@@ -230,6 +259,7 @@ void nor_poll(void) {
             if (!g_flash_present || g_chip_locked) { noruart_putc('E'); break; }   /* fail veloce */
             append_record(rec);
             noruart_putc('K');
+            dm_log("NOR APPEND");
             break;
         }
         case 'S': {                                  /* settings 32 B nel settore 0 */
@@ -244,6 +274,7 @@ void nor_poll(void) {
             page_program(SET_ADDR, s, SET_LEN);
             settings_apply(s);                       /* debug flag live, senza reboot */
             noruart_putc('K');
+            dm_log("NOR SETTINGS");
             break;
         }
         case 'Q': {                                  /* read settings */
@@ -273,7 +304,9 @@ void nor_poll(void) {
             sector_erase(LOG_ADDR);
             sector_erase(LOG_ADDR + 0x1000u);
             g_head = 0;
+            g_log_epoch++;
             noruart_putc('K');
+            dm_log("NOR CLEAR");
             break;
         case 'I': {                                  /* JEDEC id (3 B) */
             nor_cs(1); nor_xfer(CMD_JEDEC);

@@ -15,10 +15,11 @@ entity top_system is
         pwm_10_o     : out std_logic;
         pwm_4_o      : out std_logic;
         gpio_1_o     : out std_logic;
-        irq_led_o    : out std_logic;
-        fft_trig_led_o : out std_logic;
-        ausp_dbg_o   : out std_logic;
-        sdram_nz_o   : out std_logic;
+        disp_sck_o   : out std_logic;
+        disp_sda_o   : out std_logic;
+        disp_dc_o    : out std_logic;
+        disp_rst_o   : out std_logic;
+        disp_cs_o    : out std_logic;
         uart_ext_tx  : out std_logic;
         uart_ext_rx  : in  std_logic;
         flash_sck_o  : out std_logic;
@@ -74,7 +75,29 @@ architecture behavioral of top_system is
             s7_adr_o : out std_logic_vector(31 downto 0); s7_dat_o : out std_logic_vector(31 downto 0); s7_dat_i : in std_logic_vector(31 downto 0);
             s7_we_o  : out std_logic; s7_sel_o : out std_logic_vector(3 downto 0); s7_stb_o : out std_logic; s7_cyc_o : out std_logic; s7_ack_i : in std_logic;
             s8_adr_o : out std_logic_vector(31 downto 0); s8_dat_o : out std_logic_vector(31 downto 0); s8_dat_i : in std_logic_vector(31 downto 0);
-            s8_we_o  : out std_logic; s8_sel_o : out std_logic_vector(3 downto 0); s8_stb_o : out std_logic; s8_cyc_o : out std_logic; s8_ack_i : in std_logic
+            s8_we_o  : out std_logic; s8_sel_o : out std_logic_vector(3 downto 0); s8_stb_o : out std_logic; s8_cyc_o : out std_logic; s8_ack_i : in std_logic;
+            s9_adr_o : out std_logic_vector(31 downto 0); s9_dat_o : out std_logic_vector(31 downto 0); s9_dat_i : in std_logic_vector(31 downto 0);
+            s9_we_o  : out std_logic; s9_sel_o : out std_logic_vector(3 downto 0); s9_stb_o : out std_logic; s9_cyc_o : out std_logic; s9_ack_i : in std_logic
+        );
+    end component;
+
+    component spi_display
+        generic ( PRESCALER : natural := 6 );
+        port (
+            clk_i : in  std_logic;
+            rst_i : in  std_logic;
+            cyc_i : in  std_logic;
+            stb_i : in  std_logic;
+            we_i  : in  std_logic;
+            adr_i : in  std_logic_vector(7 downto 0);
+            dat_i : in  std_logic_vector(31 downto 0);
+            dat_o : out std_logic_vector(31 downto 0);
+            ack_o : out std_logic;
+            SCK_o : out std_logic;
+            SDA_o : out std_logic;
+            DC_o  : out std_logic;
+            RST_o : out std_logic;
+            CS_o  : out std_logic
         );
     end component;
 
@@ -338,6 +361,10 @@ architecture behavioral of top_system is
     signal s8_adr, s8_wdata, s8_rdata : std_logic_vector(31 downto 0);
     signal s8_stb, s8_we, s8_cyc, s8_ack : std_logic;
     signal s8_sel : std_logic_vector(3 downto 0);
+
+    signal s9_adr, s9_wdata, s9_rdata : std_logic_vector(31 downto 0);
+    signal s9_stb, s9_we, s9_cyc, s9_ack : std_logic;
+    signal s9_sel : std_logic_vector(3 downto 0);
 
     -- IRQ verso il PicoRV32 (bit 20 = FFT done dall'audio accelerator)
     signal core_irq : std_logic_vector(31 downto 20) := (others => '0');
@@ -662,8 +689,35 @@ begin
         s7_adr_o => s7_adr, s7_dat_o => s7_wdata, s7_dat_i => s7_rdata,
         s7_we_o  => s7_we,  s7_sel_o => s7_sel,   s7_stb_o => s7_stb,  s7_cyc_o => s7_cyc, s7_ack_i => s7_ack,
         s8_adr_o => s8_adr, s8_dat_o => s8_wdata, s8_dat_i => s8_rdata,
-        s8_we_o  => s8_we,  s8_sel_o => s8_sel,   s8_stb_o => s8_stb,  s8_cyc_o => s8_cyc, s8_ack_i => s8_ack
+        s8_we_o  => s8_we,  s8_sel_o => s8_sel,   s8_stb_o => s8_stb,  s8_cyc_o => s8_cyc, s8_ack_i => s8_ack,
+        s9_adr_o => s9_adr, s9_dat_o => s9_wdata, s9_dat_i => s9_rdata,
+        s9_we_o  => s9_we,  s9_sel_o => s9_sel,   s9_stb_o => s9_stb,  s9_cyc_o => s9_cyc, s9_ack_i => s9_ack
     );
+
+    -- Display TFT ST7789 (GMT020-02-7P) = slave S9 (0x5800_0000), SPI mode 3
+    -- ~6.75 MHz. Pin 27 SCL, 28 SDA, 29 DC, 30 RST, 31 CS: dallo schematico
+    -- Tang Nano 20K sono sull'header J6 (pos. 8/9/12/13/14) e arrivano SOLO al
+    -- connettore FPC dell'LCD RGB (vuoto) -- niente LED onboard (15-20), niente
+    -- backlight boost (49), niente EDID HDMI (52/53), niente HSPI BL616 (71-76,86).
+    -- Firmware: display_manager.c, colori dai settings in NOR.
+    u_disp: spi_display
+        generic map ( PRESCALER => 6 )
+        port map (
+            clk_i => clk_sdram,
+            rst_i => pll_lock,
+            cyc_i => s9_cyc,
+            stb_i => s9_stb,
+            we_i  => s9_we,
+            adr_i => s9_adr(7 downto 0),
+            dat_i => s9_wdata,
+            dat_o => s9_rdata,
+            ack_o => s9_ack,
+            SCK_o => disp_sck_o,
+            SDA_o => disp_sda_o,
+            DC_o  => disp_dc_o,
+            RST_o => disp_rst_o,
+            CS_o  => disp_cs_o
+        );
 
     -- ── S0 (0x1000_0000): la FSM tst_ "collegata al bus" (opzione 2) ────────────
     -- La CPU legge il buffer di burst della FSM tst_ (tst_rd_arr2, 26 parole appena
@@ -1047,9 +1101,7 @@ begin
     end generate gen_dead_a;
     -- ===== fine blocchi morti =====
 
-    irq_led_o <= pll_lock;
-    fft_trig_led_o <= wr_ack_seen_s;
-
+    -- pin 49/53/71/86 (ex LED debug) + 52 (CS) ora vanno al display TFT via u_disp.
     pwm_10_o <= pwm10_s;
     pwm_4_o  <= pwm4_s;
     -- UART verso ESP32: boot banner + nuovo char dal decoder.
@@ -1064,8 +1116,6 @@ begin
     -- alla produzione: uart_ext_tx <= boot_tx_pin and uart_char_tx_s;
     -- PRODUZIONE: pin 17 = UART caratteri (UART_GENERIC su S6, via bus).
     uart_ext_tx <= core_uart_tx;
-    ausp_dbg_o <= spi_dbg_cap;
-    sdram_nz_o <= rd_ack_seen_s;
 
     -- ===== SPOSTATO NEL FIRMWARE (emit nella CPU): RX char + FIFO + FSM toni + banner =====
     -- Tenuto come riferimento, commentato. La CPU fa RX dall'UART caratteri (S6),

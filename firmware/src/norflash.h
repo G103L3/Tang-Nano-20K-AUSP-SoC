@@ -37,4 +37,17 @@ int nor_present(void);
 int nor_locked(void);
 int nor_head(void);
 
+/* record del log persistente (16 B: seq[2] type[1] t_sec[4] val[1] text[8]):
+ * back=0 e' il piu' recente; ritorna 1 se il tipo e' valido {B,R,P,N,E}.
+ * nor_log_epoch cambia a ogni append/clear: il display rilegge solo allora. */
+int nor_log_get(int back, uint8_t rec[16]);
+uint32_t nor_log_epoch(void);
+
+/* accessori per display_manager.c: colori RGB (main/text/bg, 3 byte l'uno),
+ * view flags (bit0 wave..bit6 txpkt) ed epoch (cambia a ogni save -> ridisegno) */
+#include <stdint.h>
+const uint8_t *nor_colors(void);
+uint8_t        nor_views(void);
+uint32_t       nor_settings_epoch(void);
+
 #endif

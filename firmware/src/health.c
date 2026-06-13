@@ -14,6 +14,7 @@
 #include "health.h"
 #include "norflash.h"
 #include "emit_tone.h"
+#include "display_manager.h"
 #include "../include/periphs.h"
 
 #define S0_STATUS   (*(volatile uint32_t*)(0x48000000u + 0x80u))
@@ -26,6 +27,12 @@
 static uint32_t prev_rdy, prev_irq;
 static uint16_t prev_mask = 0;
 static int      primed = 0;
+
+static uint16_t s_mask = 0;            /* ultimo stato riportato (per il display) */
+static int      s_fft = 0, s_adc = 0;
+unsigned health_last_mask(void) { return s_mask; }
+int      health_last_fft(void)  { return s_fft; }
+int      health_last_adc(void)  { return s_adc; }
 
 /* solo al primo giro: marker prima di ogni prima-lettura di uno slave, cosi' se
  * una lettura non acka e la CPU resta appesa il monitor dice DOVE e' morta */
@@ -53,7 +60,9 @@ static void put_hex3(uint32_t v) {
 void health_tick(void) {
     static uint32_t last = 0;
     uint32_t now = rdcycle32();
-    if ((uint32_t)(now - last) < 2u * CPU_HZ) return;
+    /* prima scansione (probe + baseline) ~3 s dal boot, poi report ogni 15 s */
+    uint32_t period = primed ? 15u * CPU_HZ : 3u * CPU_HZ;
+    if ((uint32_t)(now - last) < period) return;
     last = now;
 
     uint32_t v;
@@ -86,6 +95,21 @@ void health_tick(void) {
     /* debounce: una singola lettura sporca non spegne il blocco in dashboard */
     uint16_t rep = (uint16_t)(m | prev_mask);
     prev_mask = m;
+    s_mask = rep; s_fft = fft; s_adc = (rep >> 1) & 1;
+
+    /* log sul display quando lo stato degli slave cambia (prima volta inclusa) */
+    {
+        static uint16_t logged = 0xFFFF;
+        if (rep != logged) {
+            static const char H[] = "0123456789ABCDEF";
+            char b[12];
+            b[0]='H'; b[1]='L'; b[2]='T'; b[3]=' '; b[4]='M'; b[5]='=';
+            b[6]=H[(rep >> 8) & 0xF]; b[7]=H[(rep >> 4) & 0xF]; b[8]=H[rep & 0xF];
+            b[9]=0;
+            dm_log(b);
+            logged = rep;
+        }
+    }
     if (!primed) { primed = 1; return; }             /* 1o giro: solo baseline */
 
     put_s("$HLT m=");  put_hex3(rep);

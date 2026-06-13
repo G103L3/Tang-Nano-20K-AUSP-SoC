@@ -13,6 +13,7 @@
 #include "read_sdram.h"     /* g_sdram[512], g_sdram_ready, read_sdram_collect */
 #include "norflash.h"       /* NOR W25Q dalla CPU: UART comandi S7 + SPI S8 */
 #include "health.h"         /* scan salute slave bus -> $HLT alla dashboard */
+#include "display_manager.h" /* mini-dashboard sul TFT ST7789 (S9) */
 
 #define BAUD  115200u
 
@@ -190,7 +191,11 @@ static void decode_step(void) {
         }
         char d = decode_char(g_sdram, 512);
         g_ok++;
-        if (d >= 'A' && d <= 'C') uartext_putchar(d);   /* SOLO RX dallo slave (maiuscole) */
+        if (d >= 'A' && d <= 'C') {                          /* RX dallo slave */
+            uartext_putchar(d);
+            dm_note_rx(d);
+            { char lb[5] = { 'R', 'X', ' ', d, 0 }; dm_log(lb); }
+        }
         if (g_nor_debug) dbg_decode(1, d);
         g_sdram_ready = 0;                       /* consumato -> prossima cattura */
     }
@@ -207,6 +212,7 @@ int main(void) {
     DMA_START   = 1;
 
     nor_init();            /* NOR W25Q: unlock + scan head (UART S7 + SPI S8) */
+    dm_log("BOOT OK");
 
     for (;;) {
         g_loops++;
@@ -219,6 +225,7 @@ int main(void) {
             dbg_dump512();   /* dump 512 bin ~ogni 3s */
         }
         health_tick();       /* scan salute slave + $HLT verso la dashboard */
+        display_tick();      /* mini-dashboard TFT (chunked, non bloccante) */
     }
     return 0;
 }

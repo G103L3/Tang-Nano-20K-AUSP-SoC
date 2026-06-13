@@ -9,10 +9,8 @@
 <body class="ausp-interface">
   <header class="topbar">
     <div class="brand">
-      <div>
-        <h1>AUSP Dashboard</h1>
-        <p class="subtitle">Comunicazione acustica FPGA ⇄ Slave</p>
-      </div>
+      <h1>AUSP Dashboard</h1>
+      <div class="subtitle">Comunicazione acustica FPGA ⇄ Slave</div>
     </div>
     <nav class="navbar">
       <a href="#health-sec">Salute SoC</a>
@@ -23,294 +21,505 @@
     </nav>
     <div class="conn">
       <span id="serverDot" class="dot dot--off"></span>
-      <span id="serverText">Server: …</span>
+      <span id="serverText">Server: disconnesso</span>
     </div>
   </header>
 
   <main class="main-grid">
-    <section id="health-sec" class="diagnostic-hub full-span">
+    <!-- SOCC Health Section -->
+    <section id="health-sec" class="card full-span diagnostic-hub">
       <div class="diagnostic-overlay">
         <div class="head-title">
           <h2>Salute del SoC</h2>
-          <p class="diag-sub">Monitoraggio hardware via bus <span id="socStats" class="stats"></span></p>
+          <span class="diag-sub">Monitoraggio hardware via bus</span>
         </div>
         <div class="diag-controls">
-          <div class="legend">
-            <span class="lg"><span class="dot dot--on"></span> OK</span>
-            <span class="lg"><span class="dot dot--bad"></span> KO</span>
-            <span class="lg"><span class="dot dot--off"></span> N/D</span>
-          </div>
+          <span id="socInfo" class="stats">In attesa di dati dalla FPGA…</span>
+          <span id="socStats" class="stats"></span>
         </div>
       </div>
-      <div class="diag-visualizer">
-        <div class="diag-screen">
-          <div class="svg-container">
-            <svg id="soc" class="soc" viewBox="0 0 760 340">
-              <g id="hb-esp" class="hb hb--unk">
-                <rect x="8" y="128" width="104" height="64" rx="6"/>
-                <text x="60" y="150" class="hb-name">ESP32</text>
-                <text x="60" y="170" class="hb-sub">master esterni</text>
-              </g>
-              <line class="lnk" x1="112" y1="144" x2="130" y2="144"/>
-              <text x="121" y="136" class="lnk-lbl">UART 17/18</text>
-              <line class="lnk" x1="112" y1="178" x2="130" y2="178"/>
-              <text x="121" y="196" class="lnk-lbl">UART 72/20</text>
-              <rect class="fpga-frame" x="130" y="10" width="560" height="320" rx="10"/>
-              <text x="148" y="32" class="frame-lbl">FPGA GW2AR-18 · ARCHITETTURA SoC</text>
-              <g id="hb-cpu" class="hb hb--unk">
-                <rect x="170" y="48" width="180" height="58" rx="8"/>
-                <text x="260" y="70" class="hb-name">CPU PicoRV32</text>
-                <text x="260" y="88" class="hb-sub">master M0</text>
-              </g>
-              <g id="hb-m1" class="hb hb--unk">
-                <rect x="390" y="48" width="150" height="58" rx="8"/>
-                <text x="465" y="70" class="hb-name">DMA · FFT</text>
-                <text x="465" y="88" class="hb-sub">master M1</text>
-              </g>
-              <line class="lnk" x1="260" y1="106" x2="260" y2="152"/>
-              <line class="lnk" x1="465" y1="106" x2="465" y2="152"/>
-              <g id="hb-bus" class="hb hb--unk">
-                <rect class="busbar" x="160" y="152" width="510" height="18" rx="5"/>
-                <text x="415" y="165" class="hb-sub bus-lbl">Wishbone Interconnect · Interconnessione Canali Slave</text>
-              </g>
-              <line class="lnk" x1="188" y1="170" x2="188" y2="212"/>
-              <line class="lnk" x1="245" y1="170" x2="245" y2="212"/>
-              <line class="lnk" x1="302" y1="170" x2="302" y2="212"/>
-              <line class="lnk" x1="359" y1="170" x2="359" y2="212"/>
-              <line class="lnk" x1="416" y1="170" x2="416" y2="212"/>
-              <line class="lnk" x1="473" y1="170" x2="473" y2="212"/>
-              <line class="lnk" x1="530" y1="170" x2="530" y2="212"/>
-              <line class="lnk" x1="587" y1="170" x2="587" y2="212"/>
-              <line class="lnk" x1="644" y1="170" x2="644" y2="212"/>
-              <g id="hb-s0" class="hb hb--unk">
-                <rect x="162" y="212" width="52" height="56" rx="6"/>
-                <text x="188" y="230" class="hb-name">S0</text>
-                <text x="188" y="250" class="hb-sub">SDRAM</text>
-              </g>
-              <g id="hb-s1" class="hb hb--unk">
-                <rect x="219" y="212" width="52" height="56" rx="6"/>
-                <text x="245" y="230" class="hb-name">S1</text>
-                <text x="245" y="250" class="hb-sub">ADC</text>
-              </g>
-              <g id="hb-s2" class="hb hb--unk">
-                <rect x="276" y="212" width="52" height="56" rx="6"/>
-                <text x="302" y="230" class="hb-name">S2</text>
-                <text x="302" y="250" class="hb-sub">PWM10</text>
-              </g>
-              <g id="hb-s3" class="hb hb--unk">
-                <rect x="333" y="212" width="52" height="56" rx="6"/>
-                <text x="359" y="230" class="hb-name">S3</text>
-                <text x="359" y="250" class="hb-sub">PWM4</text>
-              </g>
-              <g id="hb-s4" class="hb hb--unk">
-                <rect x="390" y="212" width="52" height="56" rx="6"/>
-                <text x="416" y="230" class="hb-name">S4</text>
-                <text x="416" y="250" class="hb-sub">GPIO</text>
-              </g>
-              <g id="hb-s5" class="hb hb--unk">
-                <rect x="447" y="212" width="52" height="56" rx="6"/>
-                <text x="473" y="230" class="hb-name">S5</text>
-                <text x="473" y="250" class="hb-sub">DMA</text>
-              </g>
-              <g id="hb-s6" class="hb hb--unk">
-                <rect x="504" y="212" width="52" height="56" rx="6"/>
-                <text x="530" y="230" class="hb-name">S6</text>
-                <text x="530" y="250" class="hb-sub">UART</text>
-              </g>
-              <g id="hb-s7" class="hb hb--unk">
-                <rect x="561" y="212" width="52" height="56" rx="6"/>
-                <text x="587" y="230" class="hb-name">S7</text>
-                <text x="587" y="250" class="hb-sub">U-NOR</text>
-              </g>
-              <g id="hb-s8" class="hb hb--unk">
-                <rect x="618" y="212" width="52" height="56" rx="6"/>
-                <text x="644" y="230" class="hb-name">S8</text>
-                <text x="644" y="250" class="hb-sub">SPI</text>
-              </g>
-              <line class="lnk" x1="670" y1="240" x2="700" y2="240"/>
-              <g id="hb-nor" class="hb hb--unk">
-                <rect x="700" y="212" width="52" height="56" rx="6"/>
-                <text x="726" y="230" class="hb-name">W25Q</text>
-                <text x="726" y="250" class="hb-sub">NOR</text>
-              </g>
-            </svg>
+      
+      <div class="soc-diagram">
+        <!-- ESP32 Master -->
+        <div class="soc-esp-row">
+          <div class="soc-node">
+            <div id="hb-esp" class="hb">
+              <span class="hb-name">ESP32</span>
+              <span class="hb-sub">Master</span>
+            </div>
           </div>
-          <div class="diag-data-overlay">
-            <p id="socInfo" class="diag-info-text">In attesa di dati dalla FPGA…</p>
+        </div>
+        
+        <!-- UART Lines -->
+        <div class="soc-uart-lines">
+          <div class="uart-line uart-left">
+            <span class="uart-label">UART 17/18</span>
+          </div>
+          <div class="uart-line uart-right">
+            <span class="uart-label">UART 72/20</span>
+          </div>
+        </div>
+
+        <!-- FPGA Container -->
+        <div class="soc-fpga-container">
+          <div class="fpga-label">FPGA GW2AR-18</div>
+          
+          <!-- Masters above bus -->
+          <div class="soc-masters-row">
+            <div class="soc-node">
+              <div id="hb-cpu" class="hb">
+                <span class="hb-name">CPU</span>
+                <span class="hb-sub">PicoRV32</span>
+              </div>
+              <div class="bus-connector"></div>
+            </div>
+            <div class="soc-node">
+              <div id="hb-m1" class="hb">
+                <span class="hb-name">M1</span>
+                <span class="hb-sub">FFT Master</span>
+              </div>
+              <div class="bus-connector"></div>
+            </div>
+          </div>
+
+          <!-- Wishbone Bus -->
+          <div class="wishbone-bus">
+            <div class="bus-line"></div>
+            <span class="bus-label">Wishbone Interconnect</span>
+          </div>
+
+          <!-- Slaves below bus -->
+          <div class="soc-slaves-row">
+            <div class="soc-node">
+              <div class="bus-connector"></div>
+              <div id="hb-s0" class="hb">
+                <span class="hb-name">S0</span>
+                <span class="hb-sub">SDRAM</span>
+              </div>
+            </div>
+            <div class="soc-node">
+              <div class="bus-connector"></div>
+              <div id="hb-s1" class="hb">
+                <span class="hb-name">S1</span>
+                <span class="hb-sub">ADC</span>
+              </div>
+            </div>
+            <div class="soc-node">
+              <div class="bus-connector"></div>
+              <div id="hb-s2" class="hb">
+                <span class="hb-name">S2</span>
+                <span class="hb-sub">PWM10</span>
+              </div>
+            </div>
+            <div class="soc-node">
+              <div class="bus-connector"></div>
+              <div id="hb-s3" class="hb">
+                <span class="hb-name">S3</span>
+                <span class="hb-sub">PWM4</span>
+              </div>
+            </div>
+            <div class="soc-node">
+              <div class="bus-connector"></div>
+              <div id="hb-s4" class="hb">
+                <span class="hb-name">S4</span>
+                <span class="hb-sub">GPIO</span>
+              </div>
+            </div>
+            <div class="soc-node">
+              <div class="bus-connector"></div>
+              <div id="hb-s5" class="hb">
+                <span class="hb-name">S5</span>
+                <span class="hb-sub">DMA</span>
+              </div>
+            </div>
+            <div class="soc-node">
+              <div class="bus-connector"></div>
+              <div id="hb-s6" class="hb">
+                <span class="hb-name">S6</span>
+                <span class="hb-sub">UART</span>
+              </div>
+            </div>
+            <div class="soc-node">
+              <div class="bus-connector"></div>
+              <div id="hb-s7" class="hb">
+                <span class="hb-name">S7</span>
+                <span class="hb-sub">U-NOR</span>
+              </div>
+            </div>
+            <div class="soc-node">
+              <div class="bus-connector"></div>
+              <div id="hb-s8" class="hb">
+                <span class="hb-name">S8</span>
+                <span class="hb-sub">SPI NOR</span>
+              </div>
+            </div>
+            <div class="soc-node">
+              <div class="bus-connector"></div>
+              <div id="hb-nor" class="hb">
+                <span class="hb-name">NOR</span>
+                <span class="hb-sub">W25Q Flash</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <div class="col-wrap data-stream">
-      <section id="node-sec" class="card node-panel">
-        <div class="node-header">
+    <!-- Node Status & Presence -->
+    <section id="node-sec" class="card span-6 node-panel">
+      <div class="node-header">
+        <div class="head-title">
           <h2>Stato Aggancio & Presenza</h2>
         </div>
-        <div class="pairing">
-          <span id="pairBadge" class="status-badge status-badge--off">Non agganciato</span>
-          <p id="pairDetail" class="data-detail">Nessuno slave registrato.</p>
-        </div>
-        <div class="device-line">
-          <span id="deviceDot" class="dot dot--off"></span>
-          <span id="deviceText" class="data-detail">Master non connesso al server</span>
-        </div>
-        <div class="presence-inline">
-          <div class="bulb-wrapper">
-            <svg id="bulb" class="bulb is-unknown" viewBox="0 0 120 160">
-              <g class="bulb-glass">
-                <path d="M60 8 C32 8 14 30 14 56 c0 18 10 31 21 41 6 5 9 10 9 17 h32 c0-7 3-12 9-17 11-10 21-23 21-41 C106 30 88 8 60 8 Z"/>
-              </g>
-              <line class="filament" x1="46" y1="64" x2="54" y2="48"/>
-              <line class="filament" x1="54" y1="48" x2="66" y2="48"/>
-              <line class="filament" x1="66" y1="48" x2="74" y2="64"/>
-              <rect class="bulb-base" x="44" y="120" width="32" height="10" rx="2"/>
-              <rect class="bulb-base" x="46" y="132" width="28" height="9" rx="2"/>
-              <rect class="bulb-base" x="48" y="143" width="24" height="9" rx="2"/>
-            </svg>
-          </div>
-          <div class="presence-ctrl">
-            <p id="presenceText" class="presence-text">In attesa…</p>
-            <button id="askBtn" class="btn btn--primary" disabled>Chiedi presenza</button>
-          </div>
-        </div>
-      </section>
+      </div>
+      
+      <div class="pairing">
+        <span id="pairBadge" class="status-badge status-badge--off">Non agganciato</span>
+        <span id="pairDetail" class="device-line">Nessuno slave registrato.</span>
+      </div>
 
-      <section id="quality-sec" class="card channel-panel">
-        <div class="channel-header">
-          <h2>Qualità Canale</h2>
-        </div>
-        <div class="rings-container">
-          <div class="ring-wrapper">
-            <svg viewBox="0 0 100 100">
-              <circle class="ring-bg" cx="50" cy="50" r="40"></circle>
-              <circle id="rxRing" class="ring-fg ring-rx" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="251.2"></circle>
-            </svg>
-            <div class="ring-content">
-              <span class="ring-title">RX</span>
-              <span id="rxVal" class="ring-val">0</span>
-            </div>
-          </div>
-          <div class="ring-wrapper">
-            <svg viewBox="0 0 100 100">
-              <circle class="ring-bg" cx="50" cy="50" r="40"></circle>
-              <circle id="txRing" class="ring-fg ring-tx" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="251.2"></circle>
-            </svg>
-            <div class="ring-content">
-              <span class="ring-title">TX</span>
-              <span id="txVal" class="ring-val">0</span>
-            </div>
-          </div>
-          <div class="ring-wrapper">
-            <svg viewBox="0 0 100 100">
-              <circle class="ring-bg" cx="50" cy="50" r="40"></circle>
-              <circle id="totRing" class="ring-fg ring-tot" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="251.2"></circle>
-            </svg>
-            <div class="ring-content">
-              <span class="ring-title">TOT</span>
-              <span id="totVal" class="ring-val">0</span>
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
+      <div class="device-line">
+        <span id="deviceDot" class="dot dot--off"></span>
+        <span id="deviceText">Master non connesso al server</span>
+      </div>
 
-    <div class="col-wrap data-logs">
-      <section id="traffic-sec" class="card log-panel flex-col">
-        <div class="log-header">
+      <div class="presence-inline">
+        <div class="bulb-wrapper">
+          <svg id="bulb" class="bulb is-unknown" viewBox="0 0 40 55" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path class="bulb-glass" d="M20 2C10.059 2 2 10.059 2 20C2 26.5 5.5 32 11 35V42C11 44.209 12.791 46 15 46H25C27.209 46 29 44.209 29 42V35C34.5 32 38 26.5 38 20C38 10.059 29.941 2 20 2Z" stroke-width="2"/>
+            <path class="filament" d="M15 22C15 22 17 18 20 18C23 18 25 22 25 22" stroke-width="2" stroke-linecap="round"/>
+            <path class="filament" d="M17 26C17 26 18.5 24 20 24C21.5 24 23 26 23 26" stroke-width="2" stroke-linecap="round"/>
+            <rect class="bulb-base" x="13" y="46" width="14" height="7" rx="2"/>
+          </svg>
+        </div>
+        <div class="presence-info">
+          <div id="presenceText" class="presence-text">In attesa…</div>
+          <button id="askBtn" class="btn btn--primary" disabled>Chiedi presenza</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Traffic Rings -->
+    <section id="traffic-sec" class="card span-6 node-panel">
+      <div class="node-header">
+        <div class="head-title">
+          <h2>Qualità Canale & Traffico</h2>
+        </div>
+      </div>
+
+      <div class="rings-container">
+        <div class="ring-wrapper">
+          <svg viewBox="0 0 100 100">
+            <circle class="ring-bg" cx="50" cy="50" r="40"/>
+            <circle id="rxRing" class="ring-fg ring-rx" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="251.2"/>
+          </svg>
+          <div class="ring-content">
+            <span class="ring-title">RX</span>
+            <span id="rxVal" class="ring-val">0</span>
+          </div>
+        </div>
+
+        <div class="ring-wrapper">
+          <svg viewBox="0 0 100 100">
+            <circle class="ring-bg" cx="50" cy="50" r="40"/>
+            <circle id="txRing" class="ring-fg ring-tx" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="251.2"/>
+          </svg>
+          <div class="ring-content">
+            <span class="ring-title">TX</span>
+            <span id="txVal" class="ring-val">0</span>
+          </div>
+        </div>
+
+        <div class="ring-wrapper">
+          <svg viewBox="0 0 100 100">
+            <circle class="ring-bg" cx="50" cy="50" r="40"/>
+            <circle id="totRing" class="ring-fg ring-tot" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="251.2"/>
+          </svg>
+          <div class="ring-content">
+            <span class="ring-title">TOT</span>
+            <span id="totVal" class="ring-val">0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="config-actions" style="margin-top: 20px;">
+        <button id="clearBtn" class="btn btn--ghost btn--danger">Pulisci Buffer</button>
+      </div>
+    </section>
+
+    <!-- Logs -->
+    <section class="card span-6 log-panel">
+      <div class="log-header">
+        <div class="head-title">
           <h2>Traffico Dati</h2>
-          <button id="clearBtn" class="btn btn--ghost">Pulisci Buffer</button>
         </div>
-        <div class="log-feed">
-          <ul id="log" class="data-log-list"></ul>
-        </div>
-      </section>
+      </div>
+      <div class="log-feed">
+        <ul id="log" class="data-log-list">
+          <li class="empty">Nessun traffico ancora.</li>
+        </ul>
+      </div>
+    </section>
 
-      <section id="mem-sec" class="card mem-panel flex-col">
-        <div class="mem-header">
-          <div class="head-title">
-            <h2>Memoria Persistente</h2>
-            <p class="diag-sub">Registri stabili su flash NOR <span id="memStats" class="stats"></span></p>
-          </div>
-          <div class="mem-actions">
-            <button id="memLoadBtn" class="btn btn--ghost">Sincronizza</button>
-            <button id="memClearBtn" class="btn btn--ghost btn--danger">Svuota</button>
-          </div>
+    <!-- Memory -->
+    <section id="mem-sec" class="card span-6 mem-panel">
+      <div class="mem-header">
+        <div class="head-title">
+          <h2>Memoria Persistente</h2>
+          <span class="diag-sub">Registri stabili su flash NOR</span>
         </div>
-        <div class="note-input-row">
-          <input id="noteInput" class="input input--hex" type="text" maxlength="8" placeholder="Scrivi nota rapida..."/>
-          <button id="noteBtn" class="btn">Invia</button>
-        </div>
-        <div class="mem-feed">
-          <ul id="memList" class="mem-list"><li class="empty">In attesa di dati…</li></ul>
-        </div>
-      </section>
-    </div>
+      </div>
 
-    <section id="settings-sec" class="config-panel full-span">
+      <div class="note-input-row">
+        <input type="text" id="noteInput" class="input" placeholder="Nota (max 8 char)" maxlength="8">
+        <button id="noteBtn" class="btn btn--primary" disabled>Invia</button>
+      </div>
+
+      <div class="mem-actions" style="display: flex; gap: 10px; margin-bottom: 12px;">
+        <button id="memLoadBtn" class="btn btn--ghost" disabled>Sincronizza</button>
+        <button id="memClearBtn" class="btn btn--ghost btn--danger" disabled>Svuota</button>
+      </div>
+
+      <div class="mem-feed">
+        <ul id="memList" class="mem-list">
+          <li class="empty">In attesa di dati…</li>
+        </ul>
+      </div>
+      <div id="memStats" class="stats" style="margin-top: 10px; text-align: right;"></div>
+    </section>
+
+    <!-- Settings -->
+    <section id="settings-sec" class="card full-span config-panel">
       <div class="config-header">
         <div class="head-title">
           <h2>Configurazione Sistema</h2>
-          <p class="diag-sub">Parametri applicati <span id="setFeedback" class="stats"></span></p>
+          <span class="diag-sub">Parametri applicati</span>
         </div>
-        <button id="setReloadBtn" class="btn btn--ghost">Ricarica</button>
+        <div class="diag-controls">
+          <span id="setFeedback" class="stats"></span>
+        </div>
       </div>
-      
+
       <div class="config-settings-grid">
         <div class="config-column">
-          <label class="input-group">
-            <span class="lbl">ID Master</span>
-            <input id="setName" class="input input--hex" type="text" maxlength="15" placeholder="AUSP Master"/>
-          </label>
-          <label class="input-group">
-            <span class="lbl">Auto-Presenza (s)</span>
-            <input id="setAuto" class="input input--hex" type="number" min="0" max="3600" step="1"/>
-          </label>
-          <label class="input-group">
-            <span class="lbl">Tentativi</span>
-            <input id="setTries" class="input input--hex" type="number" min="1" max="20" step="1"/>
-          </label>
-        </div>
-
-        <div class="color-control-hub">
-          <div class="color-inputs-column">
-            <label class="color-picker-wrapper"><span class="lbl">Main</span><input id="setColMain" class="color-swatch" type="color" value="#38bdf8"/></label>
-            <label class="color-picker-wrapper"><span class="lbl">Text</span><input id="setColText" class="color-swatch" type="color" value="#f8fafc"/></label>
-            <label class="color-picker-wrapper"><span class="lbl">Bg</span><input id="setColBg" class="color-swatch" type="color" value="#030712"/></label>
+          <div class="input-group">
+            <label class="lbl">ID Master</label>
+            <input type="text" id="setName" class="input" placeholder="Nome ID">
           </div>
-          <div class="futuristic-wheel-wrapper">
-            <div class="futuristic-wheel-core"></div>
+          <div class="input-group">
+            <label class="lbl">Auto-Presenza (s)</label>
+            <input type="number" id="setAuto" class="input" min="0" max="3600">
+          </div>
+          <div class="input-group">
+            <label class="lbl">Tentativi</label>
+            <input type="number" id="setTries" class="input" min="1" max="20">
+          </div>
+          <div class="switch-control-area">
+            <input type="checkbox" id="setDebug" class="switch-toggle-input">
+            <label for="setDebug" class="lbl" style="cursor: pointer;">Log Debug</label>
           </div>
         </div>
 
-        <div class="views-panel-column">
-          <div class="views-settings-controls">
-            <div class="view-settings-control-block">
-              <span class="lbl">Log Debug</span>
-              <div class="switch-control-area">
-                <input id="setDebug" type="checkbox" class="switch-toggle-input"/>
-                <span class="hint">Stream $DEC/PK/SYS</span>
+        <div class="config-column">
+          <label class="lbl">Tema Colori Display</label>
+          <div class="color-control-hub">
+            <div class="color-selector-tabs">
+              <button class="color-tab active" data-color="main">Main</button>
+              <button class="color-tab" data-color="text">Text</button>
+              <button class="color-tab" data-color="bg">Bg</button>
+            </div>
+            <div class="color-wheel-stack">
+              <div class="color-wheel-container">
+                <canvas id="colorWheel" class="color-wheel-canvas" width="140" height="140"></canvas>
+                <div class="color-wheel-preview" id="colorPreview"></div>
+              </div>
+              <input type="range" id="colorLum" class="lum-slider" min="0" max="100" value="100"
+                     title="Luminosita'">
+              <div class="color-presets" title="Neutri rapidi">
+                <button type="button" class="preset" data-c="#ffffff" style="background:#ffffff"></button>
+                <button type="button" class="preset" data-c="#c8cdd4" style="background:#c8cdd4"></button>
+                <button type="button" class="preset" data-c="#808080" style="background:#808080"></button>
+                <button type="button" class="preset" data-c="#3a3f47" style="background:#3a3f47"></button>
+                <button type="button" class="preset" data-c="#000000" style="background:#000000"></button>
+              </div>
+            </div>
+            <div class="color-inputs-column">
+              <div class="color-picker-wrapper">
+                <span class="lbl">Main</span>
+                <input type="color" id="setColMain" class="color-swatch" value="#00f2ff">
+              </div>
+              <div class="color-picker-wrapper">
+                <span class="lbl">Text</span>
+                <input type="color" id="setColText" class="color-swatch" value="#ffffff">
+              </div>
+              <div class="color-picker-wrapper">
+                <span class="lbl">Bg</span>
+                <input type="color" id="setColBg" class="color-swatch" value="#050810">
               </div>
             </div>
           </div>
-          <div class="view-chk-grid">
-            <label class="view-chk-control"><input id="vWave" type="checkbox"/><span>Onda</span></label>
-            <label class="view-chk-control"><input id="vLogs" type="checkbox"/><span>Logs</span></label>
-            <label class="view-chk-control"><input id="vSlaves" type="checkbox"/><span>Slaves</span></label>
-            <label class="view-chk-control"><input id="vDmairq" type="checkbox"/><span>IRQ DMA</span></label>
-            <label class="view-chk-control"><input id="vPeaks" type="checkbox"/><span>Peaks</span></label>
-            <label class="view-chk-control"><input id="vRxpkt" type="checkbox"/><span>RX Pkt</span></label>
-            <label class="view-chk-control"><input id="vTxpkt" type="checkbox"/><span>TX Pkt</span></label>
+        </div>
+
+        <div class="config-column views-panel-column">
+          <label class="lbl">Stream Visivi (Max 4) — Display 320×240</label>
+          <div class="display-mockup" id="displayMockup">
+            <div class="display-zone zone-left" data-zone="left">
+              <div class="zone-header">Sinistra</div>
+              <div class="zone-content">
+                <label class="view-chk-control">
+                  <input type="checkbox" id="vSlaves"> Stato Slaves
+                </label>
+                <label class="view-chk-control">
+                  <input type="checkbox" id="vTxpkt"> TX Pkt
+                </label>
+              </div>
+            </div>
+            <div class="display-center">
+              <div class="display-zone zone-top" data-zone="top">
+                <div class="zone-header">Alto-Centro</div>
+                <div class="zone-content">
+                  <label class="view-chk-control">
+                    <input type="checkbox" id="vWave"> Onda Audio
+                  </label>
+                  <label class="view-chk-control">
+                    <input type="checkbox" id="vPeaks"> Peaks Bin
+                  </label>
+                </div>
+              </div>
+              <div class="display-zone zone-bottom" data-zone="bottom">
+                <div class="zone-header">Basso-Centro</div>
+                <div class="zone-content">
+                  <label class="view-chk-control">
+                    <input type="checkbox" id="vLogs"> Logs
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div class="display-zone zone-right" data-zone="right">
+              <div class="zone-header">Destra</div>
+              <div class="zone-content">
+                <label class="view-chk-control">
+                  <input type="checkbox" id="vRxpkt"> RX Pkt
+                </label>
+                <label class="view-chk-control">
+                  <input type="checkbox" id="vDmairq"> IRQ DMA
+                </label>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       <div class="config-actions">
-        <button id="setSaveBtn" class="btn btn--primary">Applica Configurazione</button>
+        <button id="setReloadBtn" class="btn btn--ghost" disabled>Ricarica</button>
+        <button id="setSaveBtn" class="btn btn--primary" disabled>Applica Configurazione</button>
       </div>
     </section>
   </main>
 
   <script src="app.js"></script>
+  <script>
+    // Selettore colori del DISPLAY: disco hue/saturazione (centro = bianco) +
+    // slider di luminosita' + preset neutri -> TUTTO lo spazio colore, inclusi
+    // bianchi/neri/grigi. Scrive sempre un HEX valido nell'input type=color e
+    // dispatcha 'input': l'anteprima del mockup la aggiorna app.js (applyColors).
+    (function() {
+      const canvas = document.getElementById('colorWheel');
+      const preview = document.getElementById('colorPreview');
+      const tabs = document.querySelectorAll('.color-tab');
+      const lum = document.getElementById('colorLum');
+      if (!canvas) return;
+
+      const ctx = canvas.getContext('2d');
+      const R = 70, CX = 70, CY = 70;
+      let target = 'main';
+      let H = 200, S = 1, V = 1;        // stato HSV corrente
+
+      // disco: hue sull'angolo, saturazione sul raggio (centro bianco)
+      for (let a = 0; a < 360; a++) {
+        const a0 = (a - 1) * Math.PI / 180, a1 = (a + 0.5) * Math.PI / 180;
+        ctx.beginPath();
+        ctx.moveTo(CX, CY);
+        ctx.arc(CX, CY, R, a0, a1);
+        ctx.closePath();
+        ctx.fillStyle = `hsl(${a}, 100%, 50%)`;
+        ctx.fill();
+      }
+      const grad = ctx.createRadialGradient(CX, CY, 0, CX, CY, R);
+      grad.addColorStop(0, 'rgba(255,255,255,1)');
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.beginPath();
+      ctx.arc(CX, CY, R, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      function hsvToHex(h, s, v) {
+        const f = (n) => {
+          const k = (n + h / 60) % 6;
+          const c = v - v * s * Math.max(0, Math.min(k, 4 - k, 1));
+          return Math.round(c * 255).toString(16).padStart(2, '0');
+        };
+        return '#' + f(5) + f(3) + f(1);
+      }
+      function hexToHsv(hex) {
+        const r = parseInt(hex.slice(1, 3), 16) / 255;
+        const g = parseInt(hex.slice(3, 5), 16) / 255;
+        const b = parseInt(hex.slice(5, 7), 16) / 255;
+        const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+        let h = 0;
+        if (d) {
+          if (mx === r) h = 60 * (((g - b) / d) % 6);
+          else if (mx === g) h = 60 * ((b - r) / d + 2);
+          else h = 60 * ((r - g) / d + 4);
+        }
+        if (h < 0) h += 360;
+        return { h, s: mx ? d / mx : 0, v: mx };
+      }
+      function inputFor(t) {
+        return document.getElementById(t === 'main' ? 'setColMain' : t === 'text' ? 'setColText' : 'setColBg');
+      }
+      function apply() {
+        const hex = hsvToHex(H, S, V);
+        preview.style.background = hex;
+        const inp = inputFor(target);
+        inp.value = hex;
+        inp.dispatchEvent(new Event('input'));   // -> applyColors in app.js (solo mockup)
+      }
+      function loadFrom(hex) {
+        const c = hexToHsv(hex);
+        H = c.h; S = c.s; V = c.v;
+        lum.value = Math.round(V * 100);
+        preview.style.background = hex;
+      }
+
+      canvas.addEventListener('click', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left - CX, y = e.clientY - rect.top - CY;
+        const d = Math.sqrt(x * x + y * y);
+        if (d > R) return;
+        H = Math.atan2(y, x) * 180 / Math.PI;
+        if (H < 0) H += 360;
+        S = Math.min(1, d / R);                  // centro = bianco/grigi
+        apply();
+      });
+
+      lum.addEventListener('input', () => { V = lum.value / 100; apply(); });
+
+      document.querySelectorAll('.color-presets .preset').forEach((b) => {
+        b.addEventListener('click', () => { loadFrom(b.dataset.c); apply(); });
+      });
+
+      tabs.forEach((tab) => {
+        tab.addEventListener('click', () => {
+          tabs.forEach((t) => t.classList.remove('active'));
+          tab.classList.add('active');
+          target = tab.dataset.color;
+          loadFrom(inputFor(target).value);      // riparte dal colore corrente
+        });
+      });
+
+      loadFrom(inputFor(target).value);
+    })();
+  </script>
 </body>
 </html>

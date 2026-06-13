@@ -2,7 +2,7 @@ PWD /Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for
 INPUT /usr/local/texlive/2026basic/texmf.cnf
 INPUT /usr/local/texlive/2026basic/texmf-dist/web2c/texmf.cnf
 INPUT /usr/local/texlive/2026basic/texmf-var/web2c/pdftex/pdflatex.fmt
-INPUT EFES_master_report.tex
+INPUT /Users/gioelegiunta/Documents/Carriera Scolastica/PoliTO/1_1/Electronics for embedded systems/Project EFES/efes_project_s360501/report/EFES_master_report.tex
 OUTPUT EFES_master_report.log
 INPUT /usr/local/texlive/2026basic/texmf-dist/tex/latex/base/article.cls
 INPUT /usr/local/texlive/2026basic/texmf-dist/tex/latex/base/article.cls
@@ -341,6 +341,7 @@ INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/public/cm/cmex10.tfm
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/public/amsfonts/symbols/msam10.tfm
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/public/amsfonts/symbols/msbm10.tfm
 INPUT /Users/gioelegiunta/Library/texlive/2026basic/texmf-var/fonts/map/pdftex/updmap/pdftex.map
+INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/jknappen/ec/ectt1095.tfm
 OUTPUT EFES_master_report.toc
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/jknappen/ec/ecti1095.tfm
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/jknappen/ec/ecbx1200.tfm
@@ -360,7 +361,6 @@ INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/public/amsfonts/symbols/
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/public/amsfonts/symbols/msbm10.tfm
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/public/amsfonts/symbols/msbm7.tfm
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/jknappen/ec/ecrm0600.tfm
-INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/jknappen/ec/ectt1095.tfm
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/jknappen/ec/ecbx0900.tfm
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/public/cm/cmr9.tfm
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/public/cm/cmmi9.tfm
@@ -369,15 +369,18 @@ INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/public/amsfonts/cmextra/
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/public/amsfonts/symbols/msam10.tfm
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/public/amsfonts/symbols/msbm10.tfm
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/jknappen/ec/ectt0900.tfm
+INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/jknappen/ec/ecbx0800.tfm
+INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/jknappen/ec/ecti0800.tfm
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/jknappen/ec/ectt0800.tfm
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/jknappen/ec/tcrm1095.tfm
 INPUT EFES_master_report.aux
 INPUT ./EFES_master_report.out
 INPUT ./EFES_master_report.out
 INPUT /Users/gioelegiunta/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/tcrm1095.600pk
+INPUT /Users/gioelegiunta/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecti0800.600pk
+INPUT /Users/gioelegiunta/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx0800.600pk
 INPUT /Users/gioelegiunta/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt0900.600pk
 INPUT /Users/gioelegiunta/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx0900.600pk
-INPUT /Users/gioelegiunta/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt1095.600pk
 INPUT /Users/gioelegiunta/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm0600.600pk
 INPUT /Users/gioelegiunta/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt0800.600pk
 INPUT /Users/gioelegiunta/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt1000.600pk
@@ -388,6 +391,7 @@ INPUT /Users/gioelegiunta/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jk
 INPUT /Users/gioelegiunta/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx1000.600pk
 INPUT /Users/gioelegiunta/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx1200.600pk
 INPUT /Users/gioelegiunta/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecti1095.600pk
+INPUT /Users/gioelegiunta/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt1095.600pk
 INPUT /Users/gioelegiunta/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx1440.600pk
 INPUT /Users/gioelegiunta/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm1095.600pk
 INPUT /Users/gioelegiunta/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx1095.600pk
@@ -404,5 +408,6 @@ INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmr
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb
+INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.pfb
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy9.pfb

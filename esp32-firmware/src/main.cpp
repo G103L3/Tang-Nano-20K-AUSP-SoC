@@ -90,6 +90,7 @@ void setup() {
         if (flash_get_settings(&fs)) {
             protocol_set_presence_tries(fs.presence_tries);
             protocol_set_auto_presence(fs.auto_presence_s);
+            fpga_uart_set_diag_echo(fs.debug_log != 0);   /* echo HLT su USB solo se debug */
         }
     }
     flash_log_append(LOG_BOOT, millis() / 1000, 0, "boot");
