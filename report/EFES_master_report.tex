@@ -13,8 +13,13 @@
 \usepackage{hyperref}
 \usepackage{booktabs}
 \usepackage{caption}
+% Captions in this report are long and explanatory; turn off the single line
+% check so the caption package never tries to typeset a multi-thousand character
+% caption on one measured line (which overflows TeX's max dimension).
+\captionsetup{singlelinecheck=false}
 \usepackage{float}
 \usepackage{array}
+\usepackage{rotating} % sidewaysfigure for the wide board schematic
 
 \usetikzlibrary{arrows.meta, positioning, shapes.geometric, calc, fit, decorations.pathreplacing, decorations.pathmorphing, backgrounds, automata, shapes.misc, shapes.arrows, patterns}
 
@@ -133,9 +138,10 @@ microphone is an ordinary electret condenser capsule. Its signal is amplified by
 an MCP6022 operational amplifier and digitised by an MCP3201 12-bit ADC, which the
 FPGA reads over SPI. The speaker is an ordinary 8\,$\Omega$ speaker driven from
 the PWM output through a low side MOSFET. Power comes from a single 12\,V supply
-that a DFRobot DFR1202 buck module steps down to 3.3\,V for the digital part,
-while the 12\,V rail directly feeds the power LED and the speaker stage. Several
-RLZ44N MOSFETs do the low side switching, plus the usual capacitors and diodes.
+that a DFRobot DFR1202 buck module steps down to 5\,V for the Tang Nano
+\texttt{VIN}; the 12\,V rail also directly feeds the speaker stage. Several
+\texttt{IRLZ44N}/\texttt{IRLZ44NPBF} MOSFETs do the switching, plus the usual
+capacitors and diodes.
 
 The slave device, the one that receives orders over the air from this master, is
 much simpler and is documented elsewhere: it is an ESP32 wired at register level
@@ -234,6 +240,213 @@ Wi\,Fi and dashboard                     & ESP32              & software \\
 \end{tabular}
 \end{table}
 
+\subsection{The board around the FPGA}
+\label{sec:board}
+
+The SoC of the next sections lives \emph{inside} the FPGA, but the master node is
+a whole board: a power chain that ends in the FPGA, and a ring of real parts
+around it (storage, display, indicator LEDs, the analog microphone front end and
+the speaker driver). Figure~\ref{fig:board} is the board level schematic with the
+actual components I used. Three supply rails organise it. The 12\,V comes from an
+Apple USB-C charger through a USB-C \emph{trigger} module (it negotiates a fixed
+12\,V over PD/QC/AFC, so the charger behaves like a plain 12\,V brick); that 12\,V
+feeds both a DFR1202 buck converter, which steps it down to the 5\,V the Tang Nano
+20K wants on \texttt{VIN}, and the speaker, which is loud enough to run straight
+off 12\,V. The FPGA board then exposes two rails of its own: \textbf{3.3\,V} for
+the digital peripherals and \textbf{5\,V} (the \texttt{VIN} passed through) for the
+analog front end. One detail that bit me and is now load bearing: the 3.3\,V does
+not go straight to the peripherals, it passes through an \texttt{IRLZ44N} MOSFET
+that the GPIO (pin 80) holds on, so the GPIO output \emph{must} stay at \texttt{1}
+or the NOR flash, the display and the LEDs all lose their supply
+(Section~\ref{sec:soc}).
+
+\begin{figure}[p]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+    every node/.style={font=\footnotesize},
+    box/.style={draw, line width=0.8pt, fill=white, align=center, inner sep=3pt},
+    chip/.style={draw, line width=0.9pt, fill=white, align=center},
+    wire/.style={line width=0.55pt},
+    pwr/.style={line width=1.1pt},
+    lab/.style={font=\scriptsize, fill=white, inner sep=0.7pt},
+    pin/.style={font=\scriptsize, inner sep=0.7pt},
+    nb/.style={draw, rounded corners=1pt, fill=white, inner sep=1.3pt, font=\scriptsize\sffamily}
+]
+\newcommand{\gnd}[1]{\draw[wire] #1 -- ++(0,-0.2) coordinate(gg); \draw[wire] ($(gg)+(-0.2,0)$)--($(gg)+(0.2,0)$); \draw[wire] ($(gg)+(-0.12,-0.07)$)--($(gg)+(0.12,-0.07)$); \draw[wire] ($(gg)+(-0.05,-0.14)$)--($(gg)+(0.05,-0.14)$);}
+\newcommand{\capd}[3]{\draw[wire] (#1-0.2,#2)--(#1+0.2,#2); \draw[wire] (#1-0.2,#2-0.14)--(#1+0.2,#2-0.14); \node[lab,anchor=west] at (#1+0.26,#2-0.07){#3};}
+\newcommand{\rh}[4]{\draw[wire,decorate,decoration={zigzag,segment length=2.8pt,amplitude=2.5pt}] (#1,#3)--(#2,#3); \node[lab] at ({(#1+#2)/2},#3+0.3){#4};}
+\newcommand{\rv}[4]{\draw[wire,decorate,decoration={zigzag,segment length=2.8pt,amplitude=2.5pt}] (#1,#2)--(#1,#3); \node[lab,anchor=west] at (#1+0.18,{(#2+#3)/2}){#4};}
+\newcommand{\dotj}[1]{\fill #1 circle (1.9pt);}
+\newcommand{\mos}[3]{\draw[wire] (#1-0.66,#2-0.5) rectangle (#1+0.66,#2+0.5); \node[font=\tiny,align=center] at (#1,#2){#3}; \node[lab,anchor=east] at (#1-0.68,#2){G}; \node[lab,anchor=south] at (#1,#2+0.52){D}; \node[lab,anchor=north] at (#1,#2-0.52){S};}
+\newcommand{\led}[2]{\draw[wire] (#1-0.22,#2+0.22)--(#1+0.22,#2+0.22)--(#1,#2-0.15)--cycle; \draw[wire] (#1-0.22,#2-0.15)--(#1+0.22,#2-0.15); \draw[-{Stealth[length=3pt]},line width=0.4pt] ($(#1+0.25,#2+0.11)$)--($(#1+0.45,#2+0.31)$);}
+
+% ===== POWER CHAIN =====
+\node[box,minimum width=2.0cm,minimum height=0.9cm] (psu)  at (1.6,22.0){Apple\\USB-C PSU};
+\node[box,minimum width=2.6cm,minimum height=0.9cm] (pd)   at (4.5,22.0){USB-C PD/QC/AFC\\trigger};
+\node[box,minimum width=2.5cm,minimum height=0.9cm] (buck) at (7.7,22.0){Buck \texttt{DFR1202}\\12\,V$\to$5\,V};
+\draw[pwr] (psu.east)--(pd.west);
+\draw[pwr] (pd.east)-- node[lab,above]{12\,V} (buck.west);
+\draw[pwr] (buck.east)--(9.2,22.0); \node[nb,anchor=west] at (9.25,22.0){5\,V};
+\coordinate (p12) at ($(pd.east)!0.5!(buck.west)$); \draw[pwr] (p12)--(6.1,21.2); \node[nb] at (6.1,21.35){12\,V};
+
+% ===== ESP32 =====
+\node[box,minimum width=2.4cm,minimum height=1.5cm] (esp) at (12.9,20.0){\textbf{ESP32}\\UART1 + UART2\\Wi-Fi};
+\draw[-{Stealth[length=5pt]},wire] (esp.north)--++(0,0.45) node[lab,anchor=south]{Wi-Fi $\to$ dashboard};
+
+% ===== FPGA =====
+\node[chip,minimum width=5.4cm,minimum height=11.4cm] (fpga) at (7.0,13.2){};
+\node[align=center] at (7.0,13.6){\textbf{Tang Nano 20K}\\Gowin GW2AR-18\\[2pt]\emph{SoC inside}};
+% TOP pins
+\foreach \x/\t/\c in {5.2/{VIN}/p_vin, 6.3/{17}/p_ctx, 6.8/{18}/p_crx, 7.7/{72}/p_ntx, 8.2/{20}/p_nrx}{
+  \coordinate (\c) at (\x,18.9); \draw[wire] (\x,18.9)--(\x,19.15); \node[pin,anchor=south,rotate=90] at (\x,19.2){\t};}
+\node[pin] at (7.25,19.95){UARTs $\to$ ESP32};
+% RIGHT pins
+\foreach \y/\t/\c in {18.3/{3.3V}/p_33, 17.7/{80}/p_gpio,
+                      16.45/{41}/p_fcs, 16.0/{48}/p_fmiso, 15.55/{42}/p_fsck, 15.1/{51}/p_fmosi,
+                      12.4/{27}/p_tscl, 12.0/{28}/p_tsda, 11.6/{29}/p_tdc, 11.2/{30}/p_trst, 10.8/{31}/p_tcs}{
+  \coordinate (\c) at (9.7,\y); \draw[wire] (9.7,\y)--(9.95,\y); \node[pin,anchor=west] at (10.0,\y){\t};}
+% BOTTOM pins
+\foreach \x/\t/\c in {4.9/{5V}/p_5out, 5.7/{74}/p_acsk, 6.2/{73}/p_acs, 6.7/{85}/p_amiso, 7.2/{75}/p_amosi, 8.1/{76}/p_spwm, 8.9/{77}/p_lpwm}{
+  \coordinate (\c) at (\x,7.5); \draw[wire] (\x,7.5)--(\x,7.25); \node[pin,anchor=north,rotate=90] at (\x,7.2){\t};}
+\node[pin,anchor=north] at (6.45,6.5){ADC SPI};
+
+% ===== VIN from buck =====
+\draw[pwr] (buck.south)--(7.7,20.6)--(5.2,20.6)--(p_vin);
+% ===== UARTs -> ESP32 =====
+\draw[wire] (p_ctx)--(6.3,19.4)--(11.7,19.4);
+\draw[wire] (p_crx)--(6.8,19.6)--(11.7,19.6);
+\draw[wire] (p_ntx)--(7.7,19.8)--(11.7,19.8);
+\draw[wire] (p_nrx)--(8.2,20.0)--(11.7,20.0);
+\node[lab] at (10.0,19.45){char 17/18}; \node[lab] at (10.0,20.05){NOR cmds 72/20};
+
+% ===== 3.3 V gate + 3.3Vsw rail =====
+\mos{10.9}{18.3}{\texttt{IRLZ44N}}
+\draw[pwr] (p_33)--(9.7,19.0)--(10.9,19.0)--(10.9,18.8);  % 3.3V -> D
+\draw[wire] (p_gpio)--(10.25,17.7)--(10.25,18.3);         % gpio -> G
+\node[lab,anchor=south] at (9.9,17.45){held \texttt{1}};
+\draw[pwr] (10.9,17.8)--(10.9,17.4)--(14.6,17.4); \node[nb,anchor=south] at (13.2,17.45){3.3\,V\textsubscript{sw}};
+\draw[pwr] (14.6,17.4)--(14.6,6.5);  % rail verticale 3.3Vsw
+
+% ===== NOR flash =====
+\node[chip,minimum width=2.1cm,minimum height=2.3cm] (nor) at (12.4,15.6){\textbf{W25Q64}\\NOR\\flash};
+\foreach \y/\t/\c in {16.45/{1 /CS}/n_cs, 16.0/{2 DO}/n_do, 15.55/{6 CLK}/n_clk, 15.1/{5 DI}/n_di}{
+  \coordinate (\c) at (11.35,\y); \draw[wire] (11.35,\y)--(11.1,\y); \node[pin,anchor=east] at (11.05,\y){\t};}
+\foreach \y/\t/\c in {16.45/{8 VCC}/n_vcc, 16.0/{7 /HOLD}/n_hold, 15.55/{3 /WP}/n_wp, 15.1/{4 GND}/n_gnd}{
+  \coordinate (\c) at (13.45,\y); \draw[wire] (13.45,\y)--(13.7,\y); \node[pin,anchor=west] at (13.75,\y){\t};}
+\draw[wire] (p_fcs)--(n_cs);
+\draw[wire] (p_fmiso)--(n_do);
+\draw[wire] (p_fsck)--(n_clk);
+\draw[wire] (p_fmosi)--(n_di);
+\draw[pwr] (n_vcc)--(14.6,16.45); \dotj{(14.6,16.45)} \node[nb,anchor=south] at (14.1,16.5){3.3\,Vsw}; % VCC -> rail
+\draw[wire] (n_hold)--(14.2,16.0)--(14.2,16.45);                              % /HOLD high
+\draw[wire] (n_wp)--(14.05,15.55)--(14.05,16.45);                            % /WP high
+\gnd{(n_gnd)}
+% condensatori in parallelo sulla VCC
+\draw[wire] (13.45,16.45) -- (13.45,16.95); \capd{13.45}{16.95}{10\,$\mu$F} \gnd{(13.45,16.75)}
+\draw[wire] (13.45,16.45) -- (12.85,16.45) -- (12.85,16.95); \capd{12.85}{16.95}{1\,$\mu$F} \gnd{(12.85,16.75)}
+
+% ===== TFT display =====
+\node[chip,minimum width=2.1cm,minimum height=2.6cm] (tft) at (12.4,11.4){\textbf{GMT020}\\\texttt{-02-7P}\\ST7789};
+\foreach \y/\t/\c in {12.4/{SCL}/t_scl, 12.0/{SDA}/t_sda, 11.6/{DC}/t_dc, 11.2/{RST}/t_rst, 10.8/{CS}/t_cs}{
+  \coordinate (\c) at (11.35,\y); \draw[wire] (11.35,\y)--(11.1,\y); \node[pin,anchor=east] at (11.05,\y){\t};}
+\draw[wire] (p_tscl)--(t_scl);
+\draw[wire] (p_tsda)--(t_sda);
+\draw[wire] (p_tdc)--(t_dc);
+\draw[wire] (p_trst)--(t_rst);
+\draw[wire] (p_tcs)--(t_cs);
+\draw[pwr] (13.45,12.4)--(14.6,12.4); \dotj{(14.6,12.4)} \node[pin,anchor=south] at (13.9,12.45){VCC};
+\draw[wire] (13.45,10.9)--(13.8,10.9); \node[pin,anchor=west] at (13.85,10.9){GND}; \gnd{(13.85,10.9)}
+% condensatore di bypass direttamente sul pin VCC
+\draw[wire] (13.45,12.4) -- (13.45,12.9); \capd{13.45}{12.9}{1\,$\mu$F} \gnd{(13.45,12.7)}
+
+% ===== LEDs + speaker drivers =====
+\draw[pwr] (14.6,9.4)--(11.5,9.4); \dotj{(14.6,9.4)} \draw[pwr] (11.5,9.4)--(11.5,8.7);
+\node[pin,anchor=west] at (11.55,9.1){3.3\,V\textsubscript{sw}};
+\rv{11.5}{8.7}{8.0}{$2\times$R}
+\led{11.5}{7.3} \draw[wire] (11.5,8.0)--(11.5,7.52); \draw[wire] (11.5,7.15)--(11.5,6.8);
+\node[pin,anchor=west] at (11.7,7.3){2 LEDs};
+\mos{11.5}{5.9}{\texttt{IRLZ44N}} \draw[wire] (11.5,6.8)--(11.5,6.4);
+\draw[wire] (p_lpwm)--(8.9,6.8)--(10.85,6.8)--(10.85,5.9); \node[lab,anchor=south] at (9.9,6.85){pwm\_4 (77)};
+\gnd{(11.5,5.35)}
+% 12 V supply per speaker – percorso pulito a sinistra
+\draw[pwr] (6.1,21.2)--(1.5,21.2)--(1.5,6.0)--(14.0,6.0)--(14.0,7.3);
+\node[lab,anchor=east] at (13.95,6.7){12\,V};
+\draw[wire] (13.7,7.3) rectangle (14.3,6.7); \draw[wire] (14.3,7.3)--(14.7,7.6)--(14.7,6.4)--(14.3,6.7);
+\node[pin,anchor=north] at (14.2,6.65){8\,$\Omega$ spk};
+\draw[wire] (14.0,6.7)--(14.0,6.4); \mos{14.0}{5.9}{\texttt{IRLZ44N}} \draw[wire] (14.0,6.4)--(14.0,6.4);
+\draw[wire] (p_spwm)--(8.1,6.5)--(13.4,6.5)--(13.4,5.9); \node[lab,anchor=south] at (10.6,6.55){pwm\_10 (76)};
+\gnd{(14.0,5.35)}
+
+% ===== 5 V analog rail =====
+\draw[pwr] (p_5out)--(4.9,6.8)--(0.6,6.8)--(0.6,1.1); \node[nb] at (0.6,5.6){5\,V analog};
+
+% ===== microfono + AC coupling =====
+\draw[wire] (1.3,3.6) circle (0.3); \node[pin] at (1.3,3.6){MIC}; \node[pin,anchor=south] at (1.3,4.0){electret};
+\draw[pwr] (0.6,4.0)--(1.3,4.0); \dotj{(0.6,4.0)} \gnd{(1.3,3.28)}
+\draw[wire] (1.65,3.6)--(2.05,3.6);
+\draw[wire] (2.15,3.35)--(2.15,3.85); \draw[wire] (2.32,3.35)--(2.32,3.85); \node[lab,anchor=south] at (2.24,3.85){1\,$\mu$F};
+\draw[wire] (2.32,3.6)--(2.7,3.6); \rh{2.7}{3.6}{3.6}{100\,$\Omega$}
+\draw[wire] (3.6,3.6)--(4.15,3.6);
+
+% ===== bias divider 47k/47k -> 2.5 V (spostato a sx) =====
+\draw[pwr] (0.3,5.3) -- (0.3,5.3) node[above]{}; % dummy
+\draw[pwr] (0.6,5.3)--(0.3,5.3); \dotj{(0.6,5.3)}
+\rv{0.3}{5.3}{4.5}{47\,k} \dotj{(0.3,4.5)} \node[nb,anchor=east] at (0.1,4.5){2.5\,V};
+\rv{0.3}{4.5}{3.7}{47\,k} \gnd{(0.3,3.7)}
+% collegamento del bias al nodo di R1
+\draw[wire] (0.3,4.5) -- (1.05,4.5) -- (1.05,3.7) -- (2.0,3.7) -- (3.1,3.7);
+
+% ===== MCP6022 op‑amp =====
+\draw[wire,fill=white] (4.45,4.2)--(4.45,2.6)--(6.25,3.4)--cycle;
+\node[font=\scriptsize] at (4.9,3.4){\textbf{MCP6022}};
+\node[pin] at (4.68,3.7){$-$}; \node[pin] at (4.68,3.1){$+$};
+\coordinate (opp) at (4.45,3.1); \coordinate (opm) at (4.45,3.7); \coordinate (opo) at (6.25,3.4);
+\draw[wire] (4.15,3.6)--(4.15,3.1)--(opp); \dotj{(4.15,3.1)} \node[pin,anchor=north] at (4.05,3.0){3};
+% rete di retroazione – resistenze spaziate
+\rh{2.6}{3.5}{2.8}{R\textsubscript{b} 100\,k}
+\draw[wire] (4.15,3.1)--(4.15,2.8)--(3.5,2.8);
+\draw[wire] (opm)--(4.05,3.7); \node[pin,anchor=south] at (4.0,3.75){2};
+\rh{3.1}{4.05}{3.7}{R1 10\,k}
+\draw[wire] (4.05,3.7)--(4.05,2.4); \rh{4.05}{6.55}{2.4}{R2 100\,k}
+\draw[wire] (6.55,2.4)--(6.9,2.4)--(6.9,3.4)--(opo); \dotj{(6.9,3.4)}
+\draw[pwr] (0.6,4.0)--(5.1,4.0)--(5.1,3.95); \dotj{(0.6,4.0)} \node[pin,anchor=west] at (5.15,3.68){8 VDD 5\,V};
+\draw[wire] (5.1,2.85)--(5.1,2.45); \node[pin,anchor=north] at (5.1,2.4){4 VSS}; \gnd{(5.1,2.4)}
+\node[pin,anchor=south] at (6.5,3.48){1 VOUTA};
+
+% ===== LPF + MCP3201 =====
+\draw[wire] (6.9,3.4)--(7.3,3.4); \rh{7.3}{8.3}{3.4}{R\textsubscript{f} 1.1\,k}
+\draw[wire] (8.3,3.4)--(9.0,3.4);
+\draw[wire] (8.6,3.4)--(8.6,2.9); \capd{8.6}{2.9}{C\textsubscript{f} 10\,nF} \gnd{(8.6,2.7)}
+\node[lab,anchor=south] at (7.8,3.7){LPF $f_c\!\approx\!14.5$\,kHz};
+\node[chip,minimum width=2.4cm,minimum height=2.0cm] (adc) at (9.9,2.9){\textbf{MCP3201}\\12-bit SAR};
+% IN+
+\draw[wire] (9.0,3.4) -- (8.7,3.4); \node[pin,anchor=south east] at (8.95,3.45){IN+ 2};
+% VREF / VSS (percorso alto, fuori dall'op‑amp)
+\draw[pwr] (0.6,4.8) .. controls (4,4.8) and (7,4.8) .. (8.7,4.8) -- (8.7,3.2); \dotj{(0.6,4.8)} \node[pin,anchor=south] at (8.3,4.85){VREF 5\,V};
+\gnd{(8.7,2.5)} \node[pin,anchor=east] at (8.6,2.5){VSS};
+% controllo SPI
+\coordinate (a_clk) at (11.1,3.3); \coordinate (a_dout) at (11.1,2.9); \coordinate (a_cs) at (11.1,2.5); \coordinate (a_vdd) at (11.1,3.7);
+\draw[wire] (adc.east|-0,3.7)--(a_vdd); \node[pin,anchor=west] at (a_vdd){8 VDD}; \draw[pwr] (a_vdd)--(11.5,3.7)--(11.5,4.8)--(0.6,4.8);
+\draw[wire] (adc.east|-0,3.3)--(a_clk); \node[pin,anchor=west] at (a_clk){7 CLK};
+\draw[wire] (adc.east|-0,2.9)--(a_dout); \node[pin,anchor=west] at (a_dout){6 DOUT};
+\draw[wire] (adc.east|-0,2.5)--(a_cs); \node[pin,anchor=west] at (a_cs){5 /CS};
+% collegamenti verso FPGA (etichette visibili, sfondo bianco)
+\draw[wire] (a_clk)--(12.0,3.3)--(12.0,1.3)--(5.7,1.3)--(p_acsk);
+\node[lab,fill=white,inner sep=0.7pt] at (8.6,1.35) {CLK $\to$ 74};
+\draw[wire] (a_cs)--(12.3,2.5)--(12.3,1.05)--(6.2,1.05)--(p_acs);
+\node[lab,fill=white,inner sep=0.7pt] at (8.6,1.1) {/CS $\to$ 73};
+% DOUT -> partitore -> miso_p
+\draw[wire] (a_dout)--(12.6,2.9); \rh{12.6}{13.6}{2.9}{1\,k} \dotj{(13.6,2.9)}
+\draw[wire] (13.6,2.9)--(13.6,1.55)--(6.7,1.55)--(p_amiso); \node[lab,anchor=south] at (10.0,1.6){DOUT$\div$ $\to$ 85};
+\rv{13.6}{2.9}{2.1}{2\,k} \gnd{(13.6,2.1)}
+\draw[wire] (p_amosi)--(7.2,6.8); \node[lab,anchor=south] at (7.2,6.8){75 n.c.};
+\end{tikzpicture}%
+}
+\caption{}
+\label{fig:board}
+\end{figure}
+
 % =====================================================================
 \section{The FPGA SoC}
 \label{sec:soc}
@@ -246,7 +459,7 @@ top level block diagram.
 
 \subsection{Block diagram}
 
-\begin{figure}[H]
+\begin{figure}[tp]
 \centering
 \resizebox{0.86\textwidth}{!}{%
 \begin{tikzpicture}[
@@ -258,7 +471,8 @@ top level block diagram.
     lbl/.style={font=\scriptsize},
     sig/.style={line width=0.6pt},
     clk/.style={-{Stealth[length=5pt]}, line width=0.7pt, dashed},
-    rstl/.style={line width=0.7pt, dashed},
+    rstl/.style={line width=0.48pt, draw=black!68, densely dashdotted, rounded corners=2pt},
+    rstar/.style={-{Stealth[length=5pt]}, line width=0.52pt, draw=black!68, densely dashdotted, rounded corners=2pt},
     rstdot/.style={circle, draw, line width=0.7pt, fill=white, inner sep=0pt, minimum size=4.5pt}
 ]
 
@@ -471,8 +685,8 @@ top level block diagram.
   \node[pin] (fp\i) at (-12.5,\y){}; \node[lbl,anchor=east] at (fp\i.west){\nm};
   \draw[sig] (fp\i) -- (fp\i -| L4.west);
 }
-% pin del display TFT (ex pin dei LED di debug 49/53/71/86 + 52 libero)
-\foreach \i/\y/\nm in {1/-5.3/{TFT SCL = pin 49}, 2/-5.55/{TFT SDA = pin 53}, 3/-5.8/{TFT DC = pin 71}, 4/-6.05/{TFT RST = pin 86}, 5/-6.3/{TFT CS = pin 52}}{
+% pin del display TFT (dal .cst: 27/28/29/30/31)
+\foreach \i/\y/\nm in {1/-5.3/{TFT SCL = pin 27}, 2/-5.55/{TFT SDA = pin 28}, 3/-5.8/{TFT DC = pin 29}, 4/-6.05/{TFT RST = pin 30}, 5/-6.3/{TFT CS = pin 31}}{
   \node[pin] (dp\i) at (-12.5,\y){}; \node[lbl,anchor=east] at (dp\i.west){\nm};
   \draw[sig] (dp\i) -- (dp\i -| disp.west);
 }
@@ -544,6 +758,45 @@ top level block diagram.
 
 
 % ==============================================================================
+% RESET TREE: un solo reset di sistema (pll_lock), iniettato sotto il bus come
+% i clock, e distribuito ai blocchi. Convenzione: PALLINO = ingresso attivo
+% basso (resetn / rst_i='0'), FRECCIA piena = ingresso attivo alto. Quasi tutto
+% il SoC e' attivo basso (esce dal reset quando il PLL aggancia); solo le due
+% PWM usano la versione invertita (not pll_lock), quindi attive alte.
+% ==============================================================================
+% Iniezione sotto il bus dal lock del rPLL.
+\draw[rstl] (pll.north) -- (\BusL,-8.6);
+\node[lbl, fill=white, inner sep=1pt] at (-4.3,-8.6) {reset $=$ \texttt{pll\_lock}};
+% Ogni ramo del reset porta scritto "reset" (etichetta in spazio libero, sfondo
+% bianco) e finisce col PALLINO (attivo basso) o con la FRECCIA piena (attivo alto).
+% Le quote y dei rami sono scelte nei vuoti fra blocchi, lontano dalle frecce-bus.
+% Rami colonna SINISTRA (pallino = ingresso attivo basso).
+\draw[rstl] (\BusL,10.0) -| ([xshift=-9mm]L1.north);
+\node[rstdot] at ([xshift=-9mm]L1.north) {};
+\node[lbl, fill=white, inner sep=1pt] at (-4.5,10.0) {reset};
+% (il reset del controller SDRAM, I_sdrc_rst_n, e' citato in didascalia: il
+%  cluster SIP/fetch/S0 ha tutti e quattro i lati occupati, niente ramo qui.)
+\draw[rstl] (\BusL,-1.85) -| ([xshift=-9mm]L4.north);
+\node[rstdot] at ([xshift=-9mm]L4.north) {};
+\node[lbl, fill=white, inner sep=1pt] at (-5.0,-1.85) {reset};
+\draw[rstl] (\BusL,-7.1) -| ([xshift=-9mm]disp.south);
+\node[rstdot] at ([xshift=-9mm]disp.south) {};
+\node[lbl, fill=white, inner sep=1pt] at (-4.5,-7.1) {reset};
+% Rami colonna DESTRA.
+\draw[rstl] (\BusR,10.3) -| ([xshift=9mm]R1.north);
+\node[rstdot] at ([xshift=9mm]R1.north) {};
+\node[lbl, fill=white, inner sep=1pt] at (4.5,10.3) {reset};
+\draw[rstl] (\BusR,-7.55) -| ([xshift=9mm]R5.south);
+\node[rstdot] at ([xshift=9mm]R5.south) {};
+\node[lbl, fill=white, inner sep=1pt] at (4.5,-7.55) {reset};
+% Le due PWM: attive ALTE (freccia piena, niente pallino).
+\draw[rstar] (\BusR,2.4) -| ([xshift=9mm]R3.north);
+\node[lbl, fill=white, inner sep=1pt] at (4.5,2.4) {reset};
+\draw[rstar] (\BusR,-1.6) -| ([xshift=9mm]R4.north);
+\node[lbl, fill=white, inner sep=1pt] at (4.5,-1.6) {reset};
+
+
+% ==============================================================================
 % BOUNDING BOX DEL SOC (Ora sagomato sui blocchi interni)
 % ==============================================================================
 \begin{scope}[on background layer]
@@ -554,7 +807,7 @@ top level block diagram.
 
 \end{tikzpicture}%
 }
-\caption{SoC top level (black and white). Each block reaches the central 32 bit Wishbone bus with three thick arrows: \emph{data} is bidirectional, while \emph{control} and \emph{address} arrows point toward the bus for the two masters (PicoRV32, audio accelerator) and toward the block for the slaves, indicating signal direction. The audio accelerator is both a master (M1, to read the ADC) and a slave (S5, for its control registers), so it reaches the bus with \emph{two} sets of arrows: the M1 set drawn in the master direction and the S5 set drawn in the slave direction, like every other slave. Inside it the real modules of \texttt{dma.vhd} are drawn: \texttt{dma\_proc} (the M1 master) filling the sample BSRAM, \texttt{fft\_proc} feeding the FFT core and collecting into the result BSRAM. Its spectrum \emph{drain} does not cross the bus at all, it owns a dedicated write port of the SDRAM controller, which is why the solid drain arrow enters the \emph{SIP} block directly. The SDRAM port is drawn as its real pieces: the SDRC\_HS SIP (the controller that speaks to the die and owns the write port), the \emph{fetch FSM} (\texttt{tst\_} in the RTL), and the two things the bus actually sees as slave S0, the BSRAM snapshot and the \texttt{fill\_cnt} frame counter. The dashed arrow is the frame done IRQ: in hardware it starts the fetch FSM, which reads the new spectrum back through the SIP, fills the BSRAM and finally bumps \texttt{fill\_cnt}; the same line also reaches the PicoRV32 as \texttt{irq[20]}, but the firmware ignores it and polls \texttt{fill\_cnt} over the bus instead (Section~\ref{sec:sdram}). The thin dashed nets are the clocks, drawn as a distribution tree rooted in the bus column to keep the routing readable: at the bottom the rPLL injects \texttt{clkout} (40.5\,MHz) and \texttt{clkoutp} ($+1.54$\,ns) into the spine, and the raw 27\,MHz crystal, tapped before the PLL (the dot on the \texttt{clk\_i} wire), enters next to it; each block then receives its own labelled branch, \texttt{clkout} for all the SoC logic, \texttt{clk\_i} (27\,MHz) for the LED PWM and the GPIO, and \texttt{clkoutp} only for the SDRAM die, leaving the SoC at the top left. These dashed branches are clock routing only, not Wishbone connections. ITCM and DTCM are CPU local block RAM, not on the Wishbone. The character UART generic slave S6 (\texttt{0x2}) reaches the ESP32 on pins 17 and 18 and carries the protocol characters plus the \texttt{\$} diagnostic lines; the pin is driven by this UART alone (the legacy boot banner and hardware decoder drivers are detached). The \textbf{NOR flash} path now runs through the CPU: the storage commands from the ESP32 land on the S7 UART (pins 72/20, top right), the firmware executes the W25Q sequences on the S8 generic SPI engine (pins 42, 41, 51, 48, left), and the old \texttt{flash\_ctrl} hardware block is retired (Section~\ref{sec:flashctrl}). The \textbf{SPI display} slave S9 (\texttt{spi\_display.vhd}) drives the ST7789 TFT on the five pins freed by the old debug LEDs plus pin 52, through its fixed $\div6$ prescaler (6.75\,MHz) drawn below the block like every other peripheral divider (Section~\ref{sec:display}). Every external connection carries its real FPGA pin number from the constraints file.}
+\caption{SoC top level (black and white). Each block reaches the central 32 bit Wishbone bus with three thick arrows: \emph{data} is bidirectional, while \emph{control} and \emph{address} arrows point toward the bus for the two masters (PicoRV32, audio accelerator) and toward the block for the slaves, indicating signal direction. The audio accelerator is both a master (M1, to read the ADC) and a slave (S5, for its control registers), so it reaches the bus with \emph{two} sets of arrows: the M1 set drawn in the master direction and the S5 set drawn in the slave direction, like every other slave. Inside it the real modules of \texttt{dma.vhd} are drawn: \texttt{dma\_proc} (the M1 master) filling the sample BSRAM, \texttt{fft\_proc} feeding the FFT core and collecting into the result BSRAM. Its spectrum \emph{drain} does not cross the bus at all, it owns a dedicated write port of the SDRAM controller, which is why the solid drain arrow enters the \emph{SIP} block directly. The SDRAM port is drawn as its real pieces: the SDRC\_HS SIP (the controller that speaks to the die and owns the write port), the \emph{fetch FSM} (\texttt{tst\_} in the RTL), and the two things the bus actually sees as slave S0, the BSRAM snapshot and the \texttt{fill\_cnt} frame counter. The dashed arrow is the frame done IRQ: in hardware it starts the fetch FSM, which reads the new spectrum back through the SIP, fills the BSRAM and finally bumps \texttt{fill\_cnt}; the same line also reaches the PicoRV32 as \texttt{irq[20]}, but the firmware ignores it and polls \texttt{fill\_cnt} over the bus instead (Section~\ref{sec:sdram}). The thin dashed nets are the clocks, drawn as a distribution tree rooted in the bus column to keep the routing readable: at the bottom the rPLL injects \texttt{clkout} (40.5\,MHz) and \texttt{clkoutp} ($+1.54$\,ns) into the spine, and the raw 27\,MHz crystal, tapped before the PLL (the dot on the \texttt{clk\_i} wire), enters next to it; each block then receives its own labelled branch, \texttt{clkout} for all the SoC logic, \texttt{clk\_i} (27\,MHz) for the LED PWM and the GPIO, and \texttt{clkoutp} only for the SDRAM die, leaving the SoC at the top left. The dash dotted net labelled \emph{reset} is the single system reset, the rPLL \texttt{lock} (\texttt{pll\_lock}) injected under the bus like the clocks, so the SoC leaves reset only when the PLL locks; a branch ends in a \emph{circle} where the reset input is active low (as on the CPU \texttt{resetn}, the SDRAM controller \texttt{rst\_n}, and \texttt{rst\_i} tested against \texttt{'0'} on every UART, SPI and the GPIO) and in a \emph{filled arrow} where it is active high (the two PWMs, which take \texttt{not pll\_lock}). To keep the figure readable the net is drawn to one representative block of each kind; the SDRAM controller shares it too, while the ADC SPI (tied to ``never reset'') and the accelerator (no synchronous reset) stay unmarked. ITCM and DTCM are CPU local block RAM, not on the Wishbone. The character UART generic slave S6 (\texttt{0x2}) reaches the ESP32 on pins 17 and 18 and carries the protocol characters plus the \texttt{\$} diagnostic lines; the pin is driven by this UART alone (the legacy boot banner and hardware decoder drivers are detached). The \textbf{NOR flash} path now runs through the CPU: the storage commands from the ESP32 land on the S7 UART (pins 72/20, top right), the firmware executes the W25Q sequences on the S8 generic SPI engine (pins 42, 41, 51, 48, left), and the old \texttt{flash\_ctrl} hardware block is retired (Section~\ref{sec:flashctrl}). The \textbf{SPI display} slave S9 (\texttt{spi\_display.vhd}) drives the ST7789 TFT on five spare pins (27 to 31: SCL, SDA, DC, RST, CS), through its fixed $\div6$ prescaler (6.75\,MHz) drawn below the block like every other peripheral divider (Section~\ref{sec:display}). Every external connection carries its real FPGA pin number from the constraints file.}
 \label{fig:soc}
 \end{figure}
 
@@ -1093,39 +1346,105 @@ just filled, feeds it to the Gowin FFT core, collects the 512 spectrum words in
 and raises the IRQ. While one half of \texttt{spi\_raw\_buf} is being processed,
 the other half keeps filling, so no sample is lost.
 
+Figure~\ref{fig:audio-zoom} is a zoom into the accelerator drawn in the same
+visual language as the SoC diagram (Figure~\ref{fig:soc}): the same white blocks,
+the same shaded block RAMs, the same hollow bus arrows, so it reads as the inset
+of the \texttt{dma.vhd} container blown up to show its real internal modules and
+its three external interfaces.
+
 \begin{figure}[H]
 \centering
+\resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
-    every node/.style={font=\footnotesize},
-    blk/.style={draw, line width=0.7pt, fill=white, minimum width=2.3cm, minimum height=1.0cm, align=center},
-    buf/.style={draw, line width=0.7pt, fill=black!7, minimum width=2.3cm, minimum height=1.0cm, align=center},
-    a/.style={-{Stealth}, line width=0.9pt}
+    every node/.style={font=\small},
+    blk/.style={draw, line width=0.8pt, fill=white, minimum width=3.0cm, minimum height=1.5cm, align=center, text width=2.9cm},
+    buf/.style={draw, line width=0.8pt, fill=black!7, minimum width=3.0cm, minimum height=1.5cm, align=center, text width=2.9cm},
+    sip/.style={draw, line width=0.8pt, fill=white, minimum width=2.6cm, minimum height=1.5cm, align=center, text width=2.5cm},
+    pin/.style={circle, draw, fill=white, line width=0.6pt, inner sep=1pt, minimum size=5pt},
+    lbl/.style={font=\scriptsize},
+    dp/.style={-{Stealth[length=6pt]}, line width=1.0pt},
+    dpb/.style={{Stealth[length=6pt]}-{Stealth[length=6pt]}, line width=1.0pt},
+    ctl/.style={-{Stealth[length=5pt]}, line width=0.7pt, densely dashed}
 ]
-\node[blk] (adc) {MCP3201\\ \footnotesize 12 bit ADC};
-\node[blk, right=0.7cm of adc] (spirx) {SPI rx\\ \footnotesize \texttt{dma\_proc}};
-\node[buf, right=0.7cm of spirx] (raw) {\texttt{spi\_raw\_buf}\\ \footnotesize ping-pong\\ \footnotesize $1024\times16$ BSRAM};
-\node[blk, right=0.7cm of raw] (fft) {Gowin FFT\\ \footnotesize 512 pt, \texttt{fft\_proc}};
-\node[buf, below=0.8cm of fft] (res) {\texttt{fft\_result\_buf}\\ \footnotesize $512\times16$ BSRAM};
-\node[blk, left=0.7cm of res] (sdram) {SDRAM\\ \footnotesize spectrum};
-\node[blk, left=0.7cm of sdram] (fetch) {fetch FSM\\ \footnotesize (\texttt{tst\_})};
-\node[buf, left=0.7cm of fetch] (snap) {BSRAM snapshot\\ \footnotesize $512\times16$};
-\node[blk, below=0.8cm of snap] (dec) {soft core\\ \footnotesize decode (firmware)};
-\node[blk, right=0.7cm of dec] (uart) {UART\\ \footnotesize to ESP32};
-\draw[a] (adc)--(spirx); \draw[a] (spirx)--(raw); \draw[a] (raw)--(fft);
-\draw[a] (fft)--(res); \draw[a] (res)--(sdram);
-\draw[a] (sdram)--(fetch); \draw[a] (fetch)--(snap);
-\draw[a] (snap)-- node[font=\scriptsize, right]{poll \texttt{fill\_cnt}} (dec);
-\draw[a] (dec)--(uart);
-\draw[-{Stealth}, line width=0.7pt, dashed] (fft.south west) to[out=235,in=55]
-      node[font=\scriptsize, fill=white, inner sep=1pt]{IRQ} (fetch.north east);
-\end{tikzpicture}
-\caption{Receive pipeline (black and white). The capture FSM fills one half of the
-ping-pong block RAM while the FFT FSM processes the other half into a spectrum in
-SDRAM, through the controller's dedicated write port. The frame done IRQ (dashed)
-starts the fetch FSM, which copies the spectrum into the stable BSRAM snapshot;
-the soft core polls the snapshot counter over the bus (S0), copies the 512 bins
-and, in firmware, decodes one character per tone and sends it to the ESP32.}
-\label{fig:audio-pipeline}
+% ── fat hollow bus arrows (SoC style) ──────────────────────────────────────
+\newcommand{\zR}[4]{\draw[fill=white, line width=0.8pt]
+    (#1,#3+0.16) -- (#2-0.32,#3+0.16) -- (#2-0.32,#3+0.32) -- (#2,#3) --
+    (#2-0.32,#3-0.32) -- (#2-0.32,#3-0.16) -- (#1,#3-0.16) -- cycle;
+    \node[font=\scriptsize\sffamily] at ($(#1,#3)!0.5!(#2,#3)$) {#4};}
+\newcommand{\zL}[4]{\draw[fill=white, line width=0.8pt]
+    (#2,#3+0.16) -- (#1+0.32,#3+0.16) -- (#1+0.32,#3+0.32) -- (#1,#3) --
+    (#1+0.32,#3-0.32) -- (#1+0.32,#3-0.16) -- (#2,#3-0.16) -- cycle;
+    \node[font=\scriptsize\sffamily] at ($(#1,#3)!0.5!(#2,#3)$) {#4};}
+\newcommand{\zBi}[4]{\draw[fill=white, line width=0.8pt]
+    (#1+0.32,#3+0.16) -- (#2-0.32,#3+0.16) -- (#2-0.32,#3+0.32) -- (#2,#3) --
+    (#2-0.32,#3-0.32) -- (#2-0.32,#3-0.16) -- (#1+0.32,#3-0.16) --
+    (#1+0.32,#3-0.32) -- (#1,#3) -- (#1+0.32,#3+0.32) -- cycle;
+    \node[font=\scriptsize\sffamily] at ($(#1,#3)!0.5!(#2,#3)$) {#4};}
+\def\Bx{0.3}\def\Ble{2.4}\def\Sle{2.4}
+
+% bus stub
+\draw[fill=white, line width=1.0pt, rounded corners=2pt] (-0.3,-4.7) rectangle (0.3,4.0);
+\node[rotate=90, font=\bfseries\sffamily\footnotesize] at (0,-0.4) {On chip bus};
+
+% blocks
+\node[blk] (dma) at (3.9,2.6) {\textbf{\texttt{dma\_proc}}\\capture FSM\\bus master M1};
+\node[blk, minimum height=1.2cm] (cfg) at (3.9,-3.4) {\textbf{config regs}\\slave S5 (\texttt{0x30})\\start / stop / base};
+\node[buf] (raw) at (8.2,2.6) {\texttt{spi\_raw\_buf}\\ping-pong\\$1024{\times}16$ BSRAM};
+\node[blk] (fft) at (8.2,-1.4) {\textbf{\texttt{fft\_proc}}\\FFT + drain FSM};
+\node[blk] (core) at (12.0,-1.4) {FFT 512\\Gowin IP core};
+\node[buf] (res) at (12.0,2.6) {\texttt{fft\_result\_buf}\\$512{\times}16$ BSRAM};
+\node[sip] (sip) at (15.6,2.6) {SDRC\_HS SIP\\\scriptsize dedicated write port};
+
+% bus arrows: M1 (master, toward bus) and S5 (slave, toward block)
+\zBi{\Bx}{\Ble}{2.6+0.6}{M1 data}
+\zL{\Bx}{\Ble}{2.6}{M1 control}
+\zL{\Bx}{\Ble}{2.6-0.6}{M1 address}
+\node[lbl, anchor=south west] at (0.4,3.55) {to ADC SPI (S1) over the bus};
+\zBi{\Bx}{\Sle}{-3.4+0.45}{S5 data}
+\zR{\Bx}{\Sle}{-3.4}{S5 control}
+\zR{\Bx}{\Sle}{-3.4-0.45}{S5 address}
+
+% datapaths
+\draw[dp] (dma.east) -- node[lbl, above]{12-bit sample} (raw.west);
+\draw[dp] (raw.south) -- node[lbl, right]{window read} (raw.south |- fft.north);
+\draw[dpb] (fft.east) -- node[lbl, above, align=center]{feed \texttt{xn\_re}\\collect \texttt{xk\_re}} (core.west);
+\draw[dp] (core.north) -- node[lbl, right]{\texttt{xk\_re}} (core.north |- res.south);
+\draw[dp] (res.east) -- node[lbl, above]{drain} (sip.west);
+
+% control: trigger and config
+\draw[ctl] (dma.south) |- (5.6,0.2) -| ([xshift=-7mm]fft.north);
+\node[lbl, fill=white, inner sep=1pt] at (5.6,0.55) {\texttt{fft\_trigger} + \texttt{win\_base}};
+\draw[ctl] (cfg.east) -- node[lbl, below]{start / base} ([yshift=-2mm]fft.west);
+
+% external pins
+\node[pin] (sdpin) at (17.6,2.6){}; \draw[dpb] (sip.east) -- (sdpin);
+\node[lbl, anchor=west] at (sdpin.east) {to SDRAM die (8\,MB)};
+\node[pin] (irq) at (8.2,-3.7){}; \draw[ctl] ([xshift=-6mm]fft.south) |- (irq);
+\node[lbl, anchor=north] at ([yshift=-1pt]irq.south) {frame IRQ $\to$ fetch FSM / \texttt{irq[20]}};
+\node[pin] (dbg) at (12.0,-3.7){}; \draw[dp, line width=0.7pt] ([xshift=6mm]fft.south) |- (dbg);
+\node[lbl, anchor=north] at ([yshift=-1pt]dbg.south) {\texttt{fft\_ser} debug pin};
+
+% container box
+\begin{scope}[on background layer]
+\node[draw, line width=1.1pt, fit=(dma)(cfg)(raw)(fft)(core)(res), inner sep=16pt, rounded corners=3pt] (box){};
+\end{scope}
+\node[anchor=south west, font=\bfseries] at (box.north west) {Audio accelerator \ \texttt{dma.vhd} \ (master M1 + slave S5)};
+\end{tikzpicture}%
+}
+\caption{Audio accelerator, zoomed in the SoC style. The container is the
+\texttt{dma.vhd} block of Figure~\ref{fig:soc} blown up to its real modules.
+\texttt{dma\_proc} (the bus master M1) reads the ADC over the Wishbone bus and
+writes 12-bit samples into the ping-pong \texttt{spi\_raw\_buf}; every 512 samples
+it pulses \texttt{fft\_trigger} and hands the just filled window base to
+\texttt{fft\_proc}. \texttt{fft\_proc} reads that window, feeds the Gowin FFT core,
+collects the 512 spectrum words into \texttt{fft\_result\_buf}, then drains them to
+SDRAM as 20 row bursts of 26 words through the SDRC\_HS SIP's \emph{dedicated write
+port} (the one path that does not cross the bus, exactly as in
+Figure~\ref{fig:soc}), and finally raises the frame IRQ. The config registers
+(slave S5) only carry start/stop and the SDRAM output base; the dashed nets are
+control, the solid ones are sample/spectrum datapaths. The whole right hand drain
+never touches the bus, so it cannot collide with the CPU.}
+\label{fig:audio-zoom}
 \end{figure}
 
 \subsection{Timing in cycles and in seconds}
@@ -1174,53 +1493,101 @@ guard: trimming that wait is the obvious first move if the budget ever tightens
 (for example with a larger FFT), but as long as the margin holds, a wait that is
 known to make the SDRAM reliable is not something I optimise away for elegance.
 
-\subsection{The two state machines}
+\subsection{The two state machines, drawn as HLSMs}
+
+Both machines do real work in every state, not just sequencing, so I draw them as
+high level state machines: each box keeps the RTL state name and lists the
+register transfers that state performs, while the edge labels carry the guard and,
+in braces, the action taken on the transition. The notation is the RTL one:
+$\leftarrow$ is a clocked assignment, \texttt{WB} is a Wishbone access on the M1
+master, \texttt{raw\_buf}/\texttt{res\_buf} are \texttt{spi\_raw\_buf} and
+\texttt{fft\_result\_buf}.
+
+\begin{figure}[H]
+\centering
+\resizebox{0.96\textwidth}{!}{%
+\begin{tikzpicture}[
+    every node/.style={font=\footnotesize},
+    hb/.style={draw, line width=0.7pt, fill=white, align=left, inner sep=4pt, font=\scriptsize, text width=2.7cm, minimum height=1.5cm},
+    a/.style={-{Stealth[length=5pt]}, line width=0.7pt},
+    al/.style={font=\scriptsize, fill=white, inner sep=1.5pt}
+]
+\def\hh#1{\textbf{\texttt{#1}}\\[1.5pt]}
+% feed-in (top left), then a clean rectangular steady-state loop on the right
+\node[hb] (idle)  at (0,1.5)    {\hh{DS\_IDLE}\texttt{wr\_ptr}\,$\leftarrow$\,0};
+\node[hb] (open)  at (3.4,1.5)  {\hh{DS\_OPEN}WB wr \texttt{SPI[0x04]}\,$\leftarrow$\,1\\(enable ADC SPI)};
+\node[hb] (poll)  at (6.8,1.5)  {\hh{DS\_POLL}wait\\\texttt{spi\_data\_ready}};
+\node[hb] (read)  at (10.2,1.5) {\hh{DS\_READ}WB rd \texttt{SPI[0x00]}\\\texttt{rdata}\,$\leftarrow$\,bus};
+\node[hb] (store) at (6.8,-1.4) {\hh{DS\_STORE}\texttt{raw\_buf[ptr]} $\leftarrow$ \texttt{rdata}\\\texttt{wr\_ptr}++\\\scriptsize 512$^{\text{th}}$: \{\texttt{win\_base}, \texttt{trig}\}};
+\node[hb] (clr)   at (10.2,-1.4){\hh{DS\_CLRDY}WB wr \texttt{SPI[0x0C]} $\leftarrow$ 0\\(clear ready)};
+\draw[a] (idle) -- node[al,below]{\texttt{start\_r}} (open);
+\draw[a] (open) -- (poll);
+\draw[a] (poll) -- node[al,below]{ready} (read);
+\draw[a] (read) -- (clr);
+\draw[a] (clr)  -- (store);
+\draw[a] (store) -- node[al,left]{always} (poll);
+\end{tikzpicture}%
+}
+\caption{Capture HLSM (\texttt{dma\_proc}); each Wishbone access advances on its
+\texttt{ack}, left implicit on the edges. After the one time \texttt{DS\_OPEN}
+that enables the ADC SPI master, the machine loops
+\texttt{POLL\,$\to$\,READ\,$\to$\,CLRDY\,$\to$\,STORE} once per sample: it waits
+for the conversion, reads the word over the bus, clears the ready flag, and writes
+the 12 low bits into the ping-pong buffer. Every 512$^{\text{th}}$ store it also
+selects the just filled half (\texttt{win\_base} $=0$ or $512$) and pulses
+\texttt{fft\_trigger}, which is the only thing it ever says to the FFT machine.}
+\label{fig:capture-hlsm}
+\end{figure}
 
 \begin{figure}[H]
 \centering
 \resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
     every node/.style={font=\footnotesize},
-    st/.style={rounded rectangle, draw, line width=0.6pt, fill=white, minimum width=1.9cm, minimum height=0.8cm, align=center, inner sep=3pt},
-    a/.style={-{Stealth}, line width=0.6pt},
-    al/.style={font=\scriptsize, fill=white, inner sep=1pt}
+    hb/.style={draw, line width=0.7pt, fill=white, align=left, inner sep=4pt, font=\scriptsize, text width=2.95cm, minimum height=1.5cm},
+    a/.style={-{Stealth[length=5pt]}, line width=0.7pt},
+    al/.style={font=\scriptsize, fill=white, inner sep=1.5pt}
 ]
-% capture FSM (left)
-\node[font=\bfseries] at (-5.0,1.7) {Capture (\texttt{dma\_proc})};
-\node[st] (idle) at (-8.0,0) {DS\_IDLE};
-\node[st] (open) at (-5.0,0) {DS\_OPEN};
-\node[st] (poll) at (-2.0,0) {DS\_POLL};
-\node[st] (read) at (-2.0,-2.4) {DS\_READ};
-\node[st] (clr) at (-5.0,-2.4) {DS\_CLRDY};
-\node[st] (store) at (-8.0,-2.4) {DS\_STORE};
-\draw[a] (idle)--(open); \draw[a] (open)--(poll); \draw[a] (poll)-- node[al,right]{ready}(read);
-\draw[a] (read)--(clr); \draw[a] (clr)--(store);
-\draw[a] (store) to[out=120,in=240] (idle.south);
-\node[al] at (-8.0,-3.4) {every 512: pulse \texttt{fft\_trigger}};
-% FFT FSM (right)
-\node[font=\bfseries] at (5.0,1.7) {FFT (\texttt{fft\_proc})};
-\node[st] (fi) at (2.0,0) {FS\_IDLE};
-\node[st] (ff) at (5.0,0) {FS\_FEED};
-\node[st] (fc) at (8.0,0) {FS\_COMPUTE};
-\node[st] (fcol) at (8.0,-2.4) {FS\_COLLECT};
-\node[st] (fd) at (5.0,-2.4) {FS\_SDR\_*\\ \tiny settle + drain};
-\node[st] (firq) at (2.0,-2.4) {FS\_IRQ};
-\draw[a] (fi)-- node[al,above]{trig}(ff); \draw[a] (ff)--(fc); \draw[a] (fc)--(fcol);
-\draw[a] (fcol)--(fd); \draw[a] (fd)--(firq); \draw[a] (firq) to[out=120,in=240] (fi.south);
+\def\hh#1{\textbf{\texttt{#1}}\\[1.5pt]}
+% row 1 (feed/compute/collect), L->R
+\node[hb] (idle) at (0,0)    {\hh{FS\_IDLE}\texttt{sdr\_own}\,$\leftarrow$\,0\\\texttt{rd\_idx}\,$\leftarrow$\,0};
+\node[hb] (feed) at (4.4,0)  {\hh{FS\_FEED1}if \texttt{ipd}: \texttt{rd\_idx}++\\\texttt{xn\_re} $\leftarrow$\\\texttt{raw\_buf[base+idx]}};
+\node[hb] (comp) at (8.8,0)  {\hh{FS\_COMPUTE}wait FFT\\pipeline (\texttt{busy})};
+\node[hb] (coll) at (13.2,0) {\hh{FS\_COLLECT}if \texttt{opd}:\\\texttt{res\_buf[idx]} $\leftarrow$ \texttt{xk\_re}};
+% row 2 (drain core), R->L
+\node[hb] (settle) at (13.2,-3.4) {\hh{FS\_SDR\_SETTLE}if \texttt{initdone}:\\\texttt{settle}++\\(200k cycle guard)};
+\node[hb] (ww) at (8.8,-3.4) {\hh{FS\_SDR\_WW}\texttt{data} $\leftarrow$ \texttt{res\_buf[b*26]}\\if \texttt{busy\_n}:\\\texttt{wr\_n}$\leftarrow$0, set \texttt{addr}};
+\node[hb] (w) at (4.4,-3.4) {\hh{FS\_SDR\_W}\texttt{data} $\leftarrow$\\\texttt{res\_buf[b*26+i]}\\\texttt{widx}++ (29 cyc)};
+% row 3 (irq/serial)
+\node[hb] (irq) at (4.4,-6.6) {\hh{FS\_IRQ}\texttt{sdr\_own}$\leftarrow$0\\\texttt{sdr\_done}$\leftarrow$1\\\texttt{irq}$\leftarrow$1};
+\node[hb] (ser) at (0,-6.6) {\hh{FS\_SERIAL}shift \texttt{res\_buf}\\$\to$ \texttt{fft\_ser}\\(512$\times$16 bit)};
+% row 1 transitions
+\node[al,align=center] at (2.2,1.15) {\texttt{trig}\,\&\,!\texttt{done} \{\texttt{start\_req}\}};
+\draw[a] (idle) -- (feed);
+\draw[a] (feed) -- node[al,above]{\texttt{eod}} (comp);
+\draw[a] (comp) -- node[al,above]{\texttt{soud}} (coll);
+\draw[a] (coll) -- node[al,right,align=left]{\texttt{eoud}\\\{\texttt{own}$\leftarrow$1\}} (settle);
+% row 2 transitions (labels below, clear of boxes)
+\draw[a] (settle) -- node[al,below]{=200k} (ww);
+\draw[a] (ww) -- node[al,below]{\texttt{busy\_n}} (w);
+\draw[a] (w.north) to[out=55,in=125] node[al,above]{\texttt{t}=28, next burst \{\texttt{b}++\} / warm done} (ww.north);
+\draw[a] (w) -- node[al,right]{\texttt{b}=19} (irq);
+\draw[a] (irq) -- (ser);
+\draw[a] (ser.west) to[out=180,in=180,looseness=0.7] node[al,left,align=center]{512 words\\\{\texttt{done}$\leftarrow$0\}} (idle.west);
 \end{tikzpicture}%
 }
-\caption{The two parallel FSMs. Capture reads one ADC sample per pass
-(\texttt{DS\_OPEN} starts the SPI, \texttt{DS\_POLL} waits for the conversion,
-\texttt{DS\_READ}/\texttt{DS\_STORE} write it into the ping-pong buffer) and pulses
-\texttt{fft\_trigger} every 512 samples. The FFT FSM, on that trigger, feeds the
-window (\texttt{FS\_FEED}), runs the FFT (\texttt{FS\_COMPUTE}), collects the bins
-(\texttt{FS\_COLLECT}), then takes ownership of the SDRAM write port and drains
-them (\texttt{FS\_SDR\_*}: the settle guard, then warm up plus 20 row bursts) and
-raises the IRQ (\texttt{FS\_IRQ}), after which it also streams the frame on a
-debug pin before re-arming. The two FSMs cannot collide: capture's only shared
-resource is the Wishbone bus (M1, to reach the ADC), while the drain uses the
-dedicated SDRAM port and never touches the bus.}
-\label{fig:accel-fsm}
+\caption{FFT and drain HLSM (\texttt{fft\_proc}). On a trigger it feeds the window
+to the Gowin core one sample per \texttt{ipd} (\texttt{FS\_FEED1}), waits for the
+pipeline (\texttt{FS\_COMPUTE}), and collects the 512 bins as they come out
+(\texttt{FS\_COLLECT}). Then it takes the SDRAM write port and drains: a
+\texttt{200{,}000} cycle settle guard copied from the proven bring up
+(\texttt{FS\_SDR\_SETTLE}), then the warm up burst and 20 row bursts of 26 words,
+each as a \texttt{WW}\,$\to$\,\texttt{W} present-then-strobe pair looping on
+\texttt{b} (\texttt{FS\_SDR\_WW}/\texttt{FS\_SDR\_W}). After the last burst it
+raises the IRQ and latches \texttt{sdr\_done} (\texttt{FS\_IRQ}), streams the frame
+on a debug pin (\texttt{FS\_SERIAL}), and re-arms. The collect and drain states
+touch no Wishbone, so the capture machine on M1 can never interrupt them.}
+\label{fig:fft-hlsm}
 \end{figure}
 
 \begin{table}[H]
@@ -1303,20 +1670,44 @@ window applied before the FFT spreads a pure tone over two or three bins.
 % =====================================================================
 
 The receive chain in front of the FPGA is analog, and getting it described
-correctly matters. The electret microphone produces a few millivolts riding on no
-particular DC level. An MCP6022 operational amplifier, wired as a non inverting
-stage, does two jobs: it biases the signal to mid rail and it amplifies it. The
-bias comes from a 47\,k$\Omega$ / 47\,k$\Omega$ divider from the 3.3\,V rail, which
-sets the operating point at $3.3/2 = 1.65\,\mathrm{V}$ so that the amplified
-waveform swings symmetrically inside the ADC input range. After the amplifier an RC
-low pass acts as an anti aliasing filter before the ADC. The MCP3201 is a 12 bit
-SPI ADC: it is the SPI slave, and the FPGA SPI master clocks it to read each
-conversion. So the chain is
+correctly matters; it is the bottom of the board schematic (Figure~\ref{fig:board}),
+and the whole chain runs off the FPGA's 5\,V rail, not the 3.3\,V. The electret
+microphone produces a few millivolts riding on no particular DC level. It is AC
+coupled through a 1\,$\mu$F capacitor and a 100\,$\Omega$ series resistor into an
+MCP6022 operational amplifier, wired as a non inverting stage, which does two jobs:
+it biases the signal to mid rail and it amplifies it. The bias comes from a
+47\,k$\Omega$ / 47\,k$\Omega$ divider on the 5\,V rail, which sets the operating
+point at $5/2 = 2.5\,\mathrm{V}$, the mid point of the ADC's $0$--$5$\,V input
+range, so the amplified waveform swings symmetrically. The gain is set by the two
+feedback resistors,
+
+\[
+G = 1 + \frac{R_2}{R_1} = 1 + \frac{100\,\mathrm{k}\Omega}{10\,\mathrm{k}\Omega} = 11,
+\]
+
+so a $\pm 4$\,mV microphone signal becomes a $\pm 44$\,mV swing around 2.5\,V, well
+inside range. After the amplifier an RC low pass acts as an anti aliasing filter
+before the ADC, with $R_f = 1.1\,\mathrm{k}\Omega$ and $C_f = 10\,\mathrm{nF}$, so
+the corner is
+
+\[
+f_c = \frac{1}{2\pi R_f C_f} = \frac{1}{2\pi \cdot 1.1\,\mathrm{k}\Omega \cdot 10\,\mathrm{nF}}
+    \approx 14.5\,\mathrm{kHz}.
+\]
+
+That corner is chosen to sit comfortably below the Nyquist frequency
+($f_s/2 = 23.4\,\mathrm{kHz}$) while passing every protocol tone (the highest is
+4577\,Hz), so it rejects the higher frequency content that would otherwise alias
+into the band the decoder watches. The MCP3201 is a 12 bit \emph{SAR} (successive
+approximation register) ADC: on each conversion it binary searches the input one
+bit at a time against an internal DAC, and shifts the 12 bit result out over SPI.
+It is the SPI slave (\texttt{Vref}\,$=5$\,V), and the FPGA SPI master clocks it to
+read each conversion. So the chain is
 
 \[
 \begin{aligned}
-\text{electret mic} &\rightarrow \text{MCP6022 (gain + 1.65 V bias)} \rightarrow \text{RC anti alias}\\
-&\rightarrow \text{MCP3201 (12 bit SPI ADC)} \rightarrow \text{FPGA SPI master}.
+\text{electret mic} &\rightarrow \text{1\,$\mu$F + 100\,$\Omega$} \rightarrow \text{MCP6022 ($G=11$, 2.5 V bias)} \rightarrow \text{RC anti alias (14.5 kHz)}\\
+&\rightarrow \text{MCP3201 (12 bit SAR SPI ADC, Vref 5 V)} \rightarrow \text{FPGA SPI master}.
 \end{aligned}
 \]
 
@@ -1794,10 +2185,8 @@ debugging session's worth of guessing about the state of the chip.
 Until this point the only way to see what the master was doing was the UART
 console or the web dashboard, both of which need a laptop. The last addition is
 a 2 inch IPS panel (a GMT020-02-7P, ST7789 controller, $240\times320$) wired
-straight to the FPGA, on which the soft core draws its own mini dashboard. The
-five wires it needs came at zero cost: four are the pins that used to drive the
-debug LEDs (49, 53, 71, 86), which had been idle since the resistorless LED
-purge of Section~\ref{sec:si}, plus the free pin 52 for chip select.
+straight to the FPGA, on which the soft core draws its own mini dashboard. It
+needs five wires, on five spare FPGA pins (27 to 31): SCL, SDA, DC, RST and CS.
 
 \subsection{The \texttt{spi\_display} slave}
 
