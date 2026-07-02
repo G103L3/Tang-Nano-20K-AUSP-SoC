@@ -1,0 +1,410 @@
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+-- =============================================================================
+--  sdram_controller_fsm  -  controller SDR SDRAM scritto a mano
+-- =============================================================================
+--  Rimpiazza l'IP cifrato Gowin "SDRAM_controller_top_SIP": STESSE porte, STESSO
+--  protocollo lato utente, STESSI timing documentati nel report (sec. SDRAM).
+--  Pilota il die SDR embedded del GW2AR-18 (4 bank x 2048 righe x 256 colonne
+--  x 32 bit, 8 MB) parlando JEDEC: ACTIVE / READ / WRITE / PRECHARGE / REFRESH /
+--  LOAD MODE REGISTER, con bring-up CKE -> >=200us -> PRECHARGE ALL -> 2x AUTO
+--  REFRESH -> LMR (CAS latency 3, sequenziale, full-page burst).
+--
+--  Metodologia: due processi (stato presente / stato prossimo).
+--    p_comb  : combinatorio, calcola SOLO next_state (case su 'st').
+--    p_sync  : sincrono, registra st<=nstate, i contatori, i latch e TUTTE le
+--              uscite (Moore registrate: comando emesso nel 1o ciclo di ogni
+--              stato, riconosciuto con "nstate /= st").
+--
+--  Clock (come il SIP):
+--    I_sdrc_clk  = clk_sdram   (40.5 MHz) -> tutta la logica e il sampling DQ.
+--    I_sdram_clk = clk_sdram_p (+1.54 ns) -> inoltrato su O_sdram_clk per
+--                  centrare la finestra dati in lettura (vedi report).
+--
+--  Indirizzo utente I_sdrc_addr[20:0] = { ba[1:0], row[10:0], col[7:0] }.
+--  data_len = N  ->  burst di N+1 parole (il progetto usa N=26 -> 27 parole).
+-- =============================================================================
+
+entity sdram_controller_fsm is
+    generic (
+        -- Timing in cicli di I_sdrc_clk (40.5 MHz, tCK = 24.69 ns).
+        INIT_WAIT_CYCLES : natural := 8192;  -- >=200us (8100 -> arrotondato)
+        TRCD_CYCLES      : natural := 3;     -- ACTIVE -> READ/WRITE
+        CL_CYCLES        : natural := 3;     -- CAS latency (READ -> dato)
+        TRP_CYCLES       : natural := 2;     -- PRECHARGE -> ACTIVE
+        TRFC_CYCLES      : natural := 4;     -- durata AUTO REFRESH
+        TMRD_CYCLES      : natural := 2;     -- LMR -> comando successivo
+        TWR_CYCLES       : natural := 2;     -- write recovery prima di PRECHARGE
+        REFRESH_INTERVAL : natural := 312    -- AUTO REFRESH ~ogni 7.7us
+    );
+    port (
+        -- ---- lato die SDRAM (identico al SIP) -------------------------------
+        O_sdram_clk        : out   std_logic;
+        O_sdram_cke        : out   std_logic;
+        O_sdram_cs_n       : out   std_logic;
+        O_sdram_cas_n      : out   std_logic;
+        O_sdram_ras_n      : out   std_logic;
+        O_sdram_wen_n      : out   std_logic;
+        O_sdram_dqm        : out   std_logic_vector(3 downto 0);
+        O_sdram_addr       : out   std_logic_vector(10 downto 0);
+        O_sdram_ba         : out   std_logic_vector(1 downto 0);
+        IO_sdram_dq        : inout std_logic_vector(31 downto 0);
+        -- ---- lato utente (identico al SIP) ----------------------------------
+        I_sdrc_rst_n       : in    std_logic;
+        I_sdrc_clk         : in    std_logic;
+        I_sdram_clk        : in    std_logic;
+        I_sdrc_selfrefresh : in    std_logic;
+        I_sdrc_power_down  : in    std_logic;
+        I_sdrc_wr_n        : in    std_logic;
+        I_sdrc_rd_n        : in    std_logic;
+        I_sdrc_addr        : in    std_logic_vector(20 downto 0);
+        I_sdrc_data_len    : in    std_logic_vector(7 downto 0);
+        I_sdrc_dqm         : in    std_logic_vector(3 downto 0);
+        I_sdrc_data        : in    std_logic_vector(31 downto 0);
+        O_sdrc_data        : out   std_logic_vector(31 downto 0);
+        O_sdrc_init_done   : out   std_logic;
+        O_sdrc_busy_n      : out   std_logic;
+        O_sdrc_rd_valid    : out   std_logic;
+        O_sdrc_wrd_ack     : out   std_logic
+    );
+end entity sdram_controller_fsm;
+
+architecture rtl of sdram_controller_fsm is
+
+    -- ---- encoding comando {cs_n, ras_n, cas_n, wen_n} -----------------------
+    subtype cmd_t is std_logic_vector(3 downto 0);
+    constant CMD_NOP  : cmd_t := "0111";  -- (CS basso, gli altri alti)
+    constant CMD_ACT  : cmd_t := "0011";  -- ACTIVE
+    constant CMD_READ : cmd_t := "0101";  -- READ
+    constant CMD_WRITE: cmd_t := "0100";  -- WRITE
+    constant CMD_PRE  : cmd_t := "0010";  -- PRECHARGE
+    constant CMD_REF  : cmd_t := "0001";  -- AUTO REFRESH
+    constant CMD_LMR  : cmd_t := "0000";  -- LOAD MODE REGISTER
+    constant CMD_INH  : cmd_t := "1111";  -- DESELECT (CS alto)
+
+    -- Mode Register: BL=full page(A2-0=111), CL=3(A6-4=011), seq(A3=0), A9=0.
+    constant MODE_REG : std_logic_vector(10 downto 0) := "00000110111";
+
+    type state_t is (
+        S_RESET, S_INIT_WAIT, S_INIT_PRE, S_INIT_REF1, S_INIT_REF2, S_INIT_LMR,
+        S_IDLE, S_REF,
+        S_ACT_RD, S_RD, S_RD_DATA,
+        S_WR_CAP, S_ACT_WR, S_WR_DATA, S_TWR,
+        S_PRE
+    );
+    signal st, nstate : state_t;
+
+    -- contatore unico: azzerato a ogni cambio stato, incrementa restando.
+    -- serve sia come timer (attese) sia come indice parola (cattura/drena/leggi).
+    signal tmr : unsigned(13 downto 0);
+
+    -- ===================== DIAGNOSTICA TEMPORANEA =====================
+    -- DIAG_READ_RAMP : in lettura O_sdrc_data = rampa (bypassa il die). TEST 1
+    --   gia' fatto -> rampa PULITA = FSM/fetch/display OK.
+    -- DIAG_WRITE_RAMP: in scrittura il controller manda al die una rampa NOTA
+    --   (ignora i dati del DMA) e poi la RILEGGE DAL DIE VERO (read ramp OFF).
+    --   TEST 2 (questo): se il display mostra la rampa -> die write+read OK
+    --   (problema a monte); se mostra zeri/spazzatura -> die write o read rotto.
+    -- DIAG_WBUF_RD   : in lettura O_sdrc_data = contenuto del buffer wbuf
+    --   (= cio' che e' stato CATTURATO dal DMA), bypassando il die. TEST 3:
+    --   se il display mostra dati sensati (spettro non nullo) -> cattura +
+    --   lettura buffer OK -> il problema e' la scrittura sul die; se mostra
+    --   zeri/spazzatura -> e' la CATTURA del dato dal DMA a non funzionare.
+    -- RIMETTERE tutte a false dopo i test.
+    constant DIAG_READ_RAMP  : boolean := false;
+    constant DIAG_WRITE_RAMP : boolean := false;
+    constant DIAG_WBUF_RD    : boolean := false;
+    -- =================================================================
+
+    -- latch dei parametri del comando accettato
+    signal ba_lat  : std_logic_vector(1 downto 0);
+    signal row_lat : std_logic_vector(10 downto 0);
+    signal col_lat : std_logic_vector(7 downto 0);
+    signal len_lat : unsigned(7 downto 0);
+    signal dqm_lat : std_logic_vector(3 downto 0);
+
+    -- refresh
+    signal ref_cnt : unsigned(9 downto 0);
+    signal ref_req : std_logic;
+
+    -- buffer di scrittura: disaccoppia lo streaming fisso del DMA dal timing dei
+    -- comandi SDRAM e garantisce l'allineamento (32 parole: data_len<=31; il
+    -- progetto usa 26).
+    -- IMPORTANTE: forzato a REGISTRI (syn_ramstyle="registers"). Di default Gowin
+    -- lo mappava su BSRAM con lettura REGISTRATA -> in scrittura S_WR_DATA leggeva
+    -- wbuf subito dopo che S_WR_CAP l'aveva scritto, prendendo il dato vecchio/0
+    -- (hazard read-after-write) -> il die riceveva 0. Con registri la lettura e'
+    -- combinatoria, identica alla sim GHDL, e l'hazard sparisce.
+    type wbuf_t is array (0 to 31) of std_logic_vector(31 downto 0);
+    signal wbuf : wbuf_t;
+    attribute syn_ramstyle : string;
+    attribute syn_ramstyle of wbuf : signal is "registers";
+
+    -- DQ e uscite registrate
+    signal dq_in_r  : std_logic_vector(31 downto 0);
+    signal dq_out_r : std_logic_vector(31 downto 0);
+    signal dq_oe_r  : std_logic;
+
+    signal cmd_r       : cmd_t;
+    signal addr_r      : std_logic_vector(10 downto 0);
+    signal bank_r      : std_logic_vector(1 downto 0);
+    signal dqm_r       : std_logic_vector(3 downto 0);
+    signal init_done_r : std_logic;
+    signal busy_n_r    : std_logic;
+    signal rd_valid_r  : std_logic;
+    signal wrd_ack_r   : std_logic;
+    signal data_r      : std_logic_vector(31 downto 0);
+
+begin
+
+    -- forward del clock sfasato verso il die (come fa il SIP con I_sdram_clk)
+    O_sdram_clk <= I_sdram_clk;
+    O_sdram_cke <= '1';                       -- CKE alto da subito (richiesto nel bring-up)
+
+    -- bus comando registrato
+    O_sdram_cs_n  <= cmd_r(3);
+    O_sdram_ras_n <= cmd_r(2);
+    O_sdram_cas_n <= cmd_r(1);
+    O_sdram_wen_n <= cmd_r(0);
+    O_sdram_addr  <= addr_r;
+    O_sdram_ba    <= bank_r;
+    O_sdram_dqm   <= dqm_r;
+
+    -- tristate del bus dati
+    IO_sdram_dq <= dq_out_r when dq_oe_r = '1' else (others => 'Z');
+
+    O_sdrc_data      <= data_r;
+    O_sdrc_init_done <= init_done_r;
+    O_sdrc_busy_n    <= busy_n_r;
+    O_sdrc_rd_valid  <= rd_valid_r;
+    O_sdrc_wrd_ack   <= wrd_ack_r;
+
+    -- =========================================================================
+    --  next_state (combinatorio puro)
+    -- =========================================================================
+    p_comb : process(st, tmr, ref_req, I_sdrc_wr_n, I_sdrc_rd_n, len_lat)
+    begin
+        nstate <= st;
+        case st is
+            when S_RESET     => nstate <= S_INIT_WAIT;
+
+            when S_INIT_WAIT =>
+                if tmr = INIT_WAIT_CYCLES - 1 then nstate <= S_INIT_PRE; end if;
+            when S_INIT_PRE  =>                              -- PRECHARGE ALL + tRP
+                if tmr = TRP_CYCLES  - 1 then nstate <= S_INIT_REF1; end if;
+            when S_INIT_REF1 =>                              -- AUTO REFRESH + tRFC
+                if tmr = TRFC_CYCLES - 1 then nstate <= S_INIT_REF2; end if;
+            when S_INIT_REF2 =>
+                if tmr = TRFC_CYCLES - 1 then nstate <= S_INIT_LMR;  end if;
+            when S_INIT_LMR  =>                              -- LMR + tMRD
+                if tmr = TMRD_CYCLES - 1 then nstate <= S_IDLE;      end if;
+
+            when S_IDLE =>
+                -- priorita' al comando utente (l'impulso wr_n/rd_n dura 1 ciclo
+                -- e non si puo' perdere); il refresh resta pending e parte al
+                -- primo IDLE senza comando (i burst hanno ampi vuoti fra loro).
+                if    I_sdrc_wr_n  = '0' then nstate <= S_WR_CAP;
+                elsif I_sdrc_rd_n  = '0' then nstate <= S_ACT_RD;
+                elsif ref_req      = '1' then nstate <= S_REF;
+                end if;
+
+            when S_REF =>
+                if tmr = TRFC_CYCLES - 1 then nstate <= S_IDLE; end if;
+
+            -- ---- lettura --------------------------------------------------
+            when S_ACT_RD =>                                 -- ACTIVE riga + tRCD
+                if tmr = TRCD_CYCLES - 1 then nstate <= S_RD; end if;
+            when S_RD =>                                     -- READ col + CL + 2
+                -- attesa = CAS latency + i 2 stadi di registro del path di
+                -- lettura (IO_sdram_dq -> dq_in_r -> data_r), cosi' il 1o
+                -- rd_valid coincide con la 1a parola valida su O_sdrc_data.
+                if tmr = CL_CYCLES + 1 then nstate <= S_RD_DATA; end if;
+            when S_RD_DATA =>                                -- N+1 parole valide
+                if tmr = len_lat then nstate <= S_PRE; end if;
+
+            -- ---- scrittura ------------------------------------------------
+            when S_WR_CAP =>                                 -- cattura N+1 parole
+                if tmr = len_lat then nstate <= S_ACT_WR; end if;
+            when S_ACT_WR =>                                 -- ACTIVE riga + tRCD
+                if tmr = TRCD_CYCLES - 1 then nstate <= S_WR_DATA; end if;
+            when S_WR_DATA =>                                -- WRITE col + drena
+                if tmr = len_lat then nstate <= S_TWR; end if;
+            when S_TWR =>                                    -- write recovery
+                if tmr = TWR_CYCLES - 1 then nstate <= S_PRE; end if;
+
+            when S_PRE =>                                    -- PRECHARGE + tRP
+                if tmr = TRP_CYCLES - 1 then nstate <= S_IDLE; end if;
+        end case;
+    end process;
+
+    -- =========================================================================
+    --  registri: stato, contatori, latch, buffer, uscite registrate
+    -- =========================================================================
+    p_sync : process(I_sdrc_clk)
+        variable ntmr : unsigned(13 downto 0);
+    begin
+        if rising_edge(I_sdrc_clk) then
+            if I_sdrc_rst_n = '0' then
+                st          <= S_RESET;
+                tmr         <= (others => '0');
+                ref_cnt     <= (others => '0');
+                ref_req     <= '0';
+                init_done_r <= '0';
+                busy_n_r    <= '0';
+                rd_valid_r  <= '0';
+                wrd_ack_r   <= '0';
+                dq_oe_r     <= '0';
+                cmd_r       <= CMD_INH;
+                addr_r      <= (others => '0');
+                bank_r      <= (others => '0');
+                dqm_r       <= (others => '0');
+                data_r      <= (others => '0');
+            else
+                ------------------------------------------------------------------
+                -- stato + contatore (azzerato a ogni transizione)
+                ------------------------------------------------------------------
+                st <= nstate;
+                if nstate /= st then ntmr := (others => '0');
+                else                 ntmr := tmr + 1;
+                end if;
+                tmr <= ntmr;
+
+                ------------------------------------------------------------------
+                -- contatore di refresh (libero; servito al primo IDLE)
+                ------------------------------------------------------------------
+                if ref_cnt = REFRESH_INTERVAL - 1 then
+                    ref_cnt <= (others => '0');
+                    ref_req <= '1';
+                else
+                    ref_cnt <= ref_cnt + 1;
+                end if;
+                if st = S_REF then        -- richiesta servita
+                    ref_req <= '0';
+                end if;
+
+                ------------------------------------------------------------------
+                -- init_done / busy_n
+                ------------------------------------------------------------------
+                if st = S_INIT_LMR and nstate = S_IDLE then
+                    init_done_r <= '1';
+                end if;
+                -- pronto solo in IDLE e con nessun refresh pending: cosi' chi
+                -- attende busy_n=1 (DMA/fetch) non emette un impulso wr_n/rd_n
+                -- proprio nel ciclo in cui il controller parte col refresh.
+                if nstate = S_IDLE and ref_req = '0' then busy_n_r <= '1';
+                else                                       busy_n_r <= '0';
+                end if;
+
+                ------------------------------------------------------------------
+                -- latch dei parametri quando si accetta un comando in IDLE
+                ------------------------------------------------------------------
+                if st = S_IDLE and
+                   (I_sdrc_wr_n = '0' or I_sdrc_rd_n = '0') then
+                    ba_lat  <= I_sdrc_addr(20 downto 19);
+                    row_lat <= I_sdrc_addr(18 downto  8);
+                    col_lat <= I_sdrc_addr( 7 downto  0);
+                    len_lat <= unsigned(I_sdrc_data_len);
+                    dqm_lat <= I_sdrc_dqm;
+                end if;
+
+                ------------------------------------------------------------------
+                -- cattura dati di scrittura: si parte dal 1o ciclo IN cui st e'
+                -- gia' S_WR_CAP (= ciclo dopo lo strobe), scartando la parola del
+                -- ciclo-strobe (come il SIP scarta il valore di WW).
+                ------------------------------------------------------------------
+                if st = S_WR_CAP then
+                    wbuf(to_integer(tmr(4 downto 0))) <= I_sdrc_data;
+                    wrd_ack_r <= '1';
+                else
+                    wrd_ack_r <= '0';
+                end if;
+
+                ------------------------------------------------------------------
+                -- pilotaggio DQ in scrittura (dato allineato al comando WRITE)
+                ------------------------------------------------------------------
+                if nstate = S_WR_DATA then
+                    if DIAG_WRITE_RAMP then
+                        dq_out_r <= std_logic_vector(resize(ntmr, 32));  -- rampa nota al die
+                    else
+                        dq_out_r <= wbuf(to_integer(ntmr(4 downto 0)));
+                    end if;
+                    dq_oe_r  <= '1';
+                else
+                    dq_oe_r  <= '0';
+                end if;
+
+                ------------------------------------------------------------------
+                -- campionamento DQ (su I_sdrc_clk: il die pilota DQ su clkoutp,
+                -- sfasato di 1.54 ns, quindi qui si campiona dentro la finestra
+                -- dati) + uscita dati in lettura.
+                -- Scarta le letture "impossibili": il dato valido e' x"0000"&bin
+                -- (16 bit alti SEMPRE 0); se sono diversi da 0 il bus DQ era
+                -- flottante/glitch (legge 1 coi pull-up) -> forzo 0 (un bin a 0 e'
+                -- invisibile, un picco max sarebbe un falso tono).
+                ------------------------------------------------------------------
+                dq_in_r <= IO_sdram_dq;
+                if nstate = S_RD_DATA then
+                    if DIAG_READ_RAMP then
+                        data_r <= std_logic_vector(resize(ntmr, 32));  -- rampa = indice parola
+                    elsif DIAG_WBUF_RD then
+                        data_r <= wbuf(to_integer(ntmr(4 downto 0)));   -- contenuto del buffer
+                    elsif dq_in_r(31 downto 16) /= x"0000" then
+                        data_r <= (others => '0');                      -- lettura flottante: scartata
+                    else
+                        data_r <= dq_in_r;
+                    end if;
+                    rd_valid_r <= '1';
+                else
+                    rd_valid_r <= '0';
+                end if;
+
+                ------------------------------------------------------------------
+                -- bus comando / indirizzo: comando emesso nel 1o ciclo dello
+                -- stato (ingresso = "nstate /= st"); altrimenti NOP.
+                ------------------------------------------------------------------
+                cmd_r  <= CMD_NOP;
+                addr_r <= (others => '0');
+                bank_r <= ba_lat;
+                if nstate /= st then
+                    case nstate is
+                        when S_INIT_PRE | S_PRE =>
+                            cmd_r  <= CMD_PRE;
+                            addr_r <= "10000000000";          -- A10=1: tutti i bank
+                        when S_INIT_REF1 | S_INIT_REF2 | S_REF =>
+                            cmd_r  <= CMD_REF;
+                        when S_INIT_LMR =>
+                            cmd_r  <= CMD_LMR;
+                            addr_r <= MODE_REG;
+                            bank_r <= "00";
+                        when S_ACT_RD | S_ACT_WR =>
+                            cmd_r  <= CMD_ACT;
+                            addr_r <= row_lat;
+                        when S_RD =>
+                            cmd_r  <= CMD_READ;
+                            addr_r <= "000" & col_lat;        -- A10=0: no auto-precharge
+                        when S_WR_DATA =>
+                            cmd_r  <= CMD_WRITE;
+                            addr_r <= "000" & col_lat;
+                        when others =>
+                            cmd_r  <= CMD_NOP;
+                    end case;
+                end if;
+
+                ------------------------------------------------------------------
+                -- DQM: basso durante le finestre dato, mascherato altrimenti
+                ------------------------------------------------------------------
+                if nstate = S_RD or nstate = S_RD_DATA then
+                    dqm_r <= "0000";
+                elsif nstate = S_WR_DATA then
+                    dqm_r <= dqm_lat;
+                else
+                    dqm_r <= "1111";
+                end if;
+
+            end if;
+        end if;
+    end process;
+
+end architecture rtl;

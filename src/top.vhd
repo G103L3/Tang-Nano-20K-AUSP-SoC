@@ -132,6 +132,41 @@ architecture behavioral of top_system is
         );
     end component;
 
+    -- Controller SDRAM scritto a mano (drop-in del SIP, porte IDENTICHE).
+    -- Il SIP qui sopra resta DICHIARATO e nel progetto Gowin, ma NON e' piu'
+    -- istanziato: u_sdram_direct ora usa sdram_controller_fsm. I generic usano
+    -- i default dell'entity (timing @40.5 MHz documentati nel report).
+    component sdram_controller_fsm
+        port (
+            O_sdram_clk      : out   std_logic;
+            O_sdram_cke      : out   std_logic;
+            O_sdram_cs_n     : out   std_logic;
+            O_sdram_cas_n    : out   std_logic;
+            O_sdram_ras_n    : out   std_logic;
+            O_sdram_wen_n    : out   std_logic;
+            O_sdram_dqm      : out   std_logic_vector(3 downto 0);
+            O_sdram_addr     : out   std_logic_vector(10 downto 0);
+            O_sdram_ba       : out   std_logic_vector(1 downto 0);
+            IO_sdram_dq      : inout std_logic_vector(31 downto 0);
+            I_sdrc_rst_n     : in    std_logic;
+            I_sdrc_clk       : in    std_logic;
+            I_sdram_clk      : in    std_logic;
+            I_sdrc_selfrefresh : in  std_logic;
+            I_sdrc_power_down  : in  std_logic;
+            I_sdrc_wr_n      : in    std_logic;
+            I_sdrc_rd_n      : in    std_logic;
+            I_sdrc_addr      : in    std_logic_vector(20 downto 0);
+            I_sdrc_data_len  : in    std_logic_vector(7 downto 0);
+            I_sdrc_dqm       : in    std_logic_vector(3 downto 0);
+            I_sdrc_data      : in    std_logic_vector(31 downto 0);
+            O_sdrc_data      : out   std_logic_vector(31 downto 0);
+            O_sdrc_init_done : out   std_logic;
+            O_sdrc_busy_n    : out   std_logic;
+            O_sdrc_rd_valid  : out   std_logic;
+            O_sdrc_wrd_ack   : out   std_logic
+        );
+    end component;
+
     component spi_master
         port (
             clk_i : in std_logic; rst_i : in std_logic; cyc_i : in std_logic; stb_i : in std_logic;
@@ -821,7 +856,10 @@ begin
     sip_rd_n <= tst_rd_n     when dma_sdr_own = '0' else '1';
     sip_addr <= dma_sdr_addr when dma_sdr_own = '1' else tst_addr;
     sip_data <= dma_sdr_data when dma_sdr_own = '1' else tst_wr_data;
-    u_sdram_direct: SDRAM_controller_top_SIP
+    -- Controller hand-made (streaming, come il SIP). Port map IDENTICA al SIP.
+    -- Il SIP resta dichiarato e nel progetto Gowin, ma NON e' piu' istanziato.
+    -- Per tornare al SIP: cambia il solo nome componente in SDRAM_controller_top_SIP.
+    u_sdram_direct: sdram_controller_fsm
     port map (
         O_sdram_clk      => O_sdram_clk,    O_sdram_cke      => O_sdram_cke,
         O_sdram_cs_n     => O_sdram_cs_n,   O_sdram_cas_n    => O_sdram_cas_n,
@@ -952,6 +990,8 @@ begin
     u_decoder: audio_decoder
         generic map (
             DEBUG_MODE  => false,  -- char mode: emette il char riconosciuto
+                                   -- (NB: blocco dentro "if false generate" = NON usato;
+                                   --  la decodifica vera e' nel firmware della CPU)
             THRESHOLD   => 6,      -- soglia ASSOLUTA sul magnitude interpolato (parabolica)
             N_BINS      => 256
         )
