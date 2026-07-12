@@ -186,7 +186,10 @@ static void decode_step(void) {
     read_sdram_tick();                          /* 1 poll: snapshot BSRAM stabile */
     if (g_sdram_ready) {
         g_sess++;
-        if (decode_slave_carrier(g_sdram, 512)) {   /* sento il carrier SLAVE (bin27)? */
+        /* sento il carrier SLAVE (bin27)? SOLO se NON sto emettendo: mentre emetto il
+         * mic prende il MIO carrier (bin22) e ogni tanto lo scambia per lo slave, che
+         * avvelenerebbe il gate dei 3 s. Durante tono e coda (emit_busy) non ascolto. */
+        if (!emit_busy() && decode_slave_carrier(g_sdram, 512)) {
             g_slave_last = rdcycle32(); g_slave_seen = 1;
         }
         char d = decode_char(g_sdram, 512);

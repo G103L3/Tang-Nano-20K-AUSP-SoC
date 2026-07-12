@@ -89,11 +89,10 @@ void emit_player_tick(void) {
             }
             break;
         case P_TONE:
-            /* se lo slave comincia a parlare mentre emetto -> mi interrompo subito */
-            if (g_channel_busy) {
-                PWM10_STOPW = 1; p_t0 = now; pstate = P_SIL;
-                break;
-            }
+            /* niente CSMA a meta' emissione: il master sentiva il PROPRIO carrier
+             * (bin22) come se fosse lo slave (bin27) e si auto-interrompeva. Il gate
+             * CSMA resta solo in P_IDLE (parto se il canale e' libero da 3 s). Una
+             * volta partito, il tono va sempre a fondo, non lo interrompe piu' niente. */
             if ((now - p_t0) >= ms_to_cycles(p_warm ? WARMUP_MS : TONE_MS)) {
                 PWM10_STOPW = 1; p_t0 = now; pstate = P_SIL;
             }

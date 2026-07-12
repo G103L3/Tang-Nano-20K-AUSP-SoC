@@ -141,7 +141,7 @@ The external hardware: a W25Q64 NOR flash (8\,MB) for storage, a 2$''$ ST7789 di
 by an MCP3201 12 bit SAR ADC, and an 8\,$\Omega$ speaker driven from a PWM pin through
 a low side MOSFET. A single 12\,V supply feeds the speaker directly and, through a
 DFR1202 buck, the 5\,V input of the board. The ESP32 connects to the FPGA through two
-UART links and runs the protocol logic, the Wi-Fi link and a WebSocket
+register level UART links and runs the protocol logic, the Wi-Fi link and a WebSocket
 web dashboard.
 
 % =====================================================================
@@ -157,7 +157,7 @@ Section~\ref{sec:protocol}). Wi-Fi only carries dashboard traffic.
 
 Inside the master, three units split the work by timing class. The FPGA
 does everything sample rate bound: it reads the ADC, computes the FFT, snapshots the
-spectrum and generates the PWM tones. The PicoRV32 soft core copies and decodes the spectrum, listens before it talks,
+spectrum and generates the PWM tones. The PicoRV32 soft core copies and decodes the spectrum, applies carrier sense,
 runs the W25Q storage protocol through the FPGA and draws the display. The ESP32 does everything decision
 bound: protocol state machine, retries, dashboard. Table~\ref{tab:partition} lists the
 partition.
@@ -173,7 +173,7 @@ partition.
 \midrule
 ADC sampling, DMA to buffer, 512 pt FFT, SDRAM store, snapshot & FPGA fabric & hardware \\
 Two tone generation (DDS sine sum, envelope) & FPGA fabric & hardware \\
-Spectrum copy, tone decode, listen before talk & soft core & software \\
+Spectrum copy, tone decode, carrier sense (CSMA) & soft core & software \\
 NOR storage protocol (W25Q), display rendering, health scan & soft core & software \\
 Protocol state machine, framing, retries, Wi-Fi dashboard & ESP32 & software \\
 \bottomrule
@@ -760,8 +760,7 @@ selected, with the two access delays.}
 A combinational process
 computes next\_state only, and a synchronous process registers the state,
 one shared counter tmr (cleared on every state change), and all
-outputs a Moore machine with registered outputs, where each JEDEC command (the
-standard that defines the SDRAM commands) is
+outputs a Moore machine with registered outputs, where each JEDEC command is
 emitted exactly on the first cycle of its state (detected as
 next\_state\,$\neq$\,curr\_state) and NOP fills the rest. The mode register is
 programmed for CAS latency 3 (CL is the one timing I set myself; I use 3 because it only
@@ -769,7 +768,7 @@ adds two cycles over CL 1 and changes nothing for the project constraints, and t
 problem on that side), sequential addressing and full page burst. This is why the
 column address goes out only once, with the READ or WRITE command: from there the die
 steps through the columns by itself, one per cycle and in order (sequential), so I never
-resend it. The burst length is how long the FSM stays in the data state, and the
+resend it. The burst length is just how long the FSM stays in the data state, and the
 closing PRECHARGE ends it. The FSM also issues an AUTO
 REFRESH about every $7.8\,\mu$s: a counter asks for one every 312 cycles, served in
 S\_IDLE. Table~\ref{tab:sdram-cmd} lists the commands it issues.
@@ -961,7 +960,7 @@ per cycle.
 \textbf{Clock phase.} On a read the die does not drive its data pins at once: the data
 comes a few nanoseconds after the die's clock edge (the access time $t_{AC}$) and then
 travels back over the board to the FPGA, so it arrives late. With the die on the same
-clock as the controller I was sampling too early, and on a few reads a
+clock as the controller I was sampling too early, and on a small fraction of reads a
 bit came back wrong (0xFFFE instead of 0xFFFF). Feeding the die the $1.54$\,ns shifted
 clock (clkoutp) lets me sample in the middle of the data, and the errors
 stopped.
@@ -1084,7 +1083,7 @@ WR\_ALIGN$=0$.
 \textbf{How the spectrum is written.} Figure~\ref{fig:sdram-write} is one burst: 26 words
 go into 26 columns next to each other in one open row (the column goes up by one every
 cycle, the row stays the same). The whole spectrum is 20 bursts, one per row (rows 2 to 21
-of bank 2). I use one row per burst to keep the addressing easy: the row is the burst
+of bank 2). I use one row per burst to keep the address simple: the row is just the burst
 number, and each bin goes to position burst$\times26+$index. Only 26 of the 256
 columns of a row are used, but the chip is 8\,MB and there is plenty of time, so filling
 the rows would not help. Each drain starts with one extra warm up burst into row 1 that is
@@ -1360,7 +1359,7 @@ the next state.
 \label{sec:adc}
 
 The analog front end (bottom of Figure~\ref{fig:board}) biases the electret capsule with a 47k/47k divider, amplifies it by $G = 1 + 100\mathrm{k}/10\mathrm{k}
-= 11$ in an MCP6022 non inverting configuration, and passes it through an RC low pass
+= 11$ in an MCP6022 non inverting configuration, and passes it through a small RC low pass
 into the MCP3201. The filter uses a $680\,\Omega$ resistor with the 102 (1\,nF) capacitors,
 so
 $f_c = 1/(2\pi \cdot 680\,\Omega \cdot 1\,\mathrm{nF}) = 234$\,kHz; it only trims fast noise.
@@ -1651,7 +1650,7 @@ The decoder run in C on the soft core, it apply three tests to each of the five
 protocol bins: a local maximum test against the six neighbours within $\pm3$
 bins, a
 curvature test on $k{-}1,k,k{+}1$ (the peak must open downward, so $k$ is a
-crest and not the side of a nearby peak); and an amplitude test on the
+crest and not the skirt of a neighbour); and an amplitude test on the
 parabolically interpolated peak against a fixed threshold exactly how my thesis described. 
 
 % =====================================================================
@@ -1703,7 +1702,7 @@ At every single 40.5\,MHz clock tick, both 24-bit accumulators add their specifi
  what let me set the frequency in fine steps. The frequency step is $f_\mathrm{clk}/2^{24}$, a few Hz; with only
   8 bits the smallest step would be $f_\mathrm{clk}/2^{8}$, which is the 158\,kHz carrier
   itself, far too coarse for an audio tone. Since FPGA hardware can run parallel tasks,
-  the code reads two different values from the exact
+  the code actually reads two different values from the exact 
   same table at the exact same time. To send these two different
    frequencies to a single output pin, the code adds the two
     retrieved sine values together and divides the result by 2
@@ -1755,7 +1754,7 @@ Finally, to make the audio sound good, the amplitude is never switched on or off
 \label{sec:display}
 % =====================================================================
 
-The display is an ST7789 TFT panel ($240\times320$ pixels, RGB565 colour) driven over
+The display is a small ST7789 TFT panel ($240\times320$ pixels, RGB565 colour) driven over
 SPI. The FPGA block spi\_display.vhd is a transmit only SPI in mode 3 (SCK idles
 high, the panel reads each bit on the rising edge). Only three wires carry data: SCK (the
 clock), SDA (the bits) and CS (chip select). The clock uses a $\div6$ prescaler, so the SCK
@@ -1768,16 +1767,16 @@ picks it. The shift FSM has three states (Figure~\ref{fig:disp-fsm}): it waits f
 then sends the 8 bits, and after the eighth bit SCK parks high, which is already the mode 3
 idle, so there is no extra state between bytes.
 
-On top of the SPI, the firmware draws a dashboard on the panel. At boot it first
+On top of the SPI, the firmware draws a small dashboard on the panel. At boot it first
 sends the ST7789 init sequence (SWRESET, SLPOUT, COLMOD RGB565, MADCTL landscape, INVON,
 NORON, DISPON), each command with its datasheet delay. After that the drawing works step by
 step. When the firmware wants to draw something it does not send it right away: it puts the
-drawing as a job in a queue that holds up to 48 jobs. Then, once per main loop, the
-function display\_tick() takes one job from the queue and sends only a chunk
+drawing as a small job in a queue that holds up to 48 jobs. Then, once per main loop, the
+function display\_tick() takes one job from the queue and sends only a small chunk
 of SPI bytes (128 to 384 bytes, about 150 to $450\,\mu$s). This chunk is short next to the
 10.9\,ms frame, so it does not slow down the tone player. If instead the firmware drew a
 full screen in one go, the SPI would take about 180\,ms and block the main loop, which would
-stop the tone and fill up the command FIFO. Sending it in chunks avoids this.
+stop the tone and fill up the command FIFO. Sending small chunks avoids this.
 
 Four fixed zones show slave health, the live spectrum
 (bins 16 to 55 straight from the snapshot), RX/TX symbols and a log ring; which
@@ -2000,7 +1999,7 @@ flag, display theme colours, view flags, v2 marker 0x5A); sectors 1 to 2 hold th
 log, 512 slots of 16 bytes (sequence, type character, timestamp, value, 8 ASCII
 bytes) managed as a ring buffer. At power up a SCAN reads the type byte of all 512
 slots and takes head $=$ (highest valid $+1$) mod 512; treating anything outside the
-valid type set as empty makes the scan ignore the gaps an aborted write leaves.
+valid type set as empty makes the scan robust to the holes an aborted write leaves.
 
 \begin{figure}[H]
 \centering
@@ -2025,7 +2024,7 @@ valid type set as empty makes the scan ignore the gaps an aborted write leaves.
 \textbf{Unlock before reading the id.} On this board the /HOLD and /WP
 pins are left unconnected. A floating /HOLD pin picks up noise from the SCK line,
 which makes the chip stop in the middle of a transfer, and then every read gives
-0xFF, even the chip id. So I cannot read the id first to check that the chip is
+0xFF, even the chip id. So I cannot just read the id first to check that the chip is
 there. Instead, at boot the firmware first sends a WRSR command that sets the QE bit (this
 frees the /HOLD and /WP pins) and clears the write protection, then a
 Global Block Unlock, and only after that it reads the id. If the id is still wrong, the
@@ -2170,7 +2169,7 @@ clocks; data goes LSB first.}
 \label{sec:firmware}
 % =====================================================================
 
-The soft core runs a firmware written in C (seven files plus a startup file), built
+The soft core runs a small firmware written in C (seven files plus a startup file), built
 for rv32imc. The code sits in the 32\,KB ITCM and the data in the 16\,KB DTCM, both
 local to the CPU and off the bus. The build turns the binary into a hex file that the CPU
 loads into the ITCM at start up, so the firmware travels inside the FPGA bitstream and needs
@@ -2193,7 +2192,7 @@ register from each slave and looks at the value it gets back; if a slave gives a
 stuck value it is marked as not healthy. The result is packed into a short status word
 (\$HLT) that both the display and the web dashboard show, so I can see at a glance
 which blocks are working. The same idea also helped at boot: just before the firmware talks
-to a slave for the first time, it prints a marker on the diagnostics UART. If that
+to a slave for the first time, it prints a small marker on the diagnostics UART. If that
 slave locks up the CPU, the last marker printed is the name of the slave that caused it, so I
 know straight away where the problem is. This is how I found the GPIO ack bug in a few
 minutes.
@@ -2282,7 +2281,7 @@ NOR command UART & T & read the status \\
 \end{tabular}
 \end{table}
 
-On the ESP32 side the software is a few modules: a UART driver that writes the chip
+On the ESP32 side the software is a few small modules: a UART driver that writes the chip
 registers directly (115\,200 baud from the 80\,MHz clock), a flash link with retry and read
 back, the codebook, the protocol state machine, and the WebSocket client for the dashboard.
 The Wi-Fi transmit power is kept at 11\,dBm, because at full power the current bursts once
@@ -2379,7 +2378,8 @@ playing. Second, before sending each byte the ESP32 waits for 1\,s of silence, a
 up after 15\,s so a noisy line cannot block sending forever. The channel loses tones often,
 so both sides retry: a presence request with no answer for 8\,s is sent again up to a set
 number of times (default 6, saved in flash), and the registration message is sent again on a
-random 30 to 40\,s timer until it is confirmed.
+random 30 to 40\,s timer until it is confirmed. Receiving the same message twice does no
+harm, so repeats are safe.
 
 \end{document}
 

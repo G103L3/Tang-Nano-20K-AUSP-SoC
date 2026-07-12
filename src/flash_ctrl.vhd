@@ -85,10 +85,6 @@ architecture rtl of flash_ctrl is
     signal rx_cnt   : integer range 0 to BUF_N := 0;
     signal cmd_r    : std_logic_vector(7 downto 0) := (others => '0');
 
-    -- W25Q sector erase puo' richiedere fino a 400 ms, page program 3 ms,
-    -- chip erase secondi. Tenere ~620 ms a 40.5 MHz = 25M cicli copre sector
-    -- erase con buon margine. (Vecchio 200000 = ~5 ms era assolutamente
-    -- insufficiente e faceva fallire ogni 0x20 -> POLL_FAIL -> 'E'.)
     constant POLL_MAX : integer := 25_000_000;
     signal poll_to    : integer range 0 to POLL_MAX := 0;
 
@@ -158,15 +154,7 @@ begin
                         buf(0) <= x"06"; fn <= 1; ret <= B_WRSR; st <= RF_CSL;
 
                     when B_WRSR =>
-                        -- WRSR a 2 byte: SR1=0x00 (clear BP/SRP) e
-                        -- SR2=0x02 (QE=1, clear tutto il resto).
-                        -- QE=1 disabilita le funzioni dei pin /HOLD# e /WP#:
-                        -- nel nostro circuito questi pin sono SCOLLEGATI (la
-                        -- board pilota solo SCK/CS/MOSI/MISO) e floating, e
-                        -- ogni transizione di SCK accoppia capacitivamente
-                        -- /HOLD#, mettendo il chip in pausa con MISO floating
-                        -- (SR e read tornano 0xFF). Con QE=1 il chip ignora
-                        -- /HOLD# e /WP# e diventa indifferente al loro stato.
+
                         buf(0) <= x"01"; buf(1) <= x"00"; buf(2) <= x"02";
                         fn <= 3; ret <= B_WP; st <= RF_CSL;
 
@@ -174,9 +162,7 @@ begin
                         poll_ret <= B_GBU_WE; poll_to <= 0; st <= POLL_SET;
 
                     when B_GBU_WE =>
-                        -- WE prima del Global Block Unlock. Il W25Q64FV ha
-                        -- individual block lock bits separati dalle SR.BP;
-                        -- senza 0x98 alcuni block possono restare protetti.
+
                         buf(0) <= x"06"; fn <= 1; ret <= B_GBU; st <= RF_CSL;
 
                     when B_GBU =>
@@ -191,9 +177,7 @@ begin
 
                     when B_RDSR_CHK =>
                         sr_save <= buf(1);
-                        -- Solo BP0..BP2 (bit2..4) e SRP (bit7) bloccano davvero
-                        -- le write. WEL (bit1) e WIP (bit0) sono volatili e
-                        -- non hanno nulla a che fare col chip-locked.
+
                         if (buf(1) and x"9C") /= x"00" then
                             chip_locked <= '1';
                         else
@@ -207,11 +191,7 @@ begin
                         st <= TX_SEND;
 
                     when SCAN_RD =>
-                        -- Leggiamo 3 byte dati dello slot (seq_hi, seq_lo,
-                        -- type). Il discriminante 'slot valido' usera' SOLO
-                        -- il byte type (buf(6)) contro le 5 lettere note,
-                        -- molto piu' robusto contro SI sporco durante SCAN
-                        -- che fa apparire byte casuali != 0xFF.
+
                         saddr := SECT0 + scan_i * REC;
                         buf(0) <= x"03";
                         buf(1) <= b8(saddr / 65536);
@@ -225,10 +205,7 @@ begin
                         st  <= RF_CSL;
 
                     when SCAN_CHK =>
-                        -- Slot 'valido' = byte 2 (type) e' una delle 5 lettere
-                        -- previste dal protocollo: 'B','R','P','N','E'.
-                        -- Qualunque altro valore (incluso 0xFF dell'erased)
-                        -- significa slot non-valido. head = ultimo valido + 1.
+
                         if buf(6) = x"42" or buf(6) = x"52" or
                            buf(6) = x"50" or buf(6) = x"4E" or
                            buf(6) = x"45" then

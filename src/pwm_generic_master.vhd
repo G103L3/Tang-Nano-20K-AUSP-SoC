@@ -2,30 +2,13 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- Generatore PWM a due toni sinusoidali sommati (DDS + sine LUT)
--- con interfaccia Wishbone.
---
--- Wishbone slave:
---   Scrittura @ 0x04: dat_i[15:0] = F1 in Hz, dat_i[31:16] = F2 in Hz
---                     -> carica le frequenze e fa partire il generatore
---                     (i parametri si aggiornano solo se start = '0', come l'originale)
---   Scrittura @ 0x08: ferma il generatore (start = 0, uscita 50% duty = DC center)
---
--- ATTENZIONE: le costanti K_RECIP e SINE_LUT sono PRECALCOLATE per:
---   CLK_HZ = 27_000_000, NBIT = 8, PHASE_NBITS = 24, FRAC_BITS = 24.
--- Il sintetizzatore Gowin/Synplify non ha ieee.math_real disponibile,
--- per cui non si possono usare sin()/round() a elaborazione: se cambi
--- uno dei parametri qui sopra DEVI rigenerare K_RECIP e SINE_LUT
--- (script Python di una decina di righe; vedi commento sotto).
 entity PWM_GENERIC is
     Generic (
         CLK_HZ        : integer := 27_000_000;
         NBIT          : integer := 8;
         PHASE_NBITS   : integer := 24;
+        -- K_RECIP_G and the sine table are precomputed, the synthesizer has no math_real
         K_RECIP_G     : integer := 10_424_999;
-        -- Se AUTO_START = true, al reset il generatore parte da solo con
-        -- le frequenze F1_DEFAULT_HZ / F2_DEFAULT_HZ. Wishbone puo' comunque
-        -- fermare (0x08) o riconfigurare (stop poi 0x04) in qualsiasi momento.
         F1_DEFAULT_HZ : integer := 0;
         F2_DEFAULT_HZ : integer := 0;
         AUTO_START    : boolean := false
@@ -50,16 +33,14 @@ architecture PWM_GENERIC_BEHAVIORAL of PWM_GENERIC is
     constant FRAC_BITS : integer := 24;
     constant K_WIDTH   : integer := 40;
 
-    -- K_RECIP_G = round(2^(FRAC_BITS + PHASE_NBITS) / CLK_HZ)
-    -- phase_inc = (f_hz * K_RECIP + 2^(FRAC_BITS-1)) >> FRAC_BITS
+    -- K_RECIP = round(2^(FRAC_BITS + PHASE_NBITS) / CLK_HZ)
     constant K_RECIP : unsigned(K_WIDTH - 1 downto 0) :=
         to_unsigned(K_RECIP_G, K_WIDTH);
 
     constant SINE_LUT_DEPTH : integer := 2**NBIT;
     type sine_lut_t is array(0 to SINE_LUT_DEPTH - 1) of unsigned(NBIT - 1 downto 0);
 
-    -- LUT seno 256x8: mid=128, amp=127 -> valori [1..255], DC center = 128
-    -- Generata con: lut[i] = round(128 + 127 * sin(2*pi*i/256))
+    -- sine table entry i = round(128 + 127 * sin(2 pi i / 256))
     constant SINE_LUT : sine_lut_t := (
         to_unsigned(128, NBIT), to_unsigned(131, NBIT), to_unsigned(134, NBIT), to_unsigned(137, NBIT), to_unsigned(140, NBIT), to_unsigned(144, NBIT), to_unsigned(147, NBIT), to_unsigned(150, NBIT),
         to_unsigned(153, NBIT), to_unsigned(156, NBIT), to_unsigned(159, NBIT), to_unsigned(162, NBIT), to_unsigned(165, NBIT), to_unsigned(168, NBIT), to_unsigned(171, NBIT), to_unsigned(174, NBIT),
@@ -95,19 +76,16 @@ architecture PWM_GENERIC_BEHAVIORAL of PWM_GENERIC is
         to_unsigned(103, NBIT), to_unsigned(106, NBIT), to_unsigned(109, NBIT), to_unsigned(112, NBIT), to_unsigned(116, NBIT), to_unsigned(119, NBIT), to_unsigned(122, NBIT), to_unsigned(125, NBIT)
     );
 
-    -- Registri configurabili via Wishbone
     signal f1_hz_r : unsigned(F_WIDTH - 1 downto 0) := (others => '0');
     signal f2_hz_r : unsigned(F_WIDTH - 1 downto 0) := (others => '0');
     signal start_r : std_logic := '0';
     signal stb_old : std_logic := '0';
 
-    -- Calcolo phase increment (combinazionale)
     signal mul_1       : unsigned(F_WIDTH + K_WIDTH - 1 downto 0);
     signal mul_2       : unsigned(F_WIDTH + K_WIDTH - 1 downto 0);
     signal phase_inc_1 : unsigned(PHASE_NBITS - 1 downto 0);
     signal phase_inc_2 : unsigned(PHASE_NBITS - 1 downto 0);
 
-    -- DDS + PWM
     signal phase_1    : unsigned(PHASE_NBITS - 1 downto 0) := (others => '0');
     signal phase_2    : unsigned(PHASE_NBITS - 1 downto 0) := (others => '0');
     signal sin_1_s    : unsigned(NBIT - 1 downto 0);
@@ -117,15 +95,7 @@ architecture PWM_GENERIC_BEHAVIORAL of PWM_GENERIC is
     signal pwm_cnt_s  : unsigned(NBIT - 1 downto 0) := (others => '0');
     signal pwm_int_s  : std_logic := '0';
 
-    -- Inviluppo (attacco/rilascio) anti "key click": l'ampiezza AC del tono sale
-    -- da 0 e scende a 0 in ~RAMP_MS invece di partire/fermarsi di colpo. Reagisce
-    -- a start_r: salita su start=1, discesa su start=0 (il DDS continua a oscillare
-    -- durante la discesa, poi silenzio). env_q in [0..AMP_MAX]; la AC viene
-    -- scalata per env_q/256.
-    --
-    -- AMP_MAX = ampiezza A REGIME (su 256). 128 = META' ampiezza: il duty oscilla
-    -- 128 +/- 63 invece di +/- 127, meno THD/intermodulazione -> suono piu' pulito.
-    -- Tunabile: 96/64 = piu' pulito ma piu' debole; 255 = piena ampiezza (com'era).
+    -- attack and release envelope so the tone does not click on and off
     constant RAMP_MS    : integer := 4;
     constant AMP_MAX    : integer := 255;
     constant RAMP_TICK  : integer := (CLK_HZ / 1000 * RAMP_MS) / AMP_MAX; -- clk/step
@@ -140,7 +110,6 @@ architecture PWM_GENERIC_BEHAVIORAL of PWM_GENERIC is
 begin
     dat_o <= (others => '0');
 
-    -- Wishbone slave (reset attivo basso)
     wb_proc: process(clk_i)
     begin
         if rising_edge(clk_i) then
@@ -159,11 +128,8 @@ begin
             else
                 ack_o   <= '0';
                 stb_old <= stb_i;
-                -- ack TENUTO alto finche' lo strobe e' attivo (come gli slave che
-                -- la CPU legge senza problemi): l'impulso singolo di 1 ciclo viene
-                -- perso dall'OPEN WB del PicoRV32 e una LETTURA resta appesa per
-                -- sempre (le scritture, posted, non se ne accorgevano).
-                -- Side-effect delle scritture solo sul fronte di stb (com'era).
+                -- ack is held for the whole strobe, the cpu bus loses single
+                -- cycle pulses; write side effects fire on the strobe edge only
                 if cyc_i = '1' and stb_i = '1' then
                     if we_i = '1' and stb_old = '0' then
                         if adr_i = x"04" then
@@ -182,7 +148,7 @@ begin
         end if;
     end process;
 
-    -- phase_inc = round(f_hz * 2^PHASE_NBITS / CLK_HZ)
+    -- phase increment = round(f * 2^PHASE_NBITS / clk)
     mul_1 <= f1_hz_r * K_RECIP;
     mul_2 <= f2_hz_r * K_RECIP;
 
@@ -193,8 +159,7 @@ begin
         shift_right(mul_2 + to_unsigned(2**(FRAC_BITS - 1), mul_2'length), FRAC_BITS),
         PHASE_NBITS);
 
-    -- Phase accumulators: oscillano in attacco/on/rilascio; fermi (a 0) solo da
-    -- IDLE (silenzio). Cosi' durante il rilascio il tono continua mentre svanisce.
+    -- the accumulators keep running during the release so the tone fades out
     process(clk_i)
     begin
         if rising_edge(clk_i) then
@@ -208,8 +173,7 @@ begin
         end if;
     end process;
 
-    -- Macchina a stati dell'inviluppo, pilotata da start_r. In ATTACK env_q sale
-    -- 0->AMP_MAX, in RELEASE scende AMP_MAX->0 (uno step ogni RAMP_TICK clk).
+    -- envelope machine: one amplitude step every RAMP_TICK clocks
     env_proc: process(clk_i)
     begin
         if rising_edge(clk_i) then
@@ -260,13 +224,12 @@ begin
     duty_sum_s <= ('0' & sin_1_s) + ('0' & sin_2_s);
     duty_s     <= duty_sum_s(NBIT downto 1);
 
-    -- Inviluppo: scala la componente AC (centrata a 128) per env_q/256, poi
-    -- ricentra. env_q=0 -> duty=128 (50% = silenzio); env_q=255 -> ~piena ampiezza.
+    -- scale the ac part around the 128 centre by env_q / 256
     ac_s       <= to_signed(to_integer(duty_s) - 128, ac_s'length);
     prod_s     <= ac_s * signed('0' & env_q);
     duty_env_s <= to_unsigned(128 + to_integer(shift_right(prod_s, NBIT)), NBIT);
 
-    -- Comparatore PWM free-running -> carrier = CLK_HZ / 2^NBIT
+    -- free running comparator, the carrier is clk / 2^NBIT
     process(clk_i)
     begin
         if rising_edge(clk_i) then

@@ -107,7 +107,7 @@
   \draw[line width=0.7pt] ({#1+0.10},#2) -- ({#1+0.22},#3);}
 
 \title{\vspace{-1.2cm}\textbf{EFES Master Node: a Full Custom FPGA plus ESP32\\Implementation of the AUSP Acoustic Protocol}}
-\author{Gioele Giunta s360501, Politecnico di Torino, LM-32\\ \small Course: Electronics for Embedded Systems}
+\author{Gioele Giunta \texttt{s360501}, Politecnico di Torino, LM-32\\ \small Course: Electronics for Embedded Systems}
 \date{Academic Year 2025 / 2026}
 
 \begin{document}
@@ -123,11 +123,11 @@
 AUSP is an acoustic communication protocol I created for my Bachelor thesis and later
 submitted to the IEEE IoT Magazine. Two devices talk using only a cheap speaker and a
 cheap microphone: packets are pairs of superimposed tones, one tone identifying the
-logical channel (the carrier) and one carrying the data symbol. The receiver
+logical channel (the \emph{carrier}) and one carrying the data symbol. The receiver
 moves the microphone signal to the frequency domain with an FFT and reads the two
 active tones as spectral peaks.
 
-This version is a full custom FPGA implementation of the master side, paired
+This version is a full custom FPGA implementation of the \emph{master} side, paired
 with an ESP32. The FPGA is a Tang Nano 20K (Gowin GW2AR-18); I used Gowin EDA for
 synthesis and place\,\&\,route, and GHDL for simulation. Everything on the FPGA is
 custom VHDL that I wrote the Wishbone interconnect, the SDRAM controller, two
@@ -141,7 +141,7 @@ The external hardware: a W25Q64 NOR flash (8\,MB) for storage, a 2$''$ ST7789 di
 by an MCP3201 12 bit SAR ADC, and an 8\,$\Omega$ speaker driven from a PWM pin through
 a low side MOSFET. A single 12\,V supply feeds the speaker directly and, through a
 DFR1202 buck, the 5\,V input of the board. The ESP32 connects to the FPGA through two
-UART links and runs the protocol logic, the Wi-Fi link and a WebSocket
+register level UART links and runs the protocol logic, the Wi-Fi link and a WebSocket
 web dashboard.
 
 % =====================================================================
@@ -150,14 +150,14 @@ web dashboard.
 
 The system is a two node star: the master (FPGA + ESP32) is the master, a second,
 simpler ESP32 based node is the slave created 1 year ago for my thesis, and a browser dashboard is an optional viewer
-connected through a Cloudflare WebSocket. The only link between master
+connected through a Cloudflare WebSocket. The \emph{only} link between master
 and slave is acoustic: presence requests, identification, acknowledgements and aborts
 all travel as tones (master carrier 2014\,Hz, slave carrier 2472\,Hz,
 Section~\ref{sec:protocol}). Wi-Fi only carries dashboard traffic.
 
-Inside the master, three units split the work by timing class. The FPGA
+Inside the master, three units split the work by \emph{timing class}. The FPGA
 does everything sample rate bound: it reads the ADC, computes the FFT, snapshots the
-spectrum and generates the PWM tones. The PicoRV32 soft core copies and decodes the spectrum, listens before it talks,
+spectrum and generates the PWM tones. The PicoRV32 soft core copies and decodes the spectrum, applies carrier sense,
 runs the W25Q storage protocol through the FPGA and draws the display. The ESP32 does everything decision
 bound: protocol state machine, retries, dashboard. Table~\ref{tab:partition} lists the
 partition.
@@ -173,7 +173,7 @@ partition.
 \midrule
 ADC sampling, DMA to buffer, 512 pt FFT, SDRAM store, snapshot & FPGA fabric & hardware \\
 Two tone generation (DDS sine sum, envelope) & FPGA fabric & hardware \\
-Spectrum copy, tone decode, listen before talk & soft core & software \\
+Spectrum copy, tone decode, carrier sense (CSMA) & soft core & software \\
 NOR storage protocol (W25Q), display rendering, health scan & soft core & software \\
 Protocol state machine, framing, retries, Wi-Fi dashboard & ESP32 & software \\
 \bottomrule
@@ -185,11 +185,11 @@ Protocol state machine, framing, retries, Wi-Fi dashboard & ESP32 & software \\
 
 Figure~\ref{fig:board} is the board level schematic with the real parts. Three rails
 organise it: 12\,V from a USB-C PD trigger feeds the speaker stage and the DFR1202
-buck (12\,V\,$\to$\,5\,V into the board's VIN); the board itself only
+buck (12\,V\,$\to$\,5\,V into the board's \texttt{VIN}); the board itself only
 regulates and exposes 3.3\,V for the digital peripherals, while the 5\,V that supplies
-the analog (audio) front end is not a board generated rail but the buck's own output, the same node that feeds VIN. The 3.3\,V does not reach the peripherals directly, it passes through
+the analog (audio) front end is not a board generated rail but the buck's own output, the same node that feeds \texttt{VIN}. The 3.3\,V does not reach the peripherals directly, it passes through
 an IRLZ44N MOSFET whose gate is held high by FPGA pin 80, so that output must stay at
-'1' or the NOR flash, the display and the LEDs all lose power.
+\texttt{'1'} or the NOR flash, the display and the LEDs all lose power.
 
 % =====================================================================
 \section{The FPGA SoC}
@@ -201,95 +201,95 @@ dedicated pins. Figure~\ref{fig:soc} is the top level block diagram of the SoC.
 
 \subsection{Bus and address map}
 
-The interconnect (wb\_interconnect.vhd) is a shared Wishbone bus with two
+The interconnect (\texttt{wb\_interconnect.vhd}) is a shared Wishbone bus with two
 masters and ten slaves. The masters are the PicoRV32 (M0) and the audio accelerator
-(M1). The slave is selected by decoding addr[31:27]: 5 bits,
- the PicoRV32 IP treats every address with addr[31:29]=000 as internal
+(M1). The slave is selected by decoding \texttt{addr[31:27]}: 5 bits,
+ the PicoRV32 IP treats every address with \texttt{addr[31:29]=000} as internal
 (ITCM, DTCM), so I needed to have 5 bits instead of 4 bits. \newline
 Table~\ref{tab:addrmap} is the map, with the essential register set of
 each slave.
 
 Inside the interconnect the address and data lines are broadcast to every slave, but the
-strobe is not: a decoder reads addr[31:27] and a set of multiplexers send the
-handshake (cyc and stb) to the one matching slave only. That slave sees
-its stb and cyc go to 1 while all the others stay at 0, so the per slave
+strobe is not: a decoder reads \texttt{addr[31:27]} and a set of multiplexers send the
+handshake (\texttt{cyc} and \texttt{stb}) to the one matching slave only. That slave sees
+its \texttt{stb} and \texttt{cyc} go to 1 while all the others stay at 0, so the per slave
 strobe works like a chip select: only the addressed slave reacts and drives its read data
-back onto the shared dat\_o. An address that matches no slave falls on a sink that
-never raises ack.
+back onto the shared \texttt{dat\_o}. An address that matches no slave falls on a sink that
+never raises \texttt{ack}.
 
 {\footnotesize
 \setlength{\LTleft}{\fill}\setlength{\LTright}{\fill}
 \begin{longtable}{l l l l p{6.7cm}}
-\caption{Address map. The slave is selected by the top 5 bits addr[31:27]}
+\caption{Address map. The slave is selected by the top 5 bits \texttt{addr[31:27]}}
 \label{tab:addrmap}\\
 \toprule
 \textbf{Base} & \textbf{Slave} & \textbf{Block} & \textbf{Offset} & \textbf{Register} \\
-addr[31:27] & & & addr[7:0] & \\
+\texttt{addr[31:27]} & & & \texttt{addr[7:0]} & \\
 \midrule
 \endfirsthead
 \toprule
 \textbf{Base} & \textbf{Slave} & \textbf{Block} & \textbf{Offset} & \textbf{Register} \\
-addr[31:27] & & & addr[7:0] & \\
+\texttt{addr[31:27]} & & & \texttt{addr[7:0]} & \\
 \midrule
 \endhead
 \bottomrule
 \endlastfoot
-0x2000\_0000 & S6 & character UART
- & 0x00 & tx byte (write) / pop rx FIFO (read, bit\,8 $=$ valid) \\
- & & & 0x04 & enable \\
- & & & 0x08 & disable \\
- & & & 0x0C & baud divider \\
- & & & 0x10 & format \\
- & & & 0x14 & status \\
+\texttt{0x2000\_0000} & S6 & character UART
+ & \texttt{0x00} & tx byte (write) / pop rx FIFO (read, bit\,8 $=$ valid) \\
+ & & & \texttt{0x04} & enable \\
+ & & & \texttt{0x08} & disable \\
+ & & & \texttt{0x0C} & baud divider \\
+ & & & \texttt{0x10} & format \\
+ & & & \texttt{0x14} & status \\
 \midrule
-0x2800\_0000 & S7 & NOR command UART
+\texttt{0x2800\_0000} & S7 & NOR command UART
  & \multicolumn{2}{l}{same register map as S6 (second instance, pins 72/20)} \\
 \midrule
-0x3000\_0000 & S5 & audio accelerator
- & 0x04 & start \\
- & & & 0x08 & stop \\
- & & & 0x0C & SDRAM base \\
+\texttt{0x3000\_0000} & S5 & audio accelerator
+ & \texttt{0x04} & start \\
+ & & & \texttt{0x08} & stop \\
+ & & & \texttt{0x0C} & SDRAM base \\
 \midrule
-0x3800\_0000 & S8 & NOR flash SPI
- & 0x00 & rx byte \\
- & & & 0x04 & tx byte (starts a transfer, clears done) \\
- & & & 0x08 & CS bit \\
- & & & 0x0C & busy/done (non destructive) \\
+\texttt{0x3800\_0000} & S8 & NOR flash SPI
+ & \texttt{0x00} & rx byte \\
+ & & & \texttt{0x04} & tx byte (starts a transfer, clears \texttt{done}) \\
+ & & & \texttt{0x08} & CS bit \\
+ & & & \texttt{0x0C} & busy/done (non destructive) \\
 \midrule
-0x4000\_0000 & S1 & ADC SPI
- & 0x00 & sample (acks only when ready) \\
- & & & 0x04 & start \\
- & & & 0x08 & stop \\
- & & & 0x0C & clear ready \\
+\texttt{0x4000\_0000} & S1 & ADC SPI
+ & \texttt{0x00} & sample (acks only when ready) \\
+ & & & \texttt{0x04} & start \\
+ & & & \texttt{0x08} & stop \\
+ & & & \texttt{0x0C} & clear ready \\
 \midrule
-0x4800\_0000 & S0 & SDRAM snapshot$^{\ast}$
- & 0\,0\,000100000\,00 & fetch FSM status \\
- & & & 0\,0\,000100001\,00 & samples counter \\
- & & & 0\,0\,000100010\,00 & triggers counter \\
- & & & 0\,0\,000100011\,00 & IRQ counter \\
- & & & 0\,0\,000100100\,00 & fill\_cnt (frame counter) \\
- & & & 1\,0\,000000000\,00 & spectrum bin 0 \\
+\texttt{0x4800\_0000} & S0 & SDRAM snapshot$^{\ast}$
+ & \texttt{0\,0\,000100000\,00} & fetch FSM status \\
+ & & & \texttt{0\,0\,000100001\,00} & samples counter \\
+ & & & \texttt{0\,0\,000100010\,00} & triggers counter \\
+ & & & \texttt{0\,0\,000100011\,00} & IRQ counter \\
+ & & & \texttt{0\,0\,000100100\,00} & \texttt{fill\_cnt} (frame counter) \\
+ & & & \texttt{1\,0\,000000000\,00} & spectrum bin 0 \\
  & & & $\vdots$ & $\vdots$ \\
- & & & 1\,0\,111111111\,00 & spectrum bin 511 \\
+ & & & \texttt{1\,0\,111111111\,00} & spectrum bin 511 \\
 \midrule
-0x5000\_0000 & S2 & speaker PWM
- & 0x04 & two 16 bit tones packed ($f_1$ in [15:0], $f_2$ in [31:16]);
+\texttt{0x5000\_0000} & S2 & speaker PWM
+ & \texttt{0x04} & two 16 bit tones packed ($f_1$ in [15:0], $f_2$ in [31:16]);
  loads them and starts the DDS driving the PWM pin \\
- & & & 0x08 & stop (PWM pin idles) \\
+ & & & \texttt{0x08} & stop (PWM pin idles) \\
 \midrule
-0x5800\_0000 & S9 & display SPI
- & 0x00 & byte to shift out to the panel (MSB first, on SDA) \\
- & & & 0x04 & drive the panel's DC / RST / CS lines \\
- & & & 0x08 & busy (shifter still sending) \\
+\texttt{0x5800\_0000} & S9 & display SPI
+ & \texttt{0x00} & byte to shift out to the panel (MSB first, on SDA) \\
+ & & & \texttt{0x04} & drive the panel's DC / RST / CS lines \\
+ & & & \texttt{0x08} & busy (shifter still sending) \\
 \midrule
-0x6000\_0000 & S3 & LED PWM & \multicolumn{2}{l}{same register map as S2} \\
+\texttt{0x6000\_0000} & S3 & LED PWM & \multicolumn{2}{l}{same register map as S2} \\
 \midrule
-0x7000\_0000 & S4 & GPIO & 0x00 & drive pin (write) / read back (read) \\
+\texttt{0x7000\_0000} & S4 & GPIO & \texttt{0x00} & drive pin (write) / read back (read) \\
 \end{longtable}
 }
 
 \textbf{Arbitration} is static priority: when M1 asserts
-cyc\,\&\,stb the mux gives it the bus, and M0 receives no ack and
+\texttt{cyc\,\&\,stb} the mux gives it the bus, and M0 receives no ack and
 stalls until M1 is done. M1 wins because it collect
 one ADC sample every $21.3\,\mu$s: one MCP3201 SPI frame, $16$ SCK $\times\,54$
 clocks $=864$ cycles at 40.5\,MHz that make it's traffic tiny.
@@ -310,30 +310,30 @@ Table~\ref{tab:wb}.
 \toprule
 \textbf{Signal} & \textbf{Driven by} & \textbf{Meaning} \\
 \midrule
-adr & master & address: top 5 bits pick the slave, low bits the register \\
-we & master & 1 $=$ write, 0 $=$ read \\
-dat\_i & master & data master $\to$ slave (on a write) \\
-dat\_o & slave & data slave $\to$ master (on a read) \\
-cyc\,\&\,stb & master & held high for the whole access (``I am accessing you now'') \\
-ack & slave & raised once the slave has taken or served the data \\
+\texttt{adr} & master & address: top 5 bits pick the slave, low bits the register \\
+\texttt{we} & master & \texttt{1} $=$ write, \texttt{0} $=$ read \\
+\texttt{dat\_i} & master & data master $\to$ slave (on a write) \\
+\texttt{dat\_o} & slave & data slave $\to$ master (on a read) \\
+\texttt{cyc\,\&\,stb} & master & held high for the whole access (``I am accessing you now'') \\
+\texttt{ack} & slave & raised once the slave has taken or served the data \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 A write runs in four steps:
 \begin{enumerate}\setlength{\itemsep}{0pt}
-\item the master drives adr, sets we\,=\,1 and puts the byte on dat\_i;
-\item it raises cyc\,\&\,stb;
-\item the slave whose addr[31:27] matches latches dat\_i into the addressed register and raises ack;
-\item the master sees ack and drops cyc\,\&\,stb.
+\item the master drives \texttt{adr}, sets \texttt{we\,=\,1} and puts the byte on \texttt{dat\_i};
+\item it raises \texttt{cyc\,\&\,stb};
+\item the slave whose \texttt{addr[31:27]} matches latches \texttt{dat\_i} into the addressed register and raises \texttt{ack};
+\item the master sees \texttt{ack} and drops \texttt{cyc\,\&\,stb}.
 \end{enumerate}
 
 A \textbf{read} is identical but
-we\,=\,0: the slave drives the data onto dat\_o and raises
-ack, and the master samples dat\_o on that cycle.
+\texttt{we\,=\,0}: the slave drives the data onto \texttt{dat\_o} and raises
+\texttt{ack}, and the master samples \texttt{dat\_o} on that cycle.
 
-A master does not know how long a slave will take, so it holds cyc\,\&\,stb
-and waits until ack comes back from the slave.
+A master does not know how long a slave will take, so it holds \texttt{cyc\,\&\,stb}
+and waits until \texttt{ack} comes back from the slave.
 
 
 \subsection{Clock tree}
@@ -341,8 +341,8 @@ and waits until ack comes back from the slave.
 
 A 27\,MHz external clock enters on pin 4. The internal rPLL divides by 2 and multiplies by 3,
 giving $f_\mathrm{clkout}=40.5$\,MHz for the CPU, the bus and every peripheral on it;
-a second output clkoutp is the same 40.5\,MHz shifted by
-$360^{\circ}/16=22.5^{\circ}$ ($1.54$\,ns), and clocks only the SDRAM die to
+a second output \texttt{clkoutp} is the same 40.5\,MHz shifted by
+$360^{\circ}/16=22.5^{\circ}$ ($1.54$\,ns), and clocks \emph{only} the SDRAM die to
 centre its data window (Section~\ref{sec:sdram}). The two PWM blocks use different clocks:
 the speaker PWM runs on the 40.5\,MHz bus clock, so its registers need no clock crossing,
 while the LED PWM is clocked directly by the raw 27\,MHz. Both divide by 256, so their
@@ -362,7 +362,7 @@ SPI NOR flash & 40.5 MHz & $\div 64$ & 633 kHz SCK \\
 SPI ADC & 40.5 MHz & $\div 54$ & 750 kHz SCK; 864 cycles/sample $\to f_s=46.875$ kHz \\
 SPI display & 40.5 MHz & $\div 6$ & 6.75 MHz SCK, mode 3 \\
 UART ($\times2$) & 40.5 MHz & $\div 352$ & 115\,057 baud (0.1\,\% off 115200) \\
-SDRAM controller & 40.5 MHz & none & die clocked by clkoutp ($+1.54$ ns) \\
+SDRAM controller & 40.5 MHz & none & die clocked by \texttt{clkoutp} ($+1.54$ ns) \\
 PWM speaker / LED & 40.5 / 27 MHz & $\div 256$ & carriers 158.2 / 105.5 kHz \\
 \bottomrule
 \end{tabular}
@@ -648,7 +648,7 @@ PWM speaker / LED & 40.5 / 27 MHz & $\div 256$ & carriers 158.2 / 105.5 kHz \\
 
 The board runs on three rails (Figure~\ref{fig:power}). A USB-C PD trigger gives 12\,V. The
 12\,V feeds two things: the speaker stage directly, and the input of a DFR1202 buck. The
-buck makes 5\,V, and the 5\,V feeds the board VIN and the analog front end. An on
+buck makes 5\,V, and the 5\,V feeds the board \texttt{VIN} and the analog front end. An on
 board regulator then makes 3.3\,V from the 5\,V, and the 3.3\,V feeds the digital
 peripherals, the NOR flash, the display and the LEDs, through the GPIO switch described
 below.
@@ -659,9 +659,9 @@ the MOSFET pulls the drain to ground so current flows. The gate is referenced to
 the 3.3\,V logic level turns it on with no gate driver, and the speaker has a flyback diode
 for its inductance. The speaker and the LEDs are switched this way by their PWM pins.
 
-The 3.3\,V to the peripherals passes through one more IRLZ44N, gated by gpio\_1
+The 3.3\,V to the peripherals passes through one more IRLZ44N, gated by \texttt{gpio\_1}
 (pin 80). This is a soft power switch: the CPU can cut power to the NOR flash, the display
-and the LEDs by driving the pin low, so the pin must stay at '1' in normal use.
+and the LEDs by driving the pin low, so the pin must stay at \texttt{'1'} in normal use.
 
 \begin{figure}[H]
 \centering
@@ -696,14 +696,14 @@ The GW2AR-18 package contains an 8\,MB SDRAM die, organized into 4 banks, and ea
 is a grid of 2048 rows $\times$ 256 columns, where every cell holds one 32 bit word
 (so a row is 256 words $=$ 1\,KB, and $4\times2048\times256\times4 = 8$\,MB).
 Based on the datasheet and the manufacturer's timing diagrams, 
-the memory operates using burst transfers. A single read (rd\_n)
- or write (wr\_n) command, accompanied by a 21 bit address specifying the bank,
- row, and column, triggers a data burst of data\_len$+1$ words.
- In my design, data\_len is set to 26, resulting in a 27 word burst.
-The operation is managed by a few key control signals: busy\_n 
+the memory operates using burst transfers. A single read (\texttt{rd\_n})
+ or write (\texttt{wr\_n}) command, accompanied by a 21 bit address specifying the bank,
+ row, and column, triggers a data burst of \texttt{data\_len}$+1$ words.
+ In my design, \texttt{data\_len} is set to 26, resulting in a 27 word burst.
+The operation is managed by a few key control signals: \texttt{busy\_n} 
 indicates when the controller is ready to accept a new command request;
- rd\_valid confirms that the current read word is valid data; 
- and init\_done signals that the power up initialization sequence is complete.
+ \texttt{rd\_valid} confirms that the current read word is valid data; 
+ and \texttt{init\_done} signals that the power up initialization sequence is complete.
 
 Figure~\ref{fig:sdram-struct} shows how one bank is addressed, and its two
 access delays.
@@ -758,21 +758,20 @@ selected, with the two access delays.}
 \subsection{The FSM}
 
 A combinational process
-computes next\_state only, and a synchronous process registers the state,
-one shared counter tmr (cleared on every state change), and all
-outputs a Moore machine with registered outputs, where each JEDEC command (the
-standard that defines the SDRAM commands) is
+computes \texttt{next\_state} only, and a synchronous process registers the state,
+one shared counter \texttt{tmr} (cleared on every state change), and \emph{all}
+outputs a Moore machine with registered outputs, where each JEDEC command is
 emitted exactly on the first cycle of its state (detected as
-next\_state\,$\neq$\,curr\_state) and NOP fills the rest. The mode register is
+\texttt{next\_state\,$\neq$\,curr\_state}) and NOP fills the rest. The mode register is
 programmed for CAS latency 3 (CL is the one timing I set myself; I use 3 because it only
 adds two cycles over CL 1 and changes nothing for the project constraints, and this way I am sure there is no
-problem on that side), sequential addressing and full page burst. This is why the
+problem on that side), sequential addressing and \emph{full page} burst. This is why the
 column address goes out only once, with the READ or WRITE command: from there the die
 steps through the columns by itself, one per cycle and in order (sequential), so I never
-resend it. The burst length is how long the FSM stays in the data state, and the
+resend it. The burst length is just how long the FSM stays in the data state, and the
 closing PRECHARGE ends it. The FSM also issues an AUTO
 REFRESH about every $7.8\,\mu$s: a counter asks for one every 312 cycles, served in
-S\_IDLE. Table~\ref{tab:sdram-cmd} lists the commands it issues.
+\texttt{S\_IDLE}. Table~\ref{tab:sdram-cmd} lists the commands it issues.
 
 \begin{table}[H]
 \centering
@@ -784,13 +783,13 @@ S\_IDLE. Table~\ref{tab:sdram-cmd} lists the commands it issues.
 \toprule
 \textbf{Command} & \textbf{$\overline{\mathrm{CS}}\,\overline{\mathrm{RAS}}\,\overline{\mathrm{CAS}}\,\overline{\mathrm{WE}}$} & \textbf{Role} \\
 \midrule
-ACTIVE             & 0 0 1 1 & opens a row, copying it into the sense amplifiers \\
-READ               & 0 1 0 1 & reads a column from the open row \\
-WRITE              & 0 1 0 0 & writes a column into the open row \\
-PRECHARGE          & 0 0 1 0 & closes the open row, writing it back \\
-AUTO REFRESH       & 0 0 0 1 & refreshes the rows so they keep their charge \\
-LOAD MODE REGISTER & 0 0 0 0 & sets CAS latency, burst type and length \\
-NOP                & 0 1 1 1 & does nothing, fills the waits between commands \\
+ACTIVE             & \texttt{0 0 1 1} & opens a row, copying it into the sense amplifiers \\
+READ               & \texttt{0 1 0 1} & reads a column from the open row \\
+WRITE              & \texttt{0 1 0 0} & writes a column into the open row \\
+PRECHARGE          & \texttt{0 0 1 0} & closes the open row, writing it back \\
+AUTO REFRESH       & \texttt{0 0 0 1} & refreshes the rows so they keep their charge \\
+LOAD MODE REGISTER & \texttt{0 0 0 0} & sets CAS latency, burst type and length \\
+NOP                & \texttt{0 1 1 1} & does nothing, fills the waits between commands \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -871,23 +870,23 @@ refresh & one AUTO REFRESH every & 312 & $7.7\,\mu$s \\
 \draw[a] (pre.north) -- node[al,right]{tmr $=t_{RP}-1$} (idle.south);
 \end{tikzpicture}%
 }
-\caption{Complete sdram\_controller\_fsm state graph.}
+\caption{Complete \texttt{sdram\_controller\_fsm} state graph.}
 \label{fig:sdram-fsm}
 \end{figure}
 
 \subsection{Bring up sequence}
 
-At power up the die must be initialised in a fixed order before it works. The FSM runs it once and then raises init\_done:
+At power up the die must be initialised in a fixed order before it works. The FSM runs it once and then raises \texttt{init\_done}:
 \begin{enumerate}\setlength{\itemsep}{0pt}
 \item wait 8192 cycles ($202\,\mu$s) with CKE high;
 \item PRECHARGE ALL, to put the four banks in idle;
 \item two AUTO REFRESH commands;
 \item LOAD MODE REGISTER (CL 3, sequential, full page).
 \end{enumerate}
-This runs only at boot. After init\_done the controller issues normal commands
+This runs only at boot. After \texttt{init\_done} the controller issues normal commands
 plus one AUTO REFRESH every 312 cycles. In the diagram the address line
-addr[10] (O\_sdram\_addr[10]) doubles as a control bit: on a PRECHARGE
-the chip reads addr[10]$=1$ as ``all four banks'', which is why it is high
+\texttt{addr[10]} (\texttt{O\_sdram\_addr[10]}) doubles as a control bit: on a PRECHARGE
+the chip reads \texttt{addr[10]}$=1$ as ``all four banks'', which is why it is high
 during PRECHARGE ALL.
 
 \begin{figure}[H]
@@ -948,22 +947,22 @@ during PRECHARGE ALL.
 Figure~\ref{fig:sdram-read} shows a read burst cycle by cycle. After a read request
 the FSM sends ACTIVE, then READ three cycles later (this wait is $t_{RCD}$), and three
 cycles after READ (the CAS latency CL) the die puts the first word on its data pins
-(the DQ bus). Both waits, and the others further down, are the JEDEC numbers
+(the \texttt{DQ} bus). Both waits, and the others further down, are the JEDEC numbers
 listed in Table~\ref{tab:jedec}. The SDRAM has no valid
 line of its own, so the controller times the read by counting. The word passes through
 two flip flops inside the controller: the first one captures the data pins
 coming from the die, the second one holds that word ready. When the word reaches the
-second flip flop the FSM raises rd\_valid, which tells that
-the word on O\_sdrc\_data is good. So rd\_valid goes high CL$+2$
+second flip flop the FSM raises \texttt{rd\_valid}, which tells that
+the word on \texttt{O\_sdrc\_data} is good. So \texttt{rd\_valid} goes high CL$+2$
 cycles after READ, one extra cycle per flip flop, and stays up for the 27 words, one
 per cycle.
 
 \textbf{Clock phase.} On a read the die does not drive its data pins at once: the data
 comes a few nanoseconds after the die's clock edge (the access time $t_{AC}$) and then
 travels back over the board to the FPGA, so it arrives late. With the die on the same
-clock as the controller I was sampling too early, and on a few reads a
-bit came back wrong (0xFFFE instead of 0xFFFF). Feeding the die the $1.54$\,ns shifted
-clock (clkoutp) lets me sample in the middle of the data, and the errors
+clock as the controller I was sampling too early, and on a small fraction of reads a
+bit came back wrong (\texttt{0xFFFE} instead of \texttt{0xFFFF}). Feeding the die the $1.54$\,ns shifted
+clock (\texttt{clkoutp}) lets me sample in the middle of the data, and the errors
 stopped.
 
 \begin{figure}[H]
@@ -1069,23 +1068,23 @@ stopped.
 On a write the FSM sends one word per cycle. The controller has to line the words up so that
 word 0 lands on the data pins in the same cycle as the WRITE command, which
 goes out three cycles after ACTIVE (the $t_{RCD}$ wait of Table~\ref{tab:jedec}). It does this by pushing the words through a
-short chain of flip flops (wpipe1 $\to$ wpipe2 $\to$
-wpipe3 $\to$ dq\_out\_r) that shifts every cycle
+short chain of flip flops (\texttt{wpipe1} $\to$ \texttt{wpipe2} $\to$
+\texttt{wpipe3} $\to$ \texttt{dq\_out\_r}) that shifts every cycle
 (Figure~\ref{fig:sdram-write}). A write has no CL wait and no capture registers: here
 the controller is the source, so it drives the data on its own clock and only aligns it
 with the command. On a read the die is the source, so the data comes CL cycles later and
 must be recaptured, which is why a read is the slower of the two.
 
-\textbf{The alignment stage WR\_ALIGN.} On the board word 0 arrived one cycle
+\textbf{The alignment stage \texttt{WR\_ALIGN}.} On the board word 0 arrived one cycle
 early and was lost, shifting the whole burst by one bin. One extra flip flop
-(WR\_ALIGN) puts it back in step; the simulation has no board delays and uses
-WR\_ALIGN$=0$.
+(\texttt{WR\_ALIGN}) puts it back in step; the simulation has no board delays and uses
+\texttt{WR\_ALIGN}$=0$.
 
 \textbf{How the spectrum is written.} Figure~\ref{fig:sdram-write} is one burst: 26 words
 go into 26 columns next to each other in one open row (the column goes up by one every
 cycle, the row stays the same). The whole spectrum is 20 bursts, one per row (rows 2 to 21
-of bank 2). I use one row per burst to keep the addressing easy: the row is the burst
-number, and each bin goes to position burst$\times26+$index. Only 26 of the 256
+of bank 2). I use one row per burst to keep the address simple: the row is just the burst
+number, and each bin goes to position \texttt{burst}$\times26+$index. Only 26 of the 256
 columns of a row are used, but the chip is 8\,MB and there is plenty of time, so filling
 the rows would not help. Each drain starts with one extra warm up burst into row 1 that is
 thrown away, because the first access after a pause was the one that gave errors.
@@ -1199,13 +1198,13 @@ thrown away, because the first access after a pause was the one that gave errors
 % =====================================================================
 
 The receive path is two state machines running in parallel with a ping pong buffer
-between them, inside the block I call the audio accelerator (dma.vhd,
-Figure~\ref{fig:audio-zoom}). The capture FSM (dma\_proc, bus master M1)
-waits for the SPI master's data\_ready\_s flag (a direct wire, not the bus), reads
-the sample over the bus, clears that flag, and writes the sample into spi\_raw\_buf,
+between them, inside the block I call the audio accelerator (\texttt{dma.vhd},
+Figure~\ref{fig:audio-zoom}). The capture FSM (\texttt{dma\_proc}, bus master M1)
+waits for the SPI master's \texttt{data\_ready\_s} flag (a direct wire, not the bus), reads
+the sample over the bus, clears that flag, and writes the sample into \texttt{spi\_raw\_buf},
 a $1024\times16$ block RAM holding two 512 sample windows. The FFT FSM
-(fft\_proc) takes the window just filled, feeds the Gowin FFT core, collects
-the 512 spectrum words into fft\_result\_buf, drains them to SDRAM through
+(\texttt{fft\_proc}) takes the window just filled, feeds the Gowin FFT core, collects
+the 512 spectrum words into \texttt{fft\_result\_buf}, drains them to SDRAM through
 the dedicated write port and raises the frame IRQ. While one half fills, the other
 half is processed, so no sample is ever lost. The CPU starts the accelerator once at
 boot and never reads a raw sample. The tone decoding runs in firmware, which is the
@@ -1316,7 +1315,7 @@ the next state.
 \draw[a] (store.west) to[out=180,in=270] node[al,below left]{always} (poll.south);
 \end{tikzpicture}%
 }
-\caption{Capture FSM (dma\_proc).}
+\caption{Capture FSM (\texttt{dma\_proc}).}
 \label{fig:capture-fsm}
 \end{figure}
 
@@ -1352,7 +1351,7 @@ the next state.
 \draw[a] (ser.west) to[out=180,in=180,looseness=0.8] node[al,left,align=center]{512 words\\\{\texttt{done}$\leftarrow$0\}} (idle.west);
 \end{tikzpicture}%
 }
-\caption{FFT and drain FSM (fft\_proc).}
+\caption{FFT and drain FSM (\texttt{fft\_proc}).}
 \label{fig:fft-fsm}
 \end{figure}
 
@@ -1360,14 +1359,14 @@ the next state.
 \label{sec:adc}
 
 The analog front end (bottom of Figure~\ref{fig:board}) biases the electret capsule with a 47k/47k divider, amplifies it by $G = 1 + 100\mathrm{k}/10\mathrm{k}
-= 11$ in an MCP6022 non inverting configuration, and passes it through an RC low pass
+= 11$ in an MCP6022 non inverting configuration, and passes it through a small RC low pass
 into the MCP3201. The filter uses a $680\,\Omega$ resistor with the 102 (1\,nF) capacitors,
 so
 $f_c = 1/(2\pi \cdot 680\,\Omega \cdot 1\,\mathrm{nF}) = 234$\,kHz; it only trims fast noise.
 A tight anti alias filter is not needed here because the protocol tones (2 to 4577\,Hz) sit
 far below Nyquist ($f_s/2=23.4$\,kHz), and the electret and the amplifier already roll off
 well before it. The MCP3201 is a 12 bit SAR ADC that the FPGA reads over SPI with a
-dedicated master (spi\_master.vhd); its internal block diagram
+dedicated master (\texttt{spi\_master.vhd}); its internal block diagram
 is in Figure~\ref{fig:mcp3201-block}.
 
 The master runs off the 40.5\,MHz clock and makes one SCK every 54 clock cycles:
@@ -1378,13 +1377,13 @@ A frame is 16 SCK, so it takes $16 \times 54 = 864$ clock cycles $= 21.33\,\mu$s
 sample rate is $f_s = 1/(21.33\,\mu\mathrm{s}) = 46.875$\,kHz. The frame is simple: CS goes
 low, the ADC sends one null bit and then the 12 data bits MSB first, and after the data CS
 goes high for 2 SCK and the frame starts again. Nothing is sent to the ADC, so
-MOSI is unused.
+\texttt{MOSI} is unused.
 
-The FSM has three states: S\_SHIFT covers bit periods 0 to 13 with CS low (the 12
-data bits are captured on periods 2 to 13), S\_GAP covers periods 14 to 15 with
+The FSM has three states: \texttt{S\_SHIFT} covers bit periods 0 to 13 with CS low (the 12
+data bits are captured on periods 2 to 13), \texttt{S\_GAP} covers periods 14 to 15 with
 CS high, and while the start register stays set the machine loops
-S\_GAP$\to$S\_SHIFT with no dead cycle. When the frame ends
-data\_ready\_s goes to 1. The FSM is in
+\texttt{S\_GAP}$\to$\texttt{S\_SHIFT} with no dead cycle. When the frame ends
+\texttt{data\_ready\_s} goes to 1. The FSM is in
 Figure~\ref{fig:spi-timing}, and one frame cycle by cycle is in Figure~\ref{fig:spi-wave}.
 
 
@@ -1408,7 +1407,7 @@ Figure~\ref{fig:spi-timing}, and one frame cycle by cycle is in Figure~\ref{fig:
 \draw[-{Stealth}, line width=0.6pt] (g.north) to[bend right=28] node[font=\tiny, above]{bit 15 \& start: next frame} (s.north);
 \draw[-{Stealth}, line width=0.6pt] (g.south) to[bend left=18] node[font=\tiny, below]{bit 15 \& !start} (i.south);
 \end{tikzpicture}
-\caption{ADC SPI master FSM (spi\_master.vhd).}
+\caption{ADC SPI master FSM (\texttt{spi\_master.vhd}).}
 \label{fig:spi-timing}
 \end{figure}
 
@@ -1600,27 +1599,27 @@ SDRAM write.
 \subsection{Fetch FSM and snapshot}
 \label{sec:fetch}
 
-The read side of the SDRAM port is the fetch FSM
+The read side of the SDRAM port is the \emph{fetch FSM}
 (Figure~\ref{fig:fetch-fsm}). The frame IRQ does not interrupt the CPU: in hardware
 it starts the fetch, which for each of the 20 bursts waits for the controller,
 requests a read with that burst's row address, and collects the 26 words into a
 $512\times16$ BSRAM. The write side maps each valid word to a fixed bin:
 \[
-\text{bin} = b\times26 + idx, \qquad
-b=0\ldots19\ \text{(20 bursts)}, \quad
-idx=0\ldots25\ \text{(26 words)},
+\text{bin} = \texttt{b}\times26 + \texttt{idx}, \qquad
+\texttt{b}=0\ldots19\ \text{(20 bursts)}, \quad
+\texttt{idx}=0\ldots25\ \text{(26 words)},
 \]
 The 20 bursts give $20\times26=520$ words, 8 more than
-the 512 bin BSRAM, so a bin$<512$ guard keeps bins 0 to 511 and drops the last 8
-words of burst 19. When burst 19 finishes, fill\_cnt increments. Each burst runs
+the 512 bin BSRAM, so a \texttt{bin}$<512$ guard keeps bins 0 to 511 and drops the last 8
+words of burst 19. When burst 19 finishes, \texttt{fill\_cnt} increments. Each burst runs
 The whole fetch is $20\times200=4000$ cycles (about
 $100\,\mu$s) of the 10.92\,ms frame.
 
 The fetch fills this snapshot BSRAM, which the CPU reads.
-fill\_cnt is how the CPU knows a new spectrum is ready: it is a counter that
+\texttt{fill\_cnt} is how the CPU knows a new spectrum is ready: it is a counter that
 goes up by one each time a fetch finishes, and wraps around.
 The CPU keeps the last value it read and
-compares: when fill\_cnt has changed, a fresh 512 word snapshot is ready and
+compares: when \texttt{fill\_cnt} has changed, a fresh 512 word snapshot is ready and
 the CPU copies it through the Wishbone bus.
 
 \begin{figure}[H]
@@ -1648,10 +1647,10 @@ the CPU copies it through the Wishbone bus.
 \subsection{The tone decoder}
 
 The decoder run in C on the soft core, it apply three tests to each of the five
-protocol bins: a local maximum test against the six neighbours within $\pm3$
+protocol bins: a \emph{local maximum} test against the six neighbours within $\pm3$
 bins, a
-curvature test on $k{-}1,k,k{+}1$ (the peak must open downward, so $k$ is a
-crest and not the side of a nearby peak); and an amplitude test on the
+\emph{curvature} test on $k{-}1,k,k{+}1$ (the peak must open downward, so $k$ is a
+crest and not the skirt of a neighbour); and an \emph{amplitude} test on the
 parabolically interpolated peak against a fixed threshold exactly how my thesis described. 
 
 % =====================================================================
@@ -1659,15 +1658,15 @@ parabolically interpolated peak against a fixed threshold exactly how my thesis 
 \label{sec:speaker}
 % =====================================================================
 
-The tone output is a Sinusoidal PWM (pwm\_generic\_master.vhd). A free running 8 bit
-counter (pwm\_cnt\_s) counts from 0 to 255 and then wraps back to 0, so it draws a
-sawtooth ramp (not a triangle). A comparator turns this into the pin: PWM\_o is high
-while pwm\_cnt\_s $<$ duty\_env\_s, so the width of each pulse is set by the
+The tone output is a Sinusoidal PWM (\texttt{pwm\_generic\_master.vhd}). A free running 8 bit
+counter (\texttt{pwm\_cnt\_s}) counts from 0 to 255 and then wraps back to 0, so it draws a
+sawtooth ramp (not a triangle). A comparator turns this into the pin: \texttt{PWM\_o} is high
+while \texttt{pwm\_cnt\_s} $<$ \texttt{duty\_env\_s}, so the width of each pulse is set by the
 8 bit duty (0 to 255). The counter wraps every 256 clocks, so the switching rate, the
 carrier, is $f_\mathrm{clk}/2^{8} = 40.5\,\mathrm{MHz}/256 = 158.2$\,kHz for the speaker, far
 above the audio band.
 
-To keep the tone clean, I did not use a square wave, because a square wave
+To keep the tone clean, I did not use a simple square wave, because a square wave
 also carries strong odd harmonics at $3f$, $5f$, $7f$ and so on.
 For a tone at $f=2472$\,Hz these harmonics all fall 
 below Nyquist ($f_s/2=23.4$\,kHz), so on the receiver they land in other FFT
@@ -1675,42 +1674,46 @@ bins and read as tones that were never sent.
 
 To solve this, I implemented a PWM approach that moves the switching
  far away: the pin still toggles like a square, but at the fixed 158.2\,kHz 
- carrier, and the tone is carried by the duty.
-  The duty traces a sine from the DDS and the SINE\_LUT 
-  (Figure~\ref{fig:spwm}), and the speaker cannot follow 158.2\,kHz, so it plays back a
-  clean sine at $f$. The switching noise of the PWM sits around the carrier, 158.2\,kHz, and
-  its multiples, all far above the audio band, so the speaker does not reproduce it and the
-  audio band is left with only the wanted tone.
+ carrier, and the tone is carried by the \emph{duty}.
+  The duty traces a sine from the DDS and the \texttt{SINE\_LUT} 
+  (Figure~\ref{fig:spwm}), and the speaker cannot follow 158.2\,kHz
+  (its inductance and inertia average the pulses), so it plays back a 
+  clean sine at $f$. The switching noise of the PWM shows up around the carrier, 158.2\,kHz,
+  and its multiples, all far above the audio band. This is the reason PWM is better than a
+  plain square wave: it pushes the extra energy up near the carrier, well away from the tone,
+  instead of leaving it on the low harmonics inside the audio band. The speaker does not
+  reproduce that high frequency noise, so the audio band holds only the wanted tone.
 
 
 
-When the module receives the address 0x04 from the bus, it loads two 16-bit
+When the module receives the address \texttt{0x04} from the bus, it loads two 16-bit
  frequency values. Each frequency drives its own 24-bit phase accumulator. To find how big
  the phase step ($\Delta\phi$) should be I would need to divide by the clock frequency, but
- a hardware divider is costly on an FPGA. So, using some online source
+ a hardware divider is costly on an FPGA. So, using a trick from online DSP tutorials
  (\url{https://electronics.stackexchange.com/questions/55493/fixed-point-division-in-verilog-for-spartan-6}),
  instead of dividing I multiply by a precomputed constant $K$ and then shift the bits to the
  right, which gives the same result: in my code this is $(f\cdot K + 2^{23})\gg24$.
 
-At every single 40.5\,MHz clock tick, both 24-bit accumulators add their specific step
- ($\Delta\phi$) to their running total.
- However, the SINE\_LUT only has 256 entries, meaning it 
+At every single 40.5\,MHz clock tick (the speaker PWM runs on the bus clock), both 24-bit
+ accumulators add their specific step ($\Delta\phi$) to their running total.
+ However, the \texttt{SINE\_LUT} only has 256 entries, meaning it 
  only needs an 8-bit index to be read ($2^8 = 256$). 
- So the system uses only the top 8 bits of the 24-bit accumulator to pick the sample in the
- table. The other 16 bits are the part after the point: they do not choose a sample, they
- keep track of how far the phase has moved between one sample and the next. This is why the
- accumulator is 24 bit and not 8: the 8 top bits pick the sample, but the full 24 bits are
- what let me set the frequency in fine steps. The frequency step is $f_\mathrm{clk}/2^{24}$, a few Hz; with only
+ Therefore, the system takes only the top 8 bits of each 24-bit
+ accumulator to find the right position inside the table;
+ the lower 16 bits are basically kept as a "fractional" part
+  for precision. This is the whole reason the accumulator is 24 bit and not 8: the top 8
+  bits only pick which sine sample to read, while the full 24 bit width sets how finely the
+  frequency can be tuned. The frequency step is $f_\mathrm{clk}/2^{24}$, a few Hz; with only
   8 bits the smallest step would be $f_\mathrm{clk}/2^{8}$, which is the 158\,kHz carrier
   itself, far too coarse for an audio tone. Since FPGA hardware can run parallel tasks,
-  the code reads two different values from the exact
+  the code actually reads two different values from the exact 
   same table at the exact same time. To send these two different
-   frequencies to a single output pin, the code adds the two
-    retrieved sine values together and divides the result by 2
-    (a 1-bit right shift).
+   frequencies to a single output pin, the code simply adds the two
+    retrieved sine values together and divides the result by 2 
+    (by doing a simple 1-bit right shift). 
     This creates a single 8-bit mixed duty cycle without overflowing.
 
-Finally, to make the audio sound good, the amplitude is never switched on or off abruptly. If I did that, the speaker would produce a loud clicking noise. Instead, I created a state machine that acts as a volume envelope (states E\_IDLE, E\_ATTACK, E\_ON, E\_RELEASE): it slowly increases the signal (attack) and decreases it (release) over 4\,ms. During the release phase, the accumulators keep running normally so the tone fades out naturally. This final duty cycle drives a low-side IRLZ44N MOSFET, which turns the 12\,V power on and off for the 8\,$\Omega$ speaker. The firmware is responsible for the timing, normally sending 144\,ms of tone followed by 400\,ms of silence for each symbol (Section~\ref{sec:protocol}).
+Finally, to make the audio sound good, the amplitude is never switched on or off abruptly. If I did that, the speaker would produce a loud clicking noise. Instead, I created a state machine that acts as a volume envelope (states E\_IDLE, E\_ATTACK, E\_ON, E\_RELEASE): it slowly increases the signal (attack) and decreases it (release) over 4\,ms. During the release phase, the accumulators keep running normally so the tone fades out naturally. This final duty cycle drives a low-side IRLZ44N MOSFET, which turns the 12\,V power on and off for the 8\,$\Omega$ speaker. The main firmware player is responsible for the timing, normally sending 144\,ms of tone followed by 400\,ms of silence for each symbol (Section~\ref{sec:protocol}).
 
 \begin{figure}[H]
 \centering
@@ -1746,7 +1749,7 @@ Finally, to make the audio sound good, the amplitude is never switched on or off
     ({\xo+\i*\W},\yhi) -- ({\xo+\i*\W+\wid},\yhi) -- ({\xo+\i*\W+\wid},\ylo)
     -- ({\xo+(\i+1)*\W},\ylo) -- ({\xo+(\i+1)*\W},\yhi);}
 \end{tikzpicture}}
-\caption{Sinusoidal PWM (pwm\_generic\_master.vhd).}
+\caption{Sinusoidal PWM (\texttt{pwm\_generic\_master.vhd}).}
 \label{fig:spwm}
 \end{figure}
 
@@ -1755,12 +1758,12 @@ Finally, to make the audio sound good, the amplitude is never switched on or off
 \label{sec:display}
 % =====================================================================
 
-The display is an ST7789 TFT panel ($240\times320$ pixels, RGB565 colour) driven over
-SPI. The FPGA block spi\_display.vhd is a transmit only SPI in mode 3 (SCK idles
+The display is a small ST7789 TFT panel ($240\times320$ pixels, RGB565 colour) driven over
+SPI. The FPGA block \texttt{spi\_display.vhd} is a transmit only SPI in mode 3 (SCK idles
 high, the panel reads each bit on the rising edge). Only three wires carry data: SCK (the
 clock), SDA (the bits) and CS (chip select). The clock uses a $\div6$ prescaler, so the SCK
-is $40.5\,\mathrm{MHz}/6 = 6.75$\,MHz. In clock cycles, one SCK is 6 clk\_i and one
-byte is $8\times6 = 48$ clk\_i $= 1.19\,\mu$s.
+is $40.5\,\mathrm{MHz}/6 = 6.75$\,MHz. In clock cycles, one SCK is 6 \texttt{clk\_i} and one
+byte is $8\times6 = 48$ \texttt{clk\_i} $= 1.19\,\mu$s.
 
 The panel also has three control pins, and the firmware sets them as simple register bits:
 DC tells the panel whether a byte is a command or pixel data, RST resets the panel, and CS
@@ -1768,16 +1771,16 @@ picks it. The shift FSM has three states (Figure~\ref{fig:disp-fsm}): it waits f
 then sends the 8 bits, and after the eighth bit SCK parks high, which is already the mode 3
 idle, so there is no extra state between bytes.
 
-On top of the SPI, the firmware draws a dashboard on the panel. At boot it first
+On top of the SPI, the firmware draws a small dashboard on the panel. At boot it first
 sends the ST7789 init sequence (SWRESET, SLPOUT, COLMOD RGB565, MADCTL landscape, INVON,
 NORON, DISPON), each command with its datasheet delay. After that the drawing works step by
 step. When the firmware wants to draw something it does not send it right away: it puts the
-drawing as a job in a queue that holds up to 48 jobs. Then, once per main loop, the
-function display\_tick() takes one job from the queue and sends only a chunk
+drawing as a small job in a queue that holds up to 48 jobs. Then, once per main loop, the
+function \texttt{display\_tick()} takes one job from the queue and sends only a small chunk
 of SPI bytes (128 to 384 bytes, about 150 to $450\,\mu$s). This chunk is short next to the
 10.9\,ms frame, so it does not slow down the tone player. If instead the firmware drew a
 full screen in one go, the SPI would take about 180\,ms and block the main loop, which would
-stop the tone and fill up the command FIFO. Sending it in chunks avoids this.
+stop the tone and fill up the command FIFO. Sending small chunks avoids this.
 
 Four fixed zones show slave health, the live spectrum
 (bins 16 to 55 straight from the snapshot), RX/TX symbols and a log ring; which
@@ -1800,7 +1803,7 @@ the web dashboard restyles the display remotely.
 \draw[a] (hi.south) to[bend left=22] node[al,below]{bit $<7$: shift} (lo.south);
 \draw[a] (hi.north) to[bend right=20] node[al,above]{bit $=7$: done} (idle.north);
 \end{tikzpicture}
-\caption{Display SPI FSM (spi\_display.vhd).}
+\caption{Display SPI FSM (\texttt{spi\_display.vhd}).}
 \label{fig:disp-fsm}
 \end{figure}
 
@@ -1830,7 +1833,7 @@ the web dashboard restyles the display remotely.
 \plow{\xo-0.4}{\xo+8*\bw+0.6}{\ydc}
 \node[anchor=west,font=\tiny,gray] at ({\xo+8*\bw+0.3},\ydc){command $=0$ / data $=1$};
 \end{tikzpicture}
-\caption{One display byte (spi\_display.vhd).}
+\caption{One display byte (\texttt{spi\_display.vhd}).}
 \label{fig:disp-wave}
 \end{figure}
 
@@ -1839,24 +1842,24 @@ the web dashboard restyles the display remotely.
 \label{sec:flash}
 % =====================================================================
 
-The CPU manages NOR storage in firmware (norflash.c). The ESP32 sends one
-character opcodes on the S7 UART (pins 72/20), and nor\_poll(), a non blocking
+The CPU manages NOR storage in firmware (\texttt{norflash.c}). The ESP32 sends one
+character opcodes on the S7 UART (pins 72/20), and \texttt{nor\_poll()}, a non blocking
 step in the main loop, reads each opcode and runs the matching W25Q64 SPI sequence; the
 SPI frames go out through the generic S8 master at 633\,kHz. At power up
-nor\_init() runs the boot chain, then the loop sits in the IDLE hub and
-dispatches each opcode with a case (Figure~\ref{fig:flash-fsm}).
+\texttt{nor\_init()} runs the boot chain, then the loop sits in the IDLE hub and
+dispatches each opcode with a \texttt{case} (Figure~\ref{fig:flash-fsm}).
 
 The chip uses the standard W25Q64 opcodes (Table~\ref{tab:nor-cmd}). Every access is one
-SPI transaction: CS goes low, the master (spi\_master\_generic.vhd) clocks the
+SPI transaction: CS goes low, the master (\texttt{spi\_master\_generic.vhd}) clocks the
 command byte MSB first, then a 24 bit address if the command needs one, then data, and CS
-goes high. A read (0x03) sends the address and the chip drives the bytes back on
-MISO (Figure~\ref{fig:nor-read}). A write is longer: a Write Enable (0x06) frame
-first, then a Page Program (0x02) with the address and the data, then the master
-polls the status register (0x05) until the WIP bit is 0
-(Figure~\ref{fig:nor-write}). An erase works like the program, with 0x20 and no
+goes high. A read (\texttt{0x03}) sends the address and the chip drives the bytes back on
+MISO (Figure~\ref{fig:nor-read}). A write is longer: a Write Enable (\texttt{0x06}) frame
+first, then a Page Program (\texttt{0x02}) with the address and the data, then the master
+polls the status register (\texttt{0x05}) until the WIP bit is 0
+(Figure~\ref{fig:nor-write}). An erase works like the program, with \texttt{0x20} and no
 data.
 
-In clock cycles: SCK is clk\_i$/64 = 633$\,kHz, so one SCK is 64 clocks and one
+In clock cycles: SCK is \texttt{clk\_i}$/64 = 633$\,kHz, so one SCK is 64 clocks and one
 byte is $8\times64 = 512$ clocks ($12.6\,\mu$s). A read is the command byte plus the 3
 address bytes ($4\times512 = 2048$ clocks $= 50.6\,\mu$s) and then one more byte per data
 byte read. A page program is the WREN byte, then the command, 3 address bytes and up to
@@ -1871,14 +1874,14 @@ clears, and that wait is set by the chip's internal program time, not by SPI clo
 \hline
 Code & Name & Use \\
 \hline
-0x06 & Write Enable & set before every program or erase \\
-0x01 & Write Status Register & set QE, clear the protection bits \\
-0x98 & Global Block Unlock & clear all block protection \\
-0x05 & Read Status Register & polled for the WIP (busy) bit \\
-0x9F & JEDEC ID & read manufacturer and device id \\
-0x03 & Read Data & read bytes from a 24 bit address \\
-0x02 & Page Program & write up to 256 bytes at a 24 bit address \\
-0x20 & Sector Erase & erase one 4\,KB sector \\
+\texttt{0x06} & Write Enable & set before every program or erase \\
+\texttt{0x01} & Write Status Register & set QE, clear the protection bits \\
+\texttt{0x98} & Global Block Unlock & clear all block protection \\
+\texttt{0x05} & Read Status Register & polled for the WIP (busy) bit \\
+\texttt{0x9F} & JEDEC ID & read manufacturer and device id \\
+\texttt{0x03} & Read Data & read bytes from a 24 bit address \\
+\texttt{0x02} & Page Program & write up to 256 bytes at a 24 bit address \\
+\texttt{0x20} & Sector Erase & erase one 4\,KB sector \\
 \hline
 \end{tabular}
 \end{table}
@@ -1914,7 +1917,7 @@ Code & Name & Use \\
 \pbus{\xo+4*\bw+0.5}{\xo+5*\bw+0.5}{\ymi}{D0}
 \pbus{\xo+5*\bw+0.5}{\xo+6*\bw+0.5}{\ymi}{D1}
 \end{tikzpicture}
-\caption{NOR flash read 0x03 (spi\_master\_generic.vhd).}
+\caption{NOR flash read \texttt{0x03} (\texttt{spi\_master\_generic.vhd}).}
 \label{fig:nor-read}
 \end{figure}
 
@@ -1966,7 +1969,7 @@ Code & Name & Use \\
 \node[font=\tiny, fill=white, inner sep=1pt] at ({\xo+1.5*\bw+0.4},\ymo-0.45){page program};
 \node[font=\tiny, fill=white, inner sep=1pt] at (10.4,\ymo-0.45){read status};
 \end{tikzpicture}
-\caption{NOR flash page program 0x02 (spi\_master\_generic.vhd).}
+\caption{NOR flash page program \texttt{0x02} (\texttt{spi\_master\_generic.vhd}).}
 \label{fig:nor-write}
 \end{figure}
 
@@ -1993,14 +1996,14 @@ Code & Name & Use \\
 sectors, each split into 256\,B pages (Figure~\ref{fig:nor-chip}); the smallest erase is one
 sector and the smallest write is one page. The firmware uses only the first 12\,KB
 (Figure~\ref{fig:nor-map}): sector 0 (4\,KB) holds a 32 byte settings
-blob that starts with a fixed byte 0xA5 (a marker the firmware checks to know the
+blob that starts with a fixed byte \texttt{0xA5} (a marker the firmware checks to know the
 settings are valid; if it is missing it uses defaults), then the device name, auto presence
 interval, retry count, debug
-flag, display theme colours, view flags, v2 marker 0x5A); sectors 1 to 2 hold the
+flag, display theme colours, view flags, v2 marker \texttt{0x5A}); sectors 1 to 2 hold the
 log, 512 slots of 16 bytes (sequence, type character, timestamp, value, 8 ASCII
 bytes) managed as a ring buffer. At power up a SCAN reads the type byte of all 512
 slots and takes head $=$ (highest valid $+1$) mod 512; treating anything outside the
-valid type set as empty makes the scan ignore the gaps an aborted write leaves.
+valid type set as empty makes the scan robust to the holes an aborted write leaves.
 
 \begin{figure}[H]
 \centering
@@ -2022,12 +2025,12 @@ valid type set as empty makes the scan ignore the gaps an aborted write leaves.
 \label{fig:nor-map}
 \end{figure}
 
-\textbf{Unlock before reading the id.} On this board the /HOLD and /WP
-pins are left unconnected. A floating /HOLD pin picks up noise from the SCK line,
+\textbf{Unlock before reading the id.} On this board the \texttt{/HOLD} and \texttt{/WP}
+pins are left unconnected. A floating \texttt{/HOLD} pin picks up noise from the SCK line,
 which makes the chip stop in the middle of a transfer, and then every read gives
-0xFF, even the chip id. So I cannot read the id first to check that the chip is
+\texttt{0xFF}, even the chip id. So I cannot just read the id first to check that the chip is
 there. Instead, at boot the firmware first sends a WRSR command that sets the QE bit (this
-frees the /HOLD and /WP pins) and clears the write protection, then a
+frees the \texttt{/HOLD} and \texttt{/WP} pins) and clears the write protection, then a
 Global Block Unlock, and only after that it reads the id. If the id is still wrong, the
 firmware marks the chip as missing, so the later commands fail quickly instead of waiting a
 long time. The timeouts are measured in real time, not in loop counts: 2\,ms per SPI byte,
@@ -2065,7 +2068,7 @@ ESP32.
 \draw[b] (idle)-- node[al,sloped,above]{'I','T'}(t);
 \end{tikzpicture}%
 }
-\caption{Storage FSM (norflash.c).}
+\caption{Storage FSM (\texttt{norflash.c}).}
 \label{fig:flash-fsm}
 \end{figure}
 
@@ -2079,23 +2082,23 @@ erase. To fix it I added two capacitors in parallel at the chip, one 1\,$\mu$F a
 \label{sec:uart}
 % =====================================================================
 
-The FPGA has two identical UARTs from uart\_generic.vhd: the character UART (S6,
+The FPGA has two identical UARTs from \texttt{uart\_generic.vhd}: the character UART (S6,
 pins 17/18) that carries diagnostics and banner text, and the NOR command UART (S7, pins
 72/20) that carries the one character flash opcodes (the full set is in
 Figure~\ref{fig:flash-fsm}). They are two instances of the same
-block with the same register map (Table~\ref{tab:addrmap}): 0x00 writes a byte to
-send and reads the received byte (bit 8 is the valid flag), 0x04 and 0x08
-enable and disable, 0x0C sets the baud divider and 0x10 the format, and
-0x14 is the status (rx\_valid, tx\_busy). At 115\,200 baud the
+block with the same register map (Table~\ref{tab:addrmap}): \texttt{0x00} writes a byte to
+send and reads the received byte (bit 8 is the valid flag), \texttt{0x04} and \texttt{0x08}
+enable and disable, \texttt{0x0C} sets the baud divider and \texttt{0x10} the format, and
+\texttt{0x14} is the status (\texttt{rx\_valid}, \texttt{tx\_busy}). At 115\,200 baud the
 divider is 352, so one bit lasts 352 clocks.
 
 Each instance has a transmit and a receive state machine (Figure~\ref{fig:uart-fsm}). On
-transmit, a write to 0x00 sets tx\_busy and the machine sends a start
+transmit, a write to \texttt{0x00} sets \texttt{tx\_busy} and the machine sends a start
 bit, 8 data bits LSB first, an optional parity bit and a stop bit
-(Figure~\ref{fig:uart-wave}). On receive, two flip flops (rx\_q0,
-rx\_q1) synchronise the line; a falling edge starts the machine, it samples the
+(Figure~\ref{fig:uart-wave}). On receive, two flip flops (\texttt{rx\_q0},
+\texttt{rx\_q1}) synchronise the line; a falling edge starts the machine, it samples the
 first bit at half a bit time and the rest one bit time apart, and each finished byte goes
-into a 16 deep FIFO (rxf) that the master reads from 0x00.
+into a 16 deep FIFO (\texttt{rxf}) that the master reads from \texttt{0x00}.
 
 \begin{figure}[H]
 \centering
@@ -2125,7 +2128,7 @@ into a 16 deep FIFO (rxf) that the master reads from 0x00.
   \draw[-{Stealth[length=3pt]},line width=0.5pt,gray] ({\xo+\k*\bw},\yrx-0.75)--({\xo+\k*\bw},\yrx-0.25);}
 \node[anchor=north,font=\tiny,gray] at ({\xo+3*\bw},\yrx-0.8){\texttt{rx\_q1} sampled at mid bit (\texttt{baud\_div}/2 then \texttt{baud\_div})};
 \end{tikzpicture}
-\caption{UART frame, 8N1 (uart\_generic.vhd). One bit is baud\_div
+\caption{UART frame, 8N1 (\texttt{uart\_generic.vhd}). One bit is \texttt{baud\_div}
 clocks; data goes LSB first.}
 \label{fig:uart-wave}
 \end{figure}
@@ -2161,7 +2164,7 @@ clocks; data goes LSB first.}
 \draw[a] (rp.east) to[bend left=12] (ro.north);
 \draw[a] (ro) to[out=250,in=290,looseness=0.45] node[al,below]{byte to \texttt{rxf} FIFO}(ri);
 \end{tikzpicture}}
-\caption{UART transmit and receive state machines (uart\_generic.vhd).}
+\caption{UART transmit and receive state machines (\texttt{uart\_generic.vhd}).}
 \label{fig:uart-fsm}
 \end{figure}
 
@@ -2170,35 +2173,35 @@ clocks; data goes LSB first.}
 \label{sec:firmware}
 % =====================================================================
 
-The soft core runs a firmware written in C (seven files plus a startup file), built
-for rv32imc. The code sits in the 32\,KB ITCM and the data in the 16\,KB DTCM, both
+The soft core runs a small firmware written in C (seven files plus a startup file), built
+for \texttt{rv32imc}. The code sits in the 32\,KB ITCM and the data in the 16\,KB DTCM, both
 local to the CPU and off the bus. The build turns the binary into a hex file that the CPU
 loads into the ITCM at start up, so the firmware travels inside the FPGA bitstream and needs
 no external memory.
 
 The firmware is one main loop. Each pass of the loop calls a few short functions, one after
-the other, always in this order (Figure~\ref{fig:firmware-loop}). First emit\_capture
+the other, always in this order (Figure~\ref{fig:firmware-loop}). First \texttt{emit\_capture}
 takes the characters that arrived from the ESP32 and puts them in a queue. Then
-emit\_player\_tick takes one character from the queue and plays its tone pair on the
+\texttt{emit\_player\_tick} takes one character from the queue and plays its tone pair on the
 speaker PWM (144\,ms of tone, then 400\,ms of silence); it also listens, so if it has heard
 the other device in the last 3\,s it holds the queue, and if the other device starts talking
-in the middle of a tone it stops the PWM at once. Next decode\_step checks
-fill\_cnt, and when a new spectrum is ready it copies the snapshot, decodes it, and
-sends the decoded characters to the ESP32. After that nor\_poll runs the flash
-storage protocol (Section~\ref{sec:flash}), and finally display\_tick sends one small
+in the middle of a tone it stops the PWM at once. Next \texttt{decode\_step} checks
+\texttt{fill\_cnt}, and when a new spectrum is ready it copies the snapshot, decodes it, and
+sends the decoded characters to the ESP32. After that \texttt{nor\_poll} runs the flash
+storage protocol (Section~\ref{sec:flash}), and finally \texttt{display\_tick} sends one small
 chunk to the display (Section~\ref{sec:display}).
 
-A health\_tick runs every 15\,s to check that the slaves are alive. It reads one safe
+A \texttt{health\_tick} runs every 15\,s to check that the slaves are alive. It reads one safe
 register from each slave and looks at the value it gets back; if a slave gives a wrong or
 stuck value it is marked as not healthy. The result is packed into a short status word
-(\$HLT) that both the display and the web dashboard show, so I can see at a glance
+(\texttt{\$HLT}) that both the display and the web dashboard show, so I can see at a glance
 which blocks are working. The same idea also helped at boot: just before the firmware talks
-to a slave for the first time, it prints a marker on the diagnostics UART. If that
+to a slave for the first time, it prints a small marker on the diagnostics UART. If that
 slave locks up the CPU, the last marker printed is the name of the slave that caused it, so I
 know straight away where the problem is. This is how I found the GPIO ack bug in a few
 minutes.
 
-Diagnostics use the character UART. They are simple lines that start with \$ and end
+Diagnostics use the character UART. They are simple lines that start with \texttt{\$} and end
 with a newline; the ESP32 sends these to the USB console instead of to the protocol parser. A
 debug flag in the NOR settings, which can be switched from the dashboard, turns them on and
 off.
@@ -2269,20 +2272,20 @@ the bytes that go over each link.
 Link & Byte & Meaning \\
 \hline
 character UART & protocol symbols & the tones, decoded or to send (Section~\ref{sec:protocol}) \\
-character UART & \$... line & diagnostics (FPGA to ESP32) \\
-NOR command UART & L & append a log record \\
-NOR command UART & S & save the settings \\
-NOR command UART & C & clear the log \\
-NOR command UART & G & read log slots \\
-NOR command UART & H & read the ring head \\
-NOR command UART & Q & read the settings \\
-NOR command UART & I & read the chip id \\
-NOR command UART & T & read the status \\
+character UART & \texttt{\$...} line & diagnostics (FPGA to ESP32) \\
+NOR command UART & \texttt{L} & append a log record \\
+NOR command UART & \texttt{S} & save the settings \\
+NOR command UART & \texttt{C} & clear the log \\
+NOR command UART & \texttt{G} & read log slots \\
+NOR command UART & \texttt{H} & read the ring head \\
+NOR command UART & \texttt{Q} & read the settings \\
+NOR command UART & \texttt{I} & read the chip id \\
+NOR command UART & \texttt{T} & read the status \\
 \hline
 \end{tabular}
 \end{table}
 
-On the ESP32 side the software is a few modules: a UART driver that writes the chip
+On the ESP32 side the software is a few small modules: a UART driver that writes the chip
 registers directly (115\,200 baud from the 80\,MHz clock), a flash link with retry and read
 back, the codebook, the protocol state machine, and the WebSocket client for the dashboard.
 The Wi-Fi transmit power is kept at 11\,dBm, because at full power the current bursts once
@@ -2293,12 +2296,12 @@ tripped the brownout detector on a weak supply.
 \label{sec:protocol}
 % =====================================================================
 
-The protocol uses an alternating bit codebook. A pattern is two or three
+The protocol uses an \emph{alternating bit codebook}. A pattern is two or three
 symbols in which two consecutive symbols must differ, so the receiver triggers on a
-change of tone, easy to see, rather than on silence, which is hard to
-measure on a noisy channel. Six symbols exist: lowercase a,b,c (bit 0,
+\emph{change} of tone, easy to see, rather than on silence, which is hard to
+measure on a noisy channel. Six symbols exist: lowercase \texttt{a,b,c} (bit 0,
 bit 1, EOF) ride the 2014\,Hz master carrier (FFT bin 22), uppercase
-A,B,C ride the 2472\,Hz slave carrier (bin 27); EOF, bit 0 and bit 1 use
+\texttt{A,B,C} ride the 2472\,Hz slave carrier (bin 27); EOF, bit 0 and bit 1 use
 2930, 3571 and 4577\,Hz (bins 32, 39, 50), all exact bin centres of the shared
 $91.6$\,Hz grid, the closest pair 7 bins apart. A message is identified by its first
 bit and length, the carrier gives the direction (Table~\ref{tab:codebook}); every
@@ -2313,16 +2316,16 @@ pattern is framed by EOF at both ends.
 \toprule
 \textbf{Pattern} & \textbf{(first, len)} & \textbf{Master carrier (to slave)} & \textbf{Slave carrier (to master)} \\
 \midrule
-01 & (0, 2) & presence request & presence: yes \\
-10 & (1, 2) & assign id ($=1$) & presence: no \\
-010 & (0, 3) & abort & registration request \\
-101 & (1, 3) &, & acknowledge \\
+\texttt{01} & (0, 2) & presence request & presence: yes \\
+\texttt{10} & (1, 2) & assign id ($=1$) & presence: no \\
+\texttt{010} & (0, 3) & abort & registration request \\
+\texttt{101} & (1, 3) &, & acknowledge \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 On the air, each transmission adds three things (Figure~\ref{fig:tx-timeline}). First, a
-warm up symbol: the EOF tone is held for 300\,ms instead of 144\,ms, which gives the
+\emph{warm up} symbol: the EOF tone is held for 300\,ms instead of 144\,ms, which gives the
 receiving microphone time to settle; it carries no data. Second, the EOF that frames the
 message is sent four times in a row, because losing an EOF breaks the whole message, while
 losing a data bit only loses one bit. Third, each symbol is 144\,ms of tone followed by
@@ -2379,7 +2382,30 @@ playing. Second, before sending each byte the ESP32 waits for 1\,s of silence, a
 up after 15\,s so a noisy line cannot block sending forever. The channel loses tones often,
 so both sides retry: a presence request with no answer for 8\,s is sent again up to a set
 number of times (default 6, saved in flash), and the registration message is sent again on a
-random 30 to 40\,s timer until it is confirmed.
+random 30 to 40\,s timer until it is confirmed. Receiving the same message twice does no
+harm, so repeats are safe.
+
+% =====================================================================
+\section{Results and conclusions}
+% =====================================================================
+
+What works end to end: the bus with its ten slaves and two masters, the hand made
+SDRAM controller (simulated against a behavioural die model with a self checking
+GHDL testbench, then validated on the board), the 512 point FFT pipeline with its
+$2.1\times$ timing margin, the snapshot path that gives the CPU clean spectra, the
+NOR store after the decoupling and clock work, the display dashboard, and the acoustic
+protocol between the two nodes. The design also carries its scars deliberately: the
+warm up burst, the settle guard, the counter instead of the clear on read flag, the
+register delay line instead of the buffer array, each one is a bench failure
+turned into structure. Things tried and moved: the tone decoder, the tone emitter
+and the whole flash controller all started as RTL and were re hosted in firmware
+once the soft core was trustworthy, which is exactly the partition the project set
+out to demonstrate, fabric for the sample rate, software for the decisions. The
+most useful single lesson came from the mixed signal side: $\Delta V = I\,t/C$
+explained a ``flash write succeeds but the data is not there'' bug that had looked
+like firmware for days. The main residual limit is wiring, not logic: on a proper
+board with a ground plane the NOR SPI would not be capped at 633\,kHz and the
+retry machinery would be idle.
 
 \end{document}
 

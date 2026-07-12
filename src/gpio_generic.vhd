@@ -39,8 +39,7 @@ begin
             else
                 ack_o <= '0';
                 stb_old <= stb_i;
-                -- ack tenuto alto finche' lo strobe e' attivo: l'impulso singolo
-                -- veniva perso dall'OPEN WB della CPU e le letture si piantavano.
+                -- ack is held for the whole strobe, the cpu bus loses single pulses
                 if cyc_i = '1' AND stb_i = '1' then
                     if we_i = '1' then
                         if stb_old = '0' then

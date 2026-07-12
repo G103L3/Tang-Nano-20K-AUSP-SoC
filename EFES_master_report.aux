@@ -1,0 +1,70 @@
+\relax 
+\providecommand \babel@aux [2]{\global \let \babel@toc \@gobbletwo }
+\@nameuse{bbl@beforestart}
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\babel@aux{english}{}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2}System overview}{1}{section.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Hardware/software partition.}}{1}{table.caption.1}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{tab:partition}{{1}{1}{Hardware/software partition}{table.caption.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}The board around the FPGA}{1}{subsection.2.1}\protected@file@percent }
+\newlabel{sec:board}{{2.1}{1}{The board around the FPGA}{subsection.2.1}{}}
+\gdef \LT@i {\LT@entry 
+    {1}{58.7386pt}\LT@entry 
+    {1}{34.04185pt}\LT@entry 
+    {4}{97.18199pt}\LT@entry 
+    {4}{71.48636pt}\LT@entry 
+    {1}{202.63338pt}}
+\@writefile{toc}{\contentsline {section}{\numberline {3}The FPGA SoC}{2}{section.3}\protected@file@percent }
+\newlabel{sec:soc}{{3}{2}{The FPGA SoC}{section.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Bus and address map}{2}{subsection.3.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Address map. The slave is selected by the top 5 bits \texttt  {addr[31:27]} (the \textbf  {Base}). Each slave reserves a 128\,MB window (\texttt  {addr[26:0]}) but decodes only the low \textbf  {Offset} bits it needs, \texttt  {addr[7:0]} for every block except the SDRAM snapshot ($^{\ast }$), which decodes \texttt  {addr[12:0]}; the higher window bits are don't care, so each register aliases across them. For S0 the Offset is shown in binary \texttt  {addr[12:0]}: \texttt  {bit\,12} selects the region (\texttt  {0} $=$ status registers, \texttt  {1} $=$ the 512 word spectrum), \texttt  {[10:2]} is the bin index \texttt  {0}\dots  \texttt  {511} and \texttt  {[1:0]} the byte within the word.}}{2}{table.2}\protected@file@percent }
+\newlabel{tab:addrmap}{{2}{2}{Bus and address map}{table.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Masters slaves communication}{3}{subsection.3.2}\protected@file@percent }
+\newlabel{sec:wbrules}{{3.2}{3}{Masters slaves communication}{subsection.3.2}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces The bus signals of one access.}}{3}{table.caption.2}\protected@file@percent }
+\newlabel{tab:wb}{{3}{3}{The bus signals of one access}{table.caption.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Clock tree}{3}{subsection.3.3}\protected@file@percent }
+\newlabel{sec:clocks}{{3.3}{3}{Clock tree}{subsection.3.3}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Clock and divider per block.}}{3}{table.caption.3}\protected@file@percent }
+\newlabel{tab:dividers}{{4}{3}{Clock and divider per block}{table.caption.3}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Board level schematic.}}{4}{figure.caption.4}\protected@file@percent }
+\newlabel{fig:board}{{1}{4}{Board level schematic}{figure.caption.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces SoC top level block diagram.}}{5}{figure.caption.5}\protected@file@percent }
+\newlabel{fig:soc}{{2}{5}{SoC top level block diagram}{figure.caption.5}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4}The SDRAM controller}{5}{section.4}\protected@file@percent }
+\newlabel{sec:sdram}{{4}{5}{The SDRAM controller}{section.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces One SDRAM bank: 2048 rows by 256 columns, and how a row and a column are selected, with the two access delays.}}{5}{figure.caption.6}\protected@file@percent }
+\newlabel{fig:sdram-struct}{{3}{5}{One SDRAM bank: 2048 rows by 256 columns, and how a row and a column are selected, with the two access delays}{figure.caption.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}The FSM}{5}{subsection.4.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces The SDRAM commands the FSM issues, and their code on the four control pins (active low): the FSM never sends the word, it drives this pattern for one cycle.}}{6}{table.caption.7}\protected@file@percent }
+\newlabel{tab:sdram-cmd}{{5}{6}{The SDRAM commands the FSM issues, and their code on the four control pins (active low): the FSM never sends the word, it drives this pattern for one cycle}{table.caption.7}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces SDRAM timing values read from the datasheet, each converted to 40.5\,MHz clock cycles.}}{6}{table.caption.8}\protected@file@percent }
+\newlabel{tab:jedec}{{6}{6}{SDRAM timing values read from the datasheet, each converted to 40.5\,MHz clock cycles}{table.caption.8}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Complete \texttt  {sdram\_controller\_fsm} state graph.}}{6}{figure.caption.9}\protected@file@percent }
+\newlabel{fig:sdram-fsm}{{4}{6}{Complete \texttt {sdram\_controller\_fsm} state graph}{figure.caption.9}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Bring up sequence}{7}{subsection.4.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces SDRAM bring up sequence.}}{7}{figure.caption.10}\protected@file@percent }
+\newlabel{fig:sdram-init}{{5}{7}{SDRAM bring up sequence}{figure.caption.10}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Read path and clock phase}{7}{subsection.4.3}\protected@file@percent }
+\newlabel{sec:sdram-read}{{4.3}{7}{Read path and clock phase}{subsection.4.3}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Read burst, cycle accurate.}}{7}{figure.caption.11}\protected@file@percent }
+\newlabel{fig:sdram-read}{{6}{7}{Read burst, cycle accurate}{figure.caption.11}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Write path}{8}{subsection.4.4}\protected@file@percent }
+\newlabel{sec:sdram-write}{{4.4}{8}{Write path}{subsection.4.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Streaming write burst, cycle accurate.}}{8}{figure.caption.12}\protected@file@percent }
+\newlabel{fig:sdram-write}{{7}{8}{Streaming write burst, cycle accurate}{figure.caption.12}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5}The audio pipeline: ADC $\to $ DMA $\to $ FFT $\to $ CPU}{8}{section.5}\protected@file@percent }
+\newlabel{sec:accel}{{5}{8}{The audio pipeline: ADC $\to $ DMA $\to $ FFT $\to $ CPU}{section.5}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Audio accelerator block diagram.}}{9}{figure.caption.13}\protected@file@percent }
+\newlabel{fig:audio-zoom}{{8}{9}{Audio accelerator block diagram}{figure.caption.13}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}The two state machines}{9}{subsection.5.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Capture FSM (\texttt  {dma\_proc}).}}{9}{figure.caption.14}\protected@file@percent }
+\newlabel{fig:capture-fsm}{{9}{9}{Capture FSM (\texttt {dma\_proc})}{figure.caption.14}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces FFT and drain FSM (\texttt  {fft\_proc}).}}{9}{figure.caption.15}\protected@file@percent }
+\newlabel{fig:fft-fsm}{{10}{9}{FFT and drain FSM (\texttt {fft\_proc})}{figure.caption.15}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}The ADC SPI master}{9}{subsection.5.2}\protected@file@percent }
+\newlabel{sec:adc}{{5.2}{9}{The ADC SPI master}{subsection.5.2}{}}

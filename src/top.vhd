@@ -54,6 +54,7 @@ architecture behavioral of top_system is
 
     component wb_interconnect
         port (
+            clk_i    : in std_logic;
             m0_adr_i : in std_logic_vector(31 downto 0); m0_dat_i : in std_logic_vector(31 downto 0); m0_dat_o : out std_logic_vector(31 downto 0);
             m0_we_i  : in std_logic; m0_sel_i : in std_logic_vector(3 downto 0); m0_stb_i : in std_logic; m0_cyc_i : in std_logic; m0_ack_o : out std_logic;
             m1_adr_i : in std_logic_vector(31 downto 0); m1_dat_i : in std_logic_vector(31 downto 0); m1_dat_o : out std_logic_vector(31 downto 0);
@@ -101,41 +102,6 @@ architecture behavioral of top_system is
         );
     end component;
 
-    component SDRAM_controller_top_SIP
-        port (
-            O_sdram_clk      : out   std_logic;
-            O_sdram_cke      : out   std_logic;
-            O_sdram_cs_n     : out   std_logic;
-            O_sdram_cas_n    : out   std_logic;
-            O_sdram_ras_n    : out   std_logic;
-            O_sdram_wen_n    : out   std_logic;
-            O_sdram_dqm      : out   std_logic_vector(3 downto 0);
-            O_sdram_addr     : out   std_logic_vector(10 downto 0);
-            O_sdram_ba       : out   std_logic_vector(1 downto 0);
-            IO_sdram_dq      : inout std_logic_vector(31 downto 0);
-            I_sdrc_rst_n     : in    std_logic;
-            I_sdrc_clk       : in    std_logic;
-            I_sdram_clk      : in    std_logic;
-            I_sdrc_selfrefresh : in  std_logic;
-            I_sdrc_power_down  : in  std_logic;
-            I_sdrc_wr_n      : in    std_logic;
-            I_sdrc_rd_n      : in    std_logic;
-            I_sdrc_addr      : in    std_logic_vector(20 downto 0);
-            I_sdrc_data_len  : in    std_logic_vector(7 downto 0);
-            I_sdrc_dqm       : in    std_logic_vector(3 downto 0);
-            I_sdrc_data      : in    std_logic_vector(31 downto 0);
-            O_sdrc_data      : out   std_logic_vector(31 downto 0);
-            O_sdrc_init_done : out   std_logic;
-            O_sdrc_busy_n    : out   std_logic;
-            O_sdrc_rd_valid  : out   std_logic;
-            O_sdrc_wrd_ack   : out   std_logic
-        );
-    end component;
-
-    -- Controller SDRAM scritto a mano (drop-in del SIP, porte IDENTICHE).
-    -- Il SIP qui sopra resta DICHIARATO e nel progetto Gowin, ma NON e' piu'
-    -- istanziato: u_sdram_direct ora usa sdram_controller_fsm. I generic usano
-    -- i default dell'entity (timing @40.5 MHz documentati nel report).
     component sdram_controller_fsm
         port (
             O_sdram_clk      : out   std_logic;
@@ -202,54 +168,6 @@ architecture behavioral of top_system is
         );
     end component;
 
-    component audio_decoder
-        generic (
-            DEBUG_MODE  : boolean := false;
-            THRESHOLD   : integer := 6;
-            N_BINS      : integer := 256
-        );
-        port (
-            clk_i      : in  std_logic;
-            rst_i      : in  std_logic;
-            start_i    : in  std_logic;
-            mem_addr_o : out std_logic_vector(8 downto 0);
-            mem_data_i : in  std_logic_vector(15 downto 0);
-            busy_i     : in  std_logic;
-            char_o     : out std_logic_vector(7 downto 0);
-            char_stb_o : out std_logic;
-            busy_o     : out std_logic
-        );
-    end component;
-
-    component uart_tx_char
-        generic (
-            CLK_HZ : integer := 27_000_000;
-            BAUD   : integer := 115200
-        );
-        port (
-            clk_i  : in  std_logic;
-            rst_i  : in  std_logic;
-            char_i : in  std_logic_vector(7 downto 0);
-            stb_i  : in  std_logic;
-            tx_o   : out std_logic;
-            busy_o : out std_logic
-        );
-    end component;
-
-    component uart_rx_char
-        generic (
-            CLK_HZ : integer := 27_000_000;
-            BAUD   : integer := 115200
-        );
-        port (
-            clk_i   : in  std_logic;
-            rst_i   : in  std_logic;
-            rx_i    : in  std_logic;
-            data_o  : out std_logic_vector(7 downto 0);
-            valid_o : out std_logic
-        );
-    end component;
-
     component spi_master_generic
         generic (
             PRESCALER  : natural := 16;
@@ -272,7 +190,6 @@ architecture behavioral of top_system is
         );
     end component;
 
-    -- Soft core RISC-V (Gowin PicoRV32). Master Wishbone via OPEN WB (slv_ext_*).
     component Gowin_PicoRV32_Top
         port (
             ser_tx          : out std_logic;
@@ -311,18 +228,6 @@ architecture behavioral of top_system is
         );
     end component;
 
-    -- OPEN WB master del soft core -> UART_GENERIC della CPU
-    signal core_slv_stb  : std_logic;
-    signal core_slv_we   : std_logic;
-    signal core_slv_cyc  : std_logic;
-    signal core_slv_ack  : std_logic;
-    signal core_slv_adr  : std_logic_vector(31 downto 0);
-    signal core_slv_wdat : std_logic_vector(31 downto 0);
-    signal core_slv_rdat : std_logic_vector(31 downto 0);
-    signal core_slv_sel  : std_logic_vector(3 downto 0);
-    signal core_uart_tx  : std_logic;
-    signal core_ser_tx   : std_logic;   -- simpleuart nativa dell'IP (bring-up su pin 17)
-
     component gpio_generic
         generic ( nbit : integer := 8 );
         port (
@@ -360,7 +265,17 @@ architecture behavioral of top_system is
         );
     end component;
 
-    -- ── Slave wires ────────────────────────────────────────────────────────────
+    -- cpu external bus, master m0 of the interconnect
+    signal core_slv_stb  : std_logic;
+    signal core_slv_we   : std_logic;
+    signal core_slv_cyc  : std_logic;
+    signal core_slv_ack  : std_logic;
+    signal core_slv_adr  : std_logic_vector(31 downto 0);
+    signal core_slv_wdat : std_logic_vector(31 downto 0);
+    signal core_slv_rdat : std_logic_vector(31 downto 0);
+    signal core_slv_sel  : std_logic_vector(3 downto 0);
+    signal core_uart_tx  : std_logic;
+
     signal s0_adr, s0_wdata, s0_rdata : std_logic_vector(31 downto 0);
     signal s0_stb, s0_we, s0_cyc, s0_ack : std_logic;
     signal s0_sel : std_logic_vector(3 downto 0);
@@ -401,12 +316,10 @@ architecture behavioral of top_system is
     signal s9_stb, s9_we, s9_cyc, s9_ack : std_logic;
     signal s9_sel : std_logic_vector(3 downto 0);
 
-    -- IRQ verso il PicoRV32 (bit 20 = FFT done dall'audio accelerator)
+    -- irq bit 20 is the frame done pulse from the audio accelerator
     signal core_irq : std_logic_vector(31 downto 20) := (others => '0');
 
-    signal dummy_dat : std_logic_vector(31 downto 0) := (others => '0');
-
-    -- ── DMA master bus ─────────────────────────────────────────────────────────
+    -- accelerator master bus and its split between peripherals and sdram
     signal dma_m_adr, dma_m_wdat : std_logic_vector(31 downto 0);
     signal dma_m_we, dma_m_stb, dma_m_cyc : std_logic;
     signal dma_m_rdat  : std_logic_vector(31 downto 0);
@@ -414,258 +327,62 @@ architecture behavioral of top_system is
     signal dma_to_sdram : std_logic;
     signal dma_wb_rdat, dma_rdata : std_logic_vector(31 downto 0);
     signal dma_wb_ack, dma_ack : std_logic;
-    signal dma_cyc_s, dma_stb_s, dma_we_s : std_logic;
-    signal dma_adr_s, dma_wdata_s : std_logic_vector(31 downto 0);
-    signal dma_irq        : std_logic;
-    -- ── Bridge DMA → SIP SDRAM (fase WRITE pilotata dal DMA) ─────────────────
-    signal dma_sdr_own    : std_logic;
-    signal dma_sdr_wr_n   : std_logic;
-    signal dma_sdr_addr   : std_logic_vector(20 downto 0);
-    signal dma_sdr_data   : std_logic_vector(31 downto 0);
-    signal sip_wr_n  : std_logic;
-    signal sip_rd_n  : std_logic;
-    signal sip_addr  : std_logic_vector(20 downto 0);
-    signal sip_data  : std_logic_vector(31 downto 0);
-    signal dma_fft_trig   : std_logic;
-    signal sdram_init_done : std_logic;
-    signal fft_trig_led_s : std_logic := '0';
-    signal wr_ack_seen_s   : std_logic;
-    signal rd_ack_seen_s   : std_logic;
+    signal dma_stb_wb : std_logic;
+    signal dma_cyc_wb : std_logic;
+    signal dma_irq    : std_logic;
 
-    -- ── Test diretto SDRAM ───────────────────────────────────────────────────────
-    signal tst_wr_n     : std_logic := '1';
-    signal tst_rd_n     : std_logic := '1';
-    signal tst_busy_n_s : std_logic;
-    signal tst_rd_valid_s : std_logic;
-    signal tst_wrd_ack_s  : std_logic;
-    signal tst_addr     : std_logic_vector(20 downto 0) := (others => '0');
-    signal tst_wr_data  : std_logic_vector(31 downto 0) := (others => '0');
-    signal tst_rd_data  : std_logic_vector(31 downto 0);
-    signal tst_init_done : std_logic;
+    -- direct write port from the accelerator to the sdram controller
+    signal dma_sdr_own  : std_logic;
+    signal dma_sdr_wr_n : std_logic;
+    signal dma_sdr_addr : std_logic_vector(20 downto 0);
+    signal dma_sdr_data : std_logic_vector(31 downto 0);
+    signal sip_wr_n : std_logic;
+    signal sip_rd_n : std_logic;
+    signal sip_addr : std_logic_vector(20 downto 0);
+    signal sip_data : std_logic_vector(31 downto 0);
+    signal dma_fft_trig : std_logic;
 
-    -- FSM Test SDRAM
-    type tst_st_t is (TS_INIT, TS_PREAMBLE, TS_WRITE_WAIT, TS_WRITE, TS_WRITE_DONE, TS_READ_WAIT, TS_READ, TS_TX_WORD, TS_TX_CRLF, TS_PAUSE);
-    signal tst_st       : tst_st_t := TS_INIT;
-    signal tst_timer    : integer range 0 to 500000 := 0;
-    signal tst_wrd_cnt  : integer range 0 to 511 := 0;
-    signal tst_timeout  : integer range 0 to 2047 := 0;
-    
-    signal tst_word_idx : integer range 0 to 25 := 0;
-    signal tst_nibble_idx : integer range 0 to 8 := 0;
-    
-    signal tst_baud_cnt  : unsigned(9 downto 0) := (others => '0');
-    signal tst_baud_tick : std_logic := '0';
-    signal tst_tx_sr     : std_logic_vector(9 downto 0) := (others => '1');
-    signal tst_tx_cnt    : unsigned(3 downto 0) := (others => '0');
-    signal tst_tx_busy   : std_logic := '0';
-    signal tst_tx_load   : std_logic := '0';
-    signal tst_tx_byte   : std_logic_vector(7 downto 0) := (others => '0');
-    signal test_uart_s   : std_logic;
-    
-    signal tst_idx      : integer range 0 to 63 := 0;
-    type tst_rd_arr_t is array(0 to 25) of std_logic_vector(31 downto 0);
-    signal tst_rd_arr2  : tst_rd_arr_t := (others => (others => '0'));
-
-    -- Loop burst: 20 burst x 26 parole = 520 (>= 512). 1 burst per riga SDRAM.
-    signal tst_burst    : integer range 0 to 19 := 0;
-    constant TST_NBURST : integer := 20;
-    -- Warm-up: 1 burst write+read scartato (riga dummy) per "scaldare" la
-    -- pipeline del SIP prima del burst 0 reale (1a transazione post-init).
-    signal tst_warm     : std_logic := '1';
-    signal tst_irq_prev : std_logic := '0';  -- edge-detect dma_irq (stesso dominio clk_sdram)
+    -- fetch fsm, the read side of the sdram port
+    type fetch_state_t is (F_IDLE, F_REQ, F_READ, F_DONE);
+    signal fetch_curr_state, fetch_next_state : fetch_state_t := F_IDLE;
+    signal fetch_rd_n      : std_logic := '1';
+    signal fetch_busy_n    : std_logic;
+    signal fetch_rd_valid  : std_logic;
+    signal fetch_addr      : std_logic_vector(20 downto 0) := (others => '0');
+    signal fetch_rd_data   : std_logic_vector(31 downto 0);
+    signal fetch_init_done : std_logic;
+    signal fetch_timeout   : integer range 0 to 2047 := 0;
+    signal fetch_idx       : integer range 0 to 63 := 0;
+    signal fetch_burst     : integer range 0 to 19 := 0;
+    constant FETCH_NBURST  : integer := 20;
+    type fetch_words_t is array(0 to 25) of std_logic_vector(31 downto 0);
+    signal fetch_words : fetch_words_t := (others => (others => '0'));
 
     signal spi_data_ready_s : std_logic;
     signal gpio_in_v, gpio_out_v : std_logic_vector(0 downto 0);
     signal pwm10_s, pwm4_s : std_logic;
-    -- Reset locale per le PWM: alto brevemente al power-on (PLL non agganciata)
-    -- per caricare gli AUTO_START defaults, poi basso per sempre.
-    -- Le PWM cosi' non vedono mai il bottone rst_i del top.
     signal pwm_rst_s : std_logic;
-
-    signal adc_nonzero : std_logic := '0';
-    signal ausp_cyc  : std_logic := '0';
-    signal ausp_stb  : std_logic := '0';
-    signal ausp_adr  : std_logic_vector(31 downto 0) := (others => '0');
-    signal ausp_rdat : std_logic_vector(31 downto 0);
-    signal ausp_ack  : std_logic;
-    signal hm_adr   : std_logic_vector(31 downto 0) := (others => '0');
-    signal hm_wdat  : std_logic_vector(31 downto 0) := (others => '0');
-    signal hm_stb   : std_logic := '0';
-    signal hm_cyc   : std_logic := '0';
-    signal hm_we    : std_logic := '0';
-    signal hm_rdat  : std_logic_vector(31 downto 0);
-    signal hm_ack   : std_logic;
-
-    -- Path TX FPGA: UART RX (da ESP32) -> decodifica char -> pilota u_pwm10
-    -- via Wishbone (master host hm_*) per emettere carrier+tono.
-    signal rx_char_s  : std_logic_vector(7 downto 0);
-    signal rx_valid_s : std_logic;
-    constant TONE_CYCLES : integer := 1_944_000;  -- ~72 ms @ 27 MHz
-    -- Silenzio inter-simbolo LUNGO (~350 ms): e' il separatore tra simboli; se
-    -- corto, due bit uguali di fila si fondono in ricezione (coda/riverbero del
-    -- tono) e all'orecchio sembra un tono continuo. Lungo -> gap ben percepibile
-    -- e bit separati. (Se cambi qui, adegua EMIT_PACE_MS in fpga_uart_link.cpp.)
-    constant SIL_CYCLES  : integer := 9_450_000;  -- ~350 ms @ 27 MHz
-    type tx_st_t is (TXS_IDLE, TXS_START, TXS_TONE, TXS_STOP, TXS_SIL);
-    signal tx_st     : tx_st_t := TXS_IDLE;
-    signal tx_timer  : integer range 0 to SIL_CYCLES := 0;
-    signal tx_wbdata : std_logic_vector(31 downto 0) := (others => '0');
-
-    -- FIFO TX: i char arrivano dall'UART RX in raffica (il bridge ESP32 li
-    -- inoltra di colpo) ma la FSM emette 1 tono ogni ~90ms. La FIFO li
-    -- bufferizza e la FSM li emette in sequenza.
-    constant TXF_DEPTH : integer := 32;
-    type txf_arr_t is array(0 to TXF_DEPTH - 1) of std_logic_vector(7 downto 0);
-    signal txf    : txf_arr_t;
-    signal txf_wr : integer range 0 to TXF_DEPTH - 1 := 0;
-    signal txf_rd : integer range 0 to TXF_DEPTH - 1 := 0;
-
-    -- char -> dato Wishbone per u_pwm10: [15:0]=carrier, [31:16]=tono signal.
-    -- master = minuscole (carrier 2000), config = MAIUSCOLE (carrier 2400).
-    -- Ritorna 0 se char non valido (da ignorare).
-    function char_to_wbdata(c : std_logic_vector(7 downto 0)) return std_logic_vector is
-        variable ch      : integer;
-        variable letter  : integer;
-        variable carrier : integer := 0;
-        variable sig     : integer := 0;
-    begin
-        ch := to_integer(unsigned(c));
-        -- Protocollo compatto a opcode (DIARIO 2026-05-24): minuscole = carrier
-        -- master 2000, MAIUSCOLE = carrier slave 2400. a/A=bit0, b/B=bit1, c/C=EOF.
-        -- Frequenze distanziate per local-max ±3 affidabile sul reale.
-        if    ch >= 65 and ch <= 90 then letter := ch - 65; carrier := 2400;  -- A-Z = slave
-        elsif ch >= 97 and ch <= 122 then letter := ch - 97; carrier := 2000;  -- a-z = master
-        else  letter := -1; end if;
-        case letter is
-            when 0  => sig := 3500;  -- bit 0
-            when 1  => sig := 4500;  -- bit 1
-            when 2  => sig := 2900;  -- EOF
-            when others => sig := 0; carrier := 0;  -- non valido
-        end case;
-        return std_logic_vector(to_unsigned(sig, 16)) & std_logic_vector(to_unsigned(carrier, 16));
-    end function;
-
-    type mag_array_t is array(0 to 511) of unsigned(14 downto 0);
-    signal mag : mag_array_t := (others => (others => '0'));
-
-    type ausp_st_t is (
-        ST_BOOT_START, ST_BOOT_DATA, ST_BOOT_STOP,
-        ST_TX_LOOP_DELAY,
-        ST_DMA_INIT, ST_DMA_ACK,
-        ST_IDLE,
-        ST_RD_ISSUE, ST_RD_WAIT,
-        ST_NOISE_CALC,
-        ST_PEAK_SCAN,
-        ST_PARAB_CALC,
-        ST_DECODE,
-        ST_TX_CHAR_START, ST_TX_CHAR_DATA, ST_TX_CHAR_STOP,
-        ST_RXDEC,
-        ST_PWM_STOP0, ST_PWM_STOP0_ACK,
-        ST_PWM_START_T, ST_PWM_START_ACK,
-        ST_TONE_WAIT,
-        ST_PWM_FINAL, ST_PWM_FINAL_ACK,
-        ST_SILENCE
-    );
-    signal ausp_st : ausp_st_t := ST_BOOT_START;
-
-    signal irq_cnt    : unsigned(6 downto 0) := (others => '0');
-    signal led_mode   : std_logic := '0';
-    signal led_cnt    : unsigned(23 downto 0) := (others => '0');
-    signal blink_led  : std_logic := '0';
-    signal dma_stb_wb : std_logic;
-    signal dma_cyc_wb : std_logic;
-    signal irq_led_s  : std_logic := '0';
-    signal fft_dbg_s      : std_logic := '0';
-    signal fft_ack_dbg_s  : std_logic := '0';
-    signal fft_ser_s      : std_logic := '0';
-    signal fft_idx_s      : std_logic_vector(8 downto 0);
-    signal fft_xk_re_s    : std_logic_vector(15 downto 0);
-    signal fft_opd_s      : std_logic;
-    signal ausp_irq_prev  : std_logic := '0';
-    signal ausp_dbg_s   : std_logic := '0';
-    signal sdram_nz_s   : std_logic := '0';
-    signal spi_dbg_cap  : std_logic := '0';
-    signal rd_scan_idx   : integer range 0 to 7 := 0;
-    signal sig_max_u     : unsigned(14 downto 0) := (others => '0');
-    signal carr_max_u    : unsigned(14 downto 0) := (others => '0');
-    constant C_DETECT_THR     : unsigned(14 downto 0) := to_unsigned(3, 15);
-    signal dma_irq_prev   : std_logic := '0';
-
-    type boot_tx_st_t is (BTX_START, BTX_DATA, BTX_STOP, BTX_NEXT, BTX_DONE);
-    signal boot_tx_st   : boot_tx_st_t := BTX_START;
-    signal boot_tx_pin  : std_logic := '1';
-    signal boot_tx_baud : integer range 0 to 233 := 0;
-    signal boot_tx_bitc : integer range 0 to 7   := 0;
-    signal boot_tx_sreg : std_logic_vector(7 downto 0) := (others => '1');
-    signal boot_tx_idx  : integer range 0 to 8  := 0;
-    constant C_BOOT_TX_LEN : integer := 9;
-    type boot_tx_rom_t is array(0 to 8) of std_logic_vector(7 downto 0);
-    constant C_BOOT_TX_STR : boot_tx_rom_t := (
-        x"46", x"50", x"47", x"41", x"20", x"4F", x"4E", x"0D", x"0A"
-    );
-
-    signal boot_done         : std_logic := '0';
-    type ausp_mag_t is array(0 to 7) of unsigned(14 downto 0);
-    signal ausp_mag_buf      : ausp_mag_t := (others => (others => '0'));
-    signal fft_direct_buf    : ausp_mag_t := (others => (others => '0'));
-    signal ausp_results_rdy  : std_logic := '0';
-    signal ausp_results_ltch : std_logic := '0';
-
-    type rtx_st_t is (
-        RTX_IDLE, RTX_CONV, RTX_NEXT_DIGIT,
-        RTX_BYTE_START, RTX_BYTE_BITS, RTX_BYTE_STOP,
-        RTX_AFTER_SEP, RTX_AFTER_CR
-    );
-    signal rtx_st      : rtx_st_t := RTX_IDLE;
-    signal rtx_next_st : rtx_st_t := RTX_IDLE;
-    signal rtx_pin     : std_logic := '1';
-    signal rtx_baud    : integer range 0 to 233 := 0;
-    signal rtx_bitc    : integer range 0 to 7   := 0;
-    signal rtx_sreg    : std_logic_vector(7 downto 0) := (others => '1');
-    signal rtx_val_idx : integer range 0 to 7 := 0;
-    signal rtx_dig_idx : integer range 0 to 5 := 0;
-    type rtx_dig_t is array(0 to 4) of std_logic_vector(7 downto 0);
-    signal rtx_digs    : rtx_dig_t := (others => x"30");
 
     signal clk_sdram   : std_logic;
     signal clk_sdram_p : std_logic;
     signal pll_lock    : std_logic;
 
-    -- Audio decoder + UART TX char (dominio clk_sdram)
-    signal dec_char_o     : std_logic_vector(7 downto 0);
-    signal dec_char_stb   : std_logic;
-    signal dec_busy_o     : std_logic;
-    signal dma_irq_prev2  : std_logic := '0';
-    signal uart_char_tx_s : std_logic;
-    signal uart_char_busy : std_logic;
+    signal dma_irq_prev2 : std_logic := '0';
 
-    -- Buffer BSRAM per un frame FFT: la FSM tst_* scarica qui i word letti
-    -- dalla SDRAM (veloce, niente piu' dump hex), il decoder legge da qui.
-    type fft_bsram_t is array(0 to 511) of std_logic_vector(15 downto 0);
-    signal fft_bsram   : fft_bsram_t;
-    signal bsram_widx  : unsigned(9 downto 0) := (others => '0');
-    signal bsram_rdata : std_logic_vector(15 downto 0) := (others => '0');
-    signal dec_mem_addr : std_logic_vector(8 downto 0);
-
-    -- ── Snapshot BSRAM per la CPU (S0, regione 0x48001000) ───────────────────
-    -- La FSM tst_ riempie fft_bsram in modo deterministico (bin = burst*26+idx);
-    -- la CPU legge da qui uno spettro STABILE per tutto il frame (niente race coi
-    -- "cassettini" da 200 cicli). Lettura registrata -> ack ritardato di 2 cicli.
+    -- stable spectrum snapshot for the cpu, filled bin by bin by the fetch fsm
+    type fft_bsram_t is array (0 to 511) of std_logic_vector(15 downto 0);
+    signal fft_bsram      : fft_bsram_t;
+    signal bsram_rdata    : std_logic_vector(15 downto 0) := (others => '0');
     signal bsram_addr_cpu : std_logic_vector(8 downto 0) := (others => '0');
     signal s0_bsram_cnt   : integer range 0 to 2 := 0;
-    -- fill_cnt: incrementa a ogni frame completato (pulse frame_ready_s). La CPU
-    -- lo poll-a su S0/0x90 per leggere la BSRAM solo a frame pronto (stabile ~11 ms).
     signal fill_cnt       : unsigned(15 downto 0) := (others => '0');
 
-    -- Decimazione: 1 frame decodificato/stampato ogni FRAME_DIV catture
-    -- (campione ~11 ms -> ~550 ms tra una riga di debug e l'altra).
-    constant FRAME_DIV     : integer := 1;
-    signal frame_cnt       : integer range 0 to FRAME_DIV - 1 := 0;
-    signal decode_frame_s  : std_logic := '0';  -- pulse: questo frame va letto+decodificato
-    signal frame_ready_s   : std_logic := '0';  -- pulse: BSRAM pronta -> start decoder
+    constant FRAME_DIV    : integer := 1;
+    signal frame_cnt      : integer range 0 to FRAME_DIV - 1 := 0;
+    signal decode_frame_s : std_logic := '0';
+    signal frame_ready_s  : std_logic := '0';
 
-    -- DEBUG acceleratore: contatori (dominio clk_sdram) esposti su S0 a 0x84/0x88/0x8C.
-    -- Dicono DOVE si ferma la catena: rdy=campioni ADC, trig=finestre da 512, irq=FFT done.
+    -- event counters that tell where the audio chain stops
     signal acc_rdy_cnt  : unsigned(31 downto 0) := (others => '0');
     signal acc_trig_cnt : unsigned(31 downto 0) := (others => '0');
     signal acc_irq_cnt  : unsigned(31 downto 0) := (others => '0');
@@ -681,30 +398,30 @@ begin
         lock    => pll_lock
     );
 
-    ser_tx      <= '1';
-    gpio_1_o    <= '1';
-    gpio_in_v   <= (others => '0');
+    ser_tx    <= '1';
+    -- pin 80 gates the 3v3 rail of every peripheral, it must stay high
+    gpio_1_o  <= '1';
+    gpio_in_v <= (others => '0');
 
+    -- accelerator bus split: peripheral traffic goes to the interconnect,
+    -- the sdram range would go to the direct port (not used in practice)
     dma_to_sdram <= '1' when dma_m_adr(31 downto 28) = "0001" else '0';
     dma_stb_wb   <= dma_m_stb and not dma_to_sdram;
     dma_cyc_wb   <= dma_m_cyc and not dma_to_sdram;
     dma_m_ack_s  <= dma_ack   when dma_to_sdram = '1' else dma_wb_ack;
     dma_m_rdat   <= dma_rdata when dma_to_sdram = '1' else dma_wb_rdat;
-    dma_cyc_s    <= dma_m_cyc and dma_to_sdram;
-    dma_stb_s    <= dma_m_stb and dma_to_sdram;
-    dma_we_s     <= dma_m_we;
-    dma_adr_s    <= dma_m_adr;
-    dma_wdata_s  <= dma_m_wdat;
+    dma_ack      <= '0';
+    dma_rdata    <= (others => '0');
 
     u_bus: wb_interconnect
     port map (
-        -- M0 = CPU PicoRV32 (OPEN WB). Prima era la FSM emit hm_*.
+        clk_i    => clk_sdram,
         m0_adr_i => core_slv_adr, m0_dat_i => core_slv_wdat, m0_dat_o => core_slv_rdat,
         m0_we_i  => core_slv_we,  m0_sel_i => core_slv_sel,  m0_stb_i => core_slv_stb,
         m0_cyc_i => core_slv_cyc, m0_ack_o => core_slv_ack,
         m1_adr_i => dma_m_adr,  m1_dat_i => dma_m_wdat,  m1_dat_o => dma_wb_rdat,
         m1_we_i  => dma_m_we,   m1_sel_i => "1111",
-        m1_stb_i => dma_stb_wb,   -- M1 (DMA) sul bus per l'acceleratore audio (legge ADC via S1)
+        m1_stb_i => dma_stb_wb,
         m1_cyc_i => dma_cyc_wb,
         m1_ack_o => dma_wb_ack,
         s0_adr_o => s0_adr, s0_dat_o => s0_wdata, s0_dat_i => s0_rdata,
@@ -729,12 +446,7 @@ begin
         s9_we_o  => s9_we,  s9_sel_o => s9_sel,   s9_stb_o => s9_stb,  s9_cyc_o => s9_cyc, s9_ack_i => s9_ack
     );
 
-    -- Display TFT ST7789 (GMT020-02-7P) = slave S9 (0x5800_0000), SPI mode 3
-    -- ~6.75 MHz. Pin 27 SCL, 28 SDA, 29 DC, 30 RST, 31 CS: dallo schematico
-    -- Tang Nano 20K sono sull'header J6 (pos. 8/9/12/13/14) e arrivano SOLO al
-    -- connettore FPC dell'LCD RGB (vuoto) -- niente LED onboard (15-20), niente
-    -- backlight boost (49), niente EDID HDMI (52/53), niente HSPI BL616 (71-76,86).
-    -- Firmware: display_manager.c, colori dai settings in NOR.
+    -- tft panel on five spare pins, slave s9
     u_disp: spi_display
         generic map ( PRESCALER => 6 )
         port map (
@@ -754,51 +466,43 @@ begin
             CS_o  => disp_cs_o
         );
 
-    -- ── S0 (0x1000_0000): la FSM tst_ "collegata al bus" (opzione 2) ────────────
-    -- La CPU legge il buffer di burst della FSM tst_ (tst_rd_arr2, 26 parole appena
-    -- lette dalla SDRAM) + uno stato, su flag. NON tocco la FSM: leggo solo i suoi
-    -- segnali; lei continua a leggere la SDRAM come prima (26 parole x 20 burst).
-    --   offset 0x00..0x64 : tst_rd_arr2[0..25]  (26 parole del burst corrente)
-    --   offset 0x80       : stato = [31]=frame_ready, [16]=in_read,
-    --                               [12:8]=tst_burst (0..19), [5:0]=tst_idx (0..26)
-    -- Il firmware aspetta idx=26 (burst pronto), legge le 26 parole, nota tst_burst,
-    -- e ripete per i burst che gli servono (bin = burst*26 + j).
+    -- slave s0: fetch fsm status, chain counters and the bsram snapshot;
+    -- snapshot reads are registered, the ack comes two cycles after the strobe
     s0_proc: process(clk_sdram)
         variable st_v : std_logic_vector(31 downto 0);
     begin
         if rising_edge(clk_sdram) then
             s0_ack <= '0';
-            if s0_bsram_cnt = 1 then               -- 1o ciclo di attesa latenza BSRAM
+            if s0_bsram_cnt = 1 then
                 s0_bsram_cnt <= 2;
-            elsif s0_bsram_cnt = 2 then            -- dato BSRAM pronto -> ack
+            elsif s0_bsram_cnt = 2 then
                 s0_rdata     <= x"0000" & bsram_rdata;
                 s0_ack       <= '1';
                 s0_bsram_cnt <= 0;
             elsif s0_cyc = '1' and s0_stb = '1' and s0_ack = '0' then
                 if s0_we = '0' and s0_adr(12) = '1' then
-                    -- 0x48001000 + bin*4: snapshot BSRAM (lettura registrata, ack +2)
                     bsram_addr_cpu <= s0_adr(10 downto 2);
                     s0_bsram_cnt   <= 1;
                 else
-                    s0_ack <= '1';                 -- registri/scritture: ack immediato
+                    s0_ack <= '1';
                     if s0_we = '0' then
                         case to_integer(unsigned(s0_adr(7 downto 2))) is
-                            when 0 to 25 =>            -- 0x00..0x64: burst corrente (legacy)
-                                s0_rdata <= tst_rd_arr2(to_integer(unsigned(s0_adr(7 downto 2))));
-                            when 33 =>                 -- 0x84: DEBUG campioni ADC pronti
+                            when 0 to 25 =>
+                                s0_rdata <= fetch_words(to_integer(unsigned(s0_adr(7 downto 2))));
+                            when 33 =>
                                 s0_rdata <= std_logic_vector(acc_rdy_cnt);
-                            when 34 =>                 -- 0x88: DEBUG trigger FFT (finestre 512)
+                            when 34 =>
                                 s0_rdata <= std_logic_vector(acc_trig_cnt);
-                            when 35 =>                 -- 0x8C: DEBUG IRQ FFT (frame fatti)
+                            when 35 =>
                                 s0_rdata <= std_logic_vector(acc_irq_cnt);
-                            when 36 =>                 -- 0x90: fill_cnt (frame BSRAM completati)
+                            when 36 =>
                                 s0_rdata <= x"0000" & std_logic_vector(fill_cnt);
-                            when others =>             -- 0x80 e altri: stato FSM tst_
+                            when others =>
                                 st_v := (others => '0');
                                 st_v(31) := frame_ready_s;
-                                if tst_st = TS_READ then st_v(16) := '1'; end if;
-                                st_v(12 downto 8) := std_logic_vector(to_unsigned(tst_burst, 5));
-                                st_v(5 downto 0)  := std_logic_vector(to_unsigned(tst_idx, 6));
+                                if fetch_curr_state = F_READ then st_v(16) := '1'; end if;
+                                st_v(12 downto 8) := std_logic_vector(to_unsigned(fetch_burst, 5));
+                                st_v(5 downto 0)  := std_logic_vector(to_unsigned(fetch_idx, 6));
                                 s0_rdata <= st_v;
                         end case;
                     end if;
@@ -807,27 +511,23 @@ begin
         end if;
     end process;
 
-    -- ── BSRAM frame buffer: snapshot stabile dei 512 bin per la CPU ───────────
-    -- Scrittura DETERMINISTICA: ogni parola valida letta dalla SDRAM (tst_rd_valid_s,
-    -- stesso gate idx<26 di tst_rd_arr2) va al suo bin = tst_burst*26 + tst_idx.
-    -- Niente race: il frame resta stabile finche' tst_ non lo riscrive (~11 ms).
-    -- Read port registrato (1 ciclo) verso la CPU via s0_proc.
+    -- snapshot write side: each valid word lands at bin = burst * 26 + idx,
+    -- so the frame stays still for the cpu until the next fetch
     bsram_proc: process(clk_sdram)
         variable widx : integer;
     begin
         if rising_edge(clk_sdram) then
-            if tst_rd_valid_s = '1' and tst_idx < 26 then
-                widx := tst_burst * 26 + tst_idx;
+            if fetch_rd_valid = '1' and fetch_idx < 26 then
+                widx := fetch_burst * 26 + fetch_idx;
                 if widx < 512 then
-                    fft_bsram(widx) <= tst_rd_data(15 downto 0);
+                    fft_bsram(widx) <= fetch_rd_data(15 downto 0);
                 end if;
             end if;
             bsram_rdata <= fft_bsram(to_integer(unsigned(bsram_addr_cpu)));
         end if;
     end process;
 
-    -- Contatore frame completati: la CPU lo legge (S0/0x90) per sincronizzarsi e
-    -- copiare la BSRAM solo a fill terminata (snapshot coerente). tst_ resta intatta.
+    -- the cpu polls this counter instead of a clear on read flag
     fillcnt_proc: process(clk_sdram)
     begin
         if rising_edge(clk_sdram) then
@@ -835,8 +535,6 @@ begin
         end if;
     end process;
 
-    -- DEBUG acceleratore: conta i fronti di salita di spi_data_ready / dma_fft_trig /
-    -- dma_irq. La CPU li legge via S0 (0x84/0x88/0x8C) per capire dove si ferma la catena.
     acc_dbg_proc: process(clk_sdram)
     begin
         if rising_edge(clk_sdram) then
@@ -849,16 +547,14 @@ begin
         end if;
     end process;
 
-    -- ── SDRAM Controller IP ──────────────────────────────────────────────────
-    test_uart_s <= tst_tx_sr(0);
-    -- Mux SIP: DMA possiede il bus in WRITE (sdr_own=1), la FSM top in READ.
+    -- single command port of the sdram controller: the accelerator owns it
+    -- while it drains a frame, the fetch fsm owns it the rest of the time
     sip_wr_n <= dma_sdr_wr_n when dma_sdr_own = '1' else '1';
-    sip_rd_n <= tst_rd_n     when dma_sdr_own = '0' else '1';
-    sip_addr <= dma_sdr_addr when dma_sdr_own = '1' else tst_addr;
-    sip_data <= dma_sdr_data when dma_sdr_own = '1' else tst_wr_data;
-    -- Controller hand-made (streaming, come il SIP). Port map IDENTICA al SIP.
-    -- Il SIP resta dichiarato e nel progetto Gowin, ma NON e' piu' istanziato.
-    -- Per tornare al SIP: cambia il solo nome componente in SDRAM_controller_top_SIP.
+    sip_rd_n <= fetch_rd_n   when dma_sdr_own = '0' else '1';
+    sip_addr <= dma_sdr_addr when dma_sdr_own = '1' else fetch_addr;
+    sip_data <= dma_sdr_data when dma_sdr_own = '1' else (others => '0');
+
+    -- data_len 26 gives bursts of 27 words, the capture keeps the first 26
     u_sdram_direct: sdram_controller_fsm
     port map (
         O_sdram_clk      => O_sdram_clk,    O_sdram_cke      => O_sdram_cke,
@@ -872,18 +568,12 @@ begin
         I_sdrc_wr_n      => sip_wr_n,       I_sdrc_rd_n      => sip_rd_n,
         I_sdrc_addr      => sip_addr,       I_sdrc_dqm       => "0000",
         I_sdrc_data      => sip_data,
-        I_sdrc_data_len  => x"1A",  -- 26 = 27-word burst: la 27a (difettosa) scartata da tst_idx<26
-        O_sdrc_data      => tst_rd_data,    O_sdrc_init_done => tst_init_done,
-        O_sdrc_busy_n    => tst_busy_n_s,   O_sdrc_rd_valid  => tst_rd_valid_s,
-        O_sdrc_wrd_ack   => tst_wrd_ack_s
+        I_sdrc_data_len  => x"1A",
+        O_sdrc_data      => fetch_rd_data,  O_sdrc_init_done => fetch_init_done,
+        O_sdrc_busy_n    => fetch_busy_n,   O_sdrc_rd_valid  => fetch_rd_valid,
+        O_sdrc_wrd_ack   => open
     );
-    sdram_init_done <= tst_init_done;
-    ausp_ack  <= '0'; ausp_rdat  <= (others => '0');
-    dma_ack   <= '0'; dma_rdata  <= (others => '0');
-    wr_ack_seen_s <= '0'; rd_ack_seen_s <= '0';
 
-    -- ── Altri blocchi ... ─────────────────────────────────────────────────────
-    -- DMA acceleratore audio ATTIVO: si auto-avvia, legge ADC via M1->S1, FFT, dma_irq.
     u_dma: dma port map (
         clk_i => clk_sdram,  rst_i => rst_i, s_cyc_i => s5_cyc, s_stb_i => s5_stb, s_we_i  => s5_we,
         s_adr_i => s5_adr, s_dat_i => s5_wdata, s_dat_o => s5_rdata, s_ack_o => s5_ack,
@@ -892,33 +582,35 @@ begin
         spi_data_ready_i => spi_data_ready_s,
         sdr_own_o => dma_sdr_own, sdr_wr_n_o => dma_sdr_wr_n,
         sdr_addr_o => dma_sdr_addr, sdr_data_o => dma_sdr_data,
-        sdr_busy_n_i => tst_busy_n_s, sdr_initdone_i => tst_init_done,
+        sdr_busy_n_i => fetch_busy_n, sdr_initdone_i => fetch_init_done,
         irq_o => dma_irq, fft_trigger_o => dma_fft_trig,
-        fft_dbg_o => fft_dbg_s, fft_ack_dbg_o => fft_ack_dbg_s, fft_ser_o => fft_ser_s,
-        fft_idx_o => fft_idx_s, fft_xk_re_o => fft_xk_re_s, fft_opd_o => fft_opd_s
+        fft_dbg_o => open, fft_ack_dbg_o => open, fft_ser_o => open,
+        fft_idx_o => open, fft_xk_re_o => open, fft_opd_o => open
     );
 
-    -- SPI ADC ATTIVO: campiona il MCP3201 e alza spi_data_ready_s per il DMA.
     u_spi: spi_master port map (
         clk_i => clk_sdram, rst_i => '1', cyc_i => s1_cyc, stb_i => s1_stb, we_i => s1_we,
         adr_i => s1_adr(7 downto 0), dat_i => s1_wdata, dat_o => s1_rdata, ack_o => s1_ack,
-        data_ready_o => spi_data_ready_s, dbg_cap_o => spi_dbg_cap, mosi => mosi_p, miso => miso_p, sck => sck_p, cs => cs_p
+        data_ready_o => spi_data_ready_s, dbg_cap_o => open,
+        mosi => mosi_p, miso => miso_p, sck => sck_p, cs => cs_p
     );
 
+    -- pwm reset is high only until the pll locks
     pwm_rst_s <= not pll_lock;
 
+    -- speaker pwm runs on the bus clock so its registers need no cdc
     u_pwm10: pwm_generic
         generic map (
-            CLK_HZ        => 40_500_000,   -- su clk_sdram: niente CDC col bus della CPU
+            CLK_HZ        => 40_500_000,
             NBIT          => 8,
             PHASE_NBITS   => 24,
             K_RECIP_G     => 6_949_999,
             F1_DEFAULT_HZ => 0,
             F2_DEFAULT_HZ => 0,
-            AUTO_START    => false   -- emette solo su comando WB della CPU
+            AUTO_START    => false
         )
         port map (
-            clk_i => clk_sdram, rst_i => pwm_rst_s,   -- STESSO clock del bus/CPU
+            clk_i => clk_sdram, rst_i => pwm_rst_s,
             cyc_i => s2_cyc, stb_i => s2_stb, we_i => s2_we,
             adr_i => s2_adr(7 downto 0),
             dat_i => s2_wdata, dat_o => s2_rdata, ack_o => s2_ack,
@@ -942,16 +634,13 @@ begin
             pwm_o => pwm4_s
         );
 
-    -- Stesso clock del bus (niente CDC) e reset pll_lock come gli altri slave:
-    -- col bottone rst_i il GPIO era l'UNICA logica dipendente da quella linea e
-    -- se la linea sta bassa resta in reset -> ack mai -> lettura S4 appesa.
     u_gpio1: gpio_generic generic map (nbit => 1) port map (
         clk_i => clk_sdram, rst_i => pll_lock, cyc_i => s4_cyc, stb_i => s4_stb, we_i => s4_we,
-        adr_i => s4_adr(7 downto 0), dat_i => s4_wdata, dat_o => s4_rdata, ack_o => s4_ack, gpio_i => gpio_in_v, gpio_o => gpio_out_v
+        adr_i => s4_adr(7 downto 0), dat_i => s4_wdata, dat_o => s4_rdata, ack_o => s4_ack,
+        gpio_i => gpio_in_v, gpio_o => gpio_out_v
     );
 
-    -- Divisore frame: la FFT/DMA produce un frame ogni ~11 ms; decimiamo a 1
-    -- ogni FRAME_DIV (decode_frame_s pulsa, fa partire la lettura SDRAM->BSRAM).
+    -- one fetch every FRAME_DIV frame irqs
     process(clk_sdram)
     begin
         if rising_edge(clk_sdram) then
@@ -968,67 +657,8 @@ begin
         end if;
     end process;
 
-    -- ===== SPOSTATO NEL FIRMWARE (decode nella CPU): BSRAM + u_decoder + char TX =====
-    -- La CPU legge i risultati via S0 (FSM tst_) e decodifica in C. Tenuto come
-    -- riferimento, inattivo via "if false generate" (Gowin non supporta /* */).
-    gen_moved_decode : if false generate
-    -- BSRAM: write port (scarico dalla SDRAM via tst_rd_valid_s),
-    --         read port registrato (decoder). Index azzerato a inizio frame.
-    process(clk_sdram)
-    begin
-        if rising_edge(clk_sdram) then
-            if decode_frame_s = '1' then
-                bsram_widx <= (others => '0');
-            elsif tst_rd_valid_s = '1' and bsram_widx < 512 then
-                fft_bsram(to_integer(bsram_widx)) <= tst_rd_data(15 downto 0);
-                bsram_widx <= bsram_widx + 1;
-            end if;
-            bsram_rdata <= fft_bsram(to_integer(unsigned(dec_mem_addr)));
-        end if;
-    end process;
-
-    u_decoder: audio_decoder
-        generic map (
-            DEBUG_MODE  => false,  -- char mode: emette il char riconosciuto
-                                   -- (NB: blocco dentro "if false generate" = NON usato;
-                                   --  la decodifica vera e' nel firmware della CPU)
-            THRESHOLD   => 6,      -- soglia ASSOLUTA sul magnitude interpolato (parabolica)
-            N_BINS      => 256
-        )
-        port map (
-            clk_i      => clk_sdram,
-            rst_i      => pll_lock,
-            start_i    => frame_ready_s,
-            mem_addr_o => dec_mem_addr,
-            mem_data_i => bsram_rdata,
-            busy_i     => uart_char_busy,
-            char_o     => dec_char_o,
-            char_stb_o => dec_char_stb,
-            busy_o     => dec_busy_o
-        );
-
-    u_uart_tx_char: uart_tx_char
-        generic map (
-            CLK_HZ => 40_500_000,
-            BAUD   => 115200
-        )
-        port map (
-            clk_i  => clk_sdram,
-            rst_i  => pll_lock,
-            char_i => dec_char_o,
-            stb_i  => dec_char_stb,
-            tx_o   => uart_char_tx_s,
-            busy_o => uart_char_busy
-        );
-    end generate gen_moved_decode;
-    -- ===== fine blocco spostato nel firmware =====
-
-    -- =====================================================================
-    -- NOR flash W25Q64FV gestito DALLA CPU (firmware norflash.c), niente piu'
-    -- flash_ctrl hardware. Catena: ESP32 -> UART comandi (S7, pin 72/20) ->
-    -- CPU -> SPI generico (S8, pin 42/41/51/48) -> chip W25Q.
-    -- =====================================================================
-    -- UART comandi NOR = slave S7 (0x2800_0000), stessi pin della vecchia flash_ctrl.
+    -- nor flash path: command uart in (s7), generic spi engine out (s8),
+    -- the w25q protocol itself runs in the cpu firmware
     u_nor_uart: UART_GENERIC
         port map (
             clk_i => clk_sdram,
@@ -1044,8 +674,7 @@ begin
             RX_i  => flash_rx_i
         );
 
-    -- SPI verso il W25Q = slave S8 (0x3800_0000). PRESCALER=64 -> SCK ~633 kHz
-    -- (40.5 MHz / 64), stesso clock e mode 0 del vecchio SPI_Flash in flash_ctrl.
+    -- 40.5 MHz / 64 gives the 633 kHz sck the flash wiring tolerates
     u_nor_spi: spi_master_generic
         generic map ( PRESCALER => 64, FRAME_BITS => 8 )
         port map (
@@ -1064,21 +693,11 @@ begin
             CS    => flash_cs_o
         );
 
-    -- =====================================================================
-    -- Soft core RISC-V (Gowin PicoRV32) + sua UART.
-    -- clk_in = clk_sdram (40.5 MHz, stesso dominio del bus, < 46 MHz di Fmax),
-    -- resetn_in = pll_lock (parte a PLL agganciato). Il core fa da master sul
-    -- suo OPEN WB (slv_ext_*); per ora ci appendiamo solo una UART_GENERIC a
-    -- 0x20000000, cosi' il firmware stampa "SOFT CORE ON" sul laptop riusando
-    -- il pin uart_ext_tx (condiviso a AND con il banner "FPGA ON" del top).
-    -- ser_tx/ser_rx (Simple UART interna) non usati. JTAG e IRQ a riposo.
-    -- =====================================================================
-    -- IRQ bit 20 = fine FFT dall'audio accelerator (il firmware decodifica su questo).
     core_irq <= (20 => dma_irq, others => '0');
 
     u_softcore: Gowin_PicoRV32_Top
         port map (
-            ser_tx          => core_ser_tx,
+            ser_tx          => open,
             ser_rx          => '1',
             slv_ext_stb_o   => core_slv_stb,
             slv_ext_we_o    => core_slv_we,
@@ -1097,7 +716,7 @@ begin
             resetn_in       => pll_lock
         );
 
-    -- UART caratteri = slave S6 (0x2000_0000). La CPU (M0) la raggiunge via bus.
+    -- character uart to the esp32, slave s6, alone on its pin
     u_core_uart: UART_GENERIC
         port map (
             clk_i => clk_sdram,
@@ -1113,452 +732,86 @@ begin
             RX_i  => uart_ext_rx
         );
 
-    -- Logica W25Q (ex flash_ctrl): ora nel firmware, vedi firmware/src/norflash.c
-    -- (boot unlock QE=1 + scan head, comandi L/S/G/H/C/Q/I/T via S7, SPI via S8).
-    -- (Storico SI: SCK a 633 kHz + 1uF+10uF decoupling locale + retry/verify
-    --  lato host risolvono i drop di tensione del sector erase e il SI dei
-    --  filini. I LED nudi su pin FPGA avvelenavano la massa: mettere sempre
-    --  una resistenza serie ~330 ohm - 1 k.)
-
-    -- ===== MORTE (rimuovibili da git): irq_cnt, blink_led =====
-    gen_dead_a : if false generate
-    process(clk_i)
-    begin
-        if rising_edge(clk_i) then
-            dma_irq_prev <= dma_irq;
-            if dma_irq = '1' and dma_irq_prev = '0' then irq_cnt <= irq_cnt + 1; end if;
-        end if;
-    end process;
-
-    process(clk_i)
-    begin
-        if rising_edge(clk_i) then
-            if led_cnt >= to_unsigned(13_500_000 - 1, 24) then
-                led_cnt <= (others => '0'); blink_led <= not blink_led;
-            else led_cnt <= led_cnt + 1; end if;
-        end if;
-    end process;
-    end generate gen_dead_a;
-    -- ===== fine blocchi morti =====
-
-    -- pin 49/53/71/86 (ex LED debug) + 52 (CS) ora vanno al display TFT via u_disp.
-    pwm_10_o <= pwm10_s;
-    pwm_4_o  <= pwm4_s;
-    -- UART verso ESP32: boot banner + nuovo char dal decoder.
-    -- Il vecchio path rtx_pin (ASCII digits) e test_uart_s (hex dump) NON sono
-    -- piu' instradati: i loro FSM continuano a girare internamente ma le loro
-    -- linee TX sono ignorate. La FSM tst_* serve ancora per leggere la SDRAM,
-    -- ma il suo output UART e' bypassato dal decoder.
-    -- BRING-UP SOFT CORE: il pin TX e' pilotato SOLO dalla UART della CPU, per
-    -- isolare e verificare la catena PicoRV32 + UART_GENERIC + Wishbone. Il boot
-    -- banner ("FPGA ON") e il char del decoder restano vivi internamente ma sono
-    -- staccati dal pin (l'AND a 3 vie rompeva tutto: vedi storia). Per tornare
-    -- alla produzione: uart_ext_tx <= boot_tx_pin and uart_char_tx_s;
-    -- PRODUZIONE: pin 17 = UART caratteri (UART_GENERIC su S6, via bus).
+    pwm_10_o    <= pwm10_s;
+    pwm_4_o     <= pwm4_s;
     uart_ext_tx <= core_uart_tx;
 
-    -- ===== SPOSTATO NEL FIRMWARE (emit nella CPU): RX char + FIFO + FSM toni + banner =====
-    -- Tenuto come riferimento, commentato. La CPU fa RX dall'UART caratteri (S6),
-    -- decodifica il char e pilota la PWM (S2) via bus.
-    gen_moved_emit : if false generate
-    -- ── Path TX FPGA: UART RX (da ESP32) -> emissione carrier+tono via PWM ──
-    u_uart_rx: uart_rx_char
-        generic map (CLK_HZ => 27_000_000, BAUD => 115200)
-        port map (
-            clk_i   => clk_i,
-            rst_i   => pll_lock,
-            rx_i    => uart_ext_rx,
-            data_o  => rx_char_s,
-            valid_o => rx_valid_s
-        );
-
-    -- FIFO write: bufferizza i char ricevuti dall'UART (push se non piena)
-    process(clk_i)
+    -- fetch fsm, next state logic
+    fetch_comb : process(fetch_curr_state, decode_frame_s, fetch_busy_n,
+                         fetch_timeout, fetch_burst)
     begin
-        if rising_edge(clk_i) then
-            if pll_lock = '0' then
-                txf_wr <= 0;
-            elsif rx_valid_s = '1' then
-                if ((txf_wr + 1) mod TXF_DEPTH) /= txf_rd then
-                    txf(txf_wr) <= rx_char_s;
-                    txf_wr <= (txf_wr + 1) mod TXF_DEPTH;
-                end if;
-            end if;
-        end if;
-    end process;
-
-    -- FSM TX: estrae un char dalla FIFO, decodifica (carrier,tono), scrive su
-    -- u_pwm10 via Wishbone host master (hm_*): 0x50000004 = carica freq + start,
-    -- 0x50000008 = stop. Tono per TONE_CYCLES, poi silenzio per SIL_CYCLES.
-    process(clk_i)
-    begin
-        if rising_edge(clk_i) then
-            if pll_lock = '0' then
-                tx_st  <= TXS_IDLE;
-                txf_rd <= 0;
-                hm_cyc <= '0'; hm_stb <= '0'; hm_we <= '0';
-            else
-                case tx_st is
-                    when TXS_IDLE =>
-                        hm_cyc <= '0'; hm_stb <= '0'; hm_we <= '0';
-                        if txf_wr /= txf_rd then          -- FIFO non vuota
-                            tx_wbdata <= char_to_wbdata(txf(txf_rd));
-                            txf_rd    <= (txf_rd + 1) mod TXF_DEPTH;
-                            tx_st     <= TXS_START;
-                        end if;
-
-                    when TXS_START =>
-                        if tx_wbdata = x"00000000" then
-                            tx_st <= TXS_IDLE;          -- char non valido
-                        else
-                            hm_adr  <= x"50000004";
-                            hm_wdat <= tx_wbdata;
-                            hm_we   <= '1';
-                            hm_stb  <= '1';
-                            hm_cyc  <= '1';
-                            if hm_ack = '1' then
-                                hm_stb <= '0'; hm_cyc <= '0'; hm_we <= '0';
-                                tx_timer <= 0;
-                                tx_st    <= TXS_TONE;
-                            end if;
-                        end if;
-
-                    when TXS_TONE =>
-                        hm_cyc <= '0'; hm_stb <= '0';
-                        if tx_timer = TONE_CYCLES - 1 then
-                            tx_st <= TXS_STOP;
-                        else
-                            tx_timer <= tx_timer + 1;
-                        end if;
-
-                    when TXS_STOP =>
-                        hm_adr <= x"50000008";
-                        hm_we  <= '1';
-                        hm_stb <= '1';
-                        hm_cyc <= '1';
-                        if hm_ack = '1' then
-                            hm_stb <= '0'; hm_cyc <= '0'; hm_we <= '0';
-                            tx_timer <= 0;
-                            tx_st    <= TXS_SIL;
-                        end if;
-
-                    when TXS_SIL =>
-                        hm_cyc <= '0'; hm_stb <= '0';
-                        if tx_timer = SIL_CYCLES - 1 then
-                            tx_st <= TXS_IDLE;
-                        else
-                            tx_timer <= tx_timer + 1;
-                        end if;
-                end case;
-            end if;
-        end if;
-    end process;
-
-    -- Standalone UART TX
-    process(clk_i)
-    begin
-        if rising_edge(clk_i) then
-            case boot_tx_st is
-                when BTX_START =>
-                    boot_tx_pin  <= '0';
-                    boot_tx_sreg <= C_BOOT_TX_STR(boot_tx_idx);
-                    boot_tx_bitc <= 0;
-                    if boot_tx_baud = 233 then boot_tx_baud <= 0; boot_tx_st <= BTX_DATA;
-                    else boot_tx_baud <= boot_tx_baud + 1; end if;
-                when BTX_DATA =>
-                    boot_tx_pin <= boot_tx_sreg(0);
-                    if boot_tx_baud = 233 then
-                        boot_tx_baud <= 0; boot_tx_sreg <= '1' & boot_tx_sreg(7 downto 1);
-                        if boot_tx_bitc = 7 then boot_tx_st <= BTX_STOP;
-                        else boot_tx_bitc <= boot_tx_bitc + 1; end if;
-                    else boot_tx_baud <= boot_tx_baud + 1; end if;
-                when BTX_STOP =>
-                    boot_tx_pin <= '1';
-                    if boot_tx_baud = 233 then boot_tx_baud <= 0; boot_tx_st <= BTX_NEXT;
-                    else boot_tx_baud <= boot_tx_baud + 1; end if;
-                when BTX_NEXT =>
-                    if boot_tx_idx = C_BOOT_TX_LEN - 1 then boot_tx_st <= BTX_DONE;
-                    else boot_tx_idx <= boot_tx_idx + 1; boot_tx_st <= BTX_START; end if;
-                when BTX_DONE =>
-                    boot_tx_pin <= '1'; boot_done <= '1';
-            end case;
-        end if;
-    end process;
-    end generate gen_moved_emit;
-    -- ===== fine blocco emit (spostato nel firmware) =====
-
-    -- ===== MORTE (rimuovibili da git): fft_direct_buf, rtx_st, ausp_st, adc_nonzero =====
-    gen_dead_b : if false generate
-    process(clk_i)
-        variable abs_v : unsigned(14 downto 0);
-    begin
-        if rising_edge(clk_i) then
-            if fft_opd_s = '1' and unsigned(fft_idx_s) <= 7 then
-                if fft_xk_re_s(15) = '0' then abs_v := unsigned(fft_xk_re_s(14 downto 0));
-                else abs_v := unsigned(not fft_xk_re_s(14 downto 0)) + 1; end if;
-                fft_direct_buf(to_integer(unsigned(fft_idx_s))) <= abs_v;
-            end if;
-        end if;
-    end process;
-
-    process(clk_i)
-        variable v : integer range 0 to 32767;
-    begin
-        if rising_edge(clk_i) then
-            if ausp_results_rdy = '1' then ausp_results_ltch <= '1'; end if;
-            case rtx_st is
-                when RTX_IDLE =>
-                    if boot_done = '1' and ausp_results_ltch = '1' then
-                        ausp_results_ltch <= '0'; rtx_val_idx <= 0; rtx_st <= RTX_CONV;
-                    end if;
-                when RTX_CONV =>
-                    v := to_integer(ausp_mag_buf(rtx_val_idx));
-                    rtx_digs(0) <= std_logic_vector(to_unsigned(v / 10000        + 48, 8));
-                    rtx_digs(1) <= std_logic_vector(to_unsigned(v / 1000  mod 10 + 48, 8));
-                    rtx_digs(2) <= std_logic_vector(to_unsigned(v / 100   mod 10 + 48, 8));
-                    rtx_digs(3) <= std_logic_vector(to_unsigned(v / 10    mod 10 + 48, 8));
-                    rtx_digs(4) <= std_logic_vector(to_unsigned(v         mod 10 + 48, 8));
-                    rtx_dig_idx <= 0; rtx_st <= RTX_NEXT_DIGIT;
-                when RTX_NEXT_DIGIT =>
-                    rtx_baud <= 0; rtx_bitc <= 0;
-                    if rtx_dig_idx <= 4 then
-                        rtx_sreg <= rtx_digs(rtx_dig_idx); rtx_dig_idx <= rtx_dig_idx + 1;
-                        rtx_next_st <= RTX_NEXT_DIGIT; rtx_st <= RTX_BYTE_START;
-                    elsif rtx_val_idx < 7 then
-                        rtx_sreg <= x"2C"; rtx_next_st <= RTX_AFTER_SEP; rtx_st <= RTX_BYTE_START;
+        fetch_next_state <= fetch_curr_state;
+        case fetch_curr_state is
+            when F_IDLE =>
+                if decode_frame_s = '1' then fetch_next_state <= F_REQ; end if;
+            when F_REQ =>
+                if fetch_busy_n = '1' then fetch_next_state <= F_READ; end if;
+            when F_READ =>
+                if fetch_timeout = 200 then
+                    if fetch_burst = FETCH_NBURST - 1 then
+                        fetch_next_state <= F_DONE;
                     else
-                        rtx_sreg <= x"0D"; rtx_next_st <= RTX_AFTER_CR; rtx_st <= RTX_BYTE_START;
+                        fetch_next_state <= F_REQ;
                     end if;
-                when RTX_AFTER_SEP =>
-                    rtx_val_idx <= rtx_val_idx + 1; rtx_st <= RTX_CONV;
-                when RTX_AFTER_CR =>
-                    rtx_sreg <= x"0A"; rtx_next_st <= RTX_IDLE; rtx_baud <= 0; rtx_bitc <= 0; rtx_st <= RTX_BYTE_START;
-                when RTX_BYTE_START =>
-                    rtx_pin <= '0';
-                    if rtx_baud = 233 then rtx_baud <= 0; rtx_st <= RTX_BYTE_BITS;
-                    else rtx_baud <= rtx_baud + 1; end if;
-                when RTX_BYTE_BITS =>
-                    rtx_pin <= rtx_sreg(0);
-                    if rtx_baud = 233 then
-                        rtx_baud <= 0; rtx_sreg <= '1' & rtx_sreg(7 downto 1);
-                        if rtx_bitc = 7 then rtx_st <= RTX_BYTE_STOP;
-                        else rtx_bitc <= rtx_bitc + 1; end if;
-                    else rtx_baud <= rtx_baud + 1; end if;
-                when RTX_BYTE_STOP =>
-                    rtx_pin <= '1';
-                    if rtx_baud = 233 then rtx_baud <= 0; rtx_st <= rtx_next_st;
-                    else rtx_baud <= rtx_baud + 1; end if;
-            end case;
-        end if;
+                end if;
+            when F_DONE =>
+                fetch_next_state <= F_IDLE;
+        end case;
     end process;
 
-    process(clk_i)
-        variable v_u15 : unsigned(14 downto 0);
-    begin
-        if rising_edge(clk_i) then
-            ausp_irq_prev <= dma_irq; ausp_cyc <= '0'; ausp_stb <= '0'; ausp_results_rdy <= '0';
-            case ausp_st is
-                when ST_IDLE =>
-                    if dma_irq = '1' and ausp_irq_prev = '0' then
-                        ausp_dbg_s <= '0'; sdram_nz_s <= '0'; rd_scan_idx <= 0;
-                        sig_max_u <= (others => '0'); carr_max_u <= (others => '0');
-                        ausp_st <= ST_RD_ISSUE;
-                    end if;
-                when ST_RD_ISSUE =>
-                    ausp_adr <= std_logic_vector(to_unsigned(16#10000000# + rd_scan_idx, 32));
-                    ausp_cyc <= '1'; ausp_stb <= '1'; ausp_st <= ST_RD_WAIT;
-                when ST_RD_WAIT =>
-                    ausp_cyc <= '1'; ausp_stb <= '1';
-                    if ausp_ack = '1' then
-                        ausp_cyc <= '0'; ausp_stb <= '0';
-                        if ausp_rdat(15) = '0' then v_u15 := unsigned(ausp_rdat(14 downto 0));
-                        else v_u15 := unsigned(not ausp_rdat(14 downto 0)) + 1; end if;
-                        if v_u15 /= 0 then sdram_nz_s <= '1'; end if;
-                        ausp_mag_buf(rd_scan_idx) <= v_u15;
-                        if rd_scan_idx < 4 then if v_u15 > sig_max_u then sig_max_u <= v_u15; end if;
-                        else if v_u15 > carr_max_u then carr_max_u <= v_u15; end if; end if;
-                        if rd_scan_idx = 7 then ausp_st <= ST_NOISE_CALC;
-                        else rd_scan_idx <= rd_scan_idx + 1; ausp_st <= ST_RD_ISSUE; end if;
-                    end if;
-                when ST_NOISE_CALC =>
-                    if sig_max_u > C_DETECT_THR and carr_max_u > C_DETECT_THR then ausp_dbg_s <= '1'; else ausp_dbg_s <= '0'; end if;
-                    ausp_results_rdy <= '1'; ausp_st <= ST_IDLE;
-                when others => ausp_st <= ST_IDLE;
-            end case;
-        end if;
-    end process;
-
-    process(clk_i)
-    begin
-        if rising_edge(clk_i) then
-            if s1_cyc = '1' and s1_stb = '1' and s1_ack = '1' and s1_we = '0' then
-                if unsigned(s1_rdata(11 downto 0)) > 2000 then adc_nonzero <= '1'; else adc_nonzero <= '0'; end if;
-            end if;
-        end if;
-    end process;
-    end generate gen_dead_b;
-    -- ===== fine blocchi morti =====
-
-    -- ── TEST SDRAM UART TX ──────────────────────────────────────────────────
-    process(clk_sdram)
+    -- fetch fsm: after each frame irq it reads the 20 row bursts back from
+    -- sdram inside a fixed 200 cycle window per burst, the valid words fall
+    -- into the bsram snapshot, then it signals the frame and re-arms
+    fetch_sync : process(clk_sdram)
     begin
         if rising_edge(clk_sdram) then
-            tst_baud_tick <= '0';
-            if tst_baud_cnt = 351 then tst_baud_cnt <= (others => '0'); tst_baud_tick <= '1';
-            else tst_baud_cnt <= tst_baud_cnt + 1; end if;
-        end if;
-    end process;
+            fetch_curr_state <= fetch_next_state;
+            frame_ready_s    <= '0';
 
-    process(clk_sdram)
-    begin
-        if rising_edge(clk_sdram) then
-            if tst_baud_tick = '1' and tst_tx_busy = '1' then
-                tst_tx_sr <= '1' & tst_tx_sr(9 downto 1); tst_tx_cnt <= tst_tx_cnt + 1;
-                if tst_tx_cnt = 9 then tst_tx_busy <= '0'; tst_tx_cnt <= (others => '0'); end if;
-            end if;
-            if tst_tx_load = '1' and tst_tx_busy = '0' then
-                tst_tx_sr <= '1' & tst_tx_byte & '0'; tst_tx_busy <= '1'; tst_tx_cnt <= (others => '0');
-            end if;
-        end if;
-    end process;
-
-    -- ================================================================
-    -- FSM SDRAM @ 108 MHz 
-    -- DINAMICA E SCALABILE: Handshake garantito con timeout
-    -- ================================================================
-    process(clk_sdram)
-        procedure send_nibble(n : unsigned(3 downto 0)) is
-        begin
-            if n < 10 then tst_tx_byte <= std_logic_vector(to_unsigned(48 + to_integer(n), 8));
-            else tst_tx_byte <= std_logic_vector(to_unsigned(55 + to_integer(n), 8)); end if;
-        end procedure;
-    begin
-        if rising_edge(clk_sdram) then
-            tst_tx_load   <= '0';
-            tst_irq_prev  <= dma_irq;
-            frame_ready_s <= '0';   -- default: pulse di 1 colpo
-
-            -- Cattura lettura SDRAM (stessa modalità del test): ogni rd_valid
-            -- nella finestra di READ campiona O_sdrc_data.
-            if tst_rd_valid_s = '1' then
-                if tst_idx < 26 then
-                    tst_rd_arr2(tst_idx) <= tst_rd_data;
-                    tst_idx <= tst_idx + 1;
+            if fetch_rd_valid = '1' then
+                if fetch_idx < 26 then
+                    fetch_words(fetch_idx) <= fetch_rd_data;
+                    fetch_idx <= fetch_idx + 1;
                 end if;
             end if;
 
-            case tst_st is
-                -- Attende l'IRQ del DMA (scrittura SDRAM dei 512 FFT completata).
-                when TS_INIT =>
-                    tst_rd_n <= '1';
-                    -- Parte solo 1 frame ogni FRAME_DIV (decimazione): legge
-                    -- la SDRAM e scarica in BSRAM, niente piu' dump hex.
+            case fetch_curr_state is
+
+                when F_IDLE =>
+                    fetch_rd_n <= '1';
                     if decode_frame_s = '1' then
-                        tst_wrd_cnt <= 0;
-                        tst_idx     <= 0;
-                        tst_timeout <= 0;
-                        tst_burst   <= 0;
-                        tst_st      <= TS_READ_WAIT;
+                        fetch_idx     <= 0;
+                        fetch_timeout <= 0;
+                        fetch_burst   <= 0;
                     end if;
 
-                when TS_PREAMBLE =>
-                    -- Caratteri sacrificali: assorbono il transitorio di
-                    -- sincronizzazione della UART di test (bug #5).
-                    tst_rd_n <= '1';
-                    if tst_tx_busy = '0' and tst_tx_load = '0' then
-                        tst_tx_load <= '1';
-                        tst_tx_byte <= x"20";
-                        if tst_wrd_cnt = 255 then
-                            tst_wrd_cnt <= 0;
-                            tst_burst   <= 0;
-                            tst_st      <= TS_READ_WAIT;
-                        else
-                            tst_wrd_cnt <= tst_wrd_cnt + 1;
-                        end if;
+                when F_REQ =>
+                    fetch_rd_n <= '1';
+                    if fetch_busy_n = '1' then
+                        fetch_rd_n    <= '0';
+                        -- the accelerator wrote burst k on row 2 + k of bank 2
+                        fetch_addr    <= "10"
+                                       & std_logic_vector(to_unsigned(2 + fetch_burst, 11))
+                                       & "00000101";
+                        fetch_idx     <= 0;
+                        fetch_timeout <= 0;
                     end if;
 
-                -- Stati di scrittura non più usati (la WRITE è nel DMA).
-                when TS_WRITE_WAIT | TS_WRITE | TS_WRITE_DONE =>
-                    tst_st <= TS_PAUSE;
-
-                when TS_READ_WAIT =>
-                    tst_rd_n <= '1';
-                    if tst_busy_n_s = '1' then
-                        tst_rd_n    <= '0';
-                        -- legge la riga dove il DMA ha scritto il burst k
-                        tst_addr    <= "10"
-                                     & std_logic_vector(to_unsigned(2 + tst_burst, 11))
-                                     & "00000101";
-                        tst_idx     <= 0;
-                        tst_timeout <= 0;
-                        tst_st      <= TS_READ;
-                    end if;
-
-                when TS_READ =>
-                    tst_rd_n    <= '1';
-                    tst_timeout <= tst_timeout + 1;
-                    if tst_timeout = 200 then
-                        tst_timeout <= 0;
-                        -- niente dump hex: passa al burst successivo, oppure
-                        -- se era l'ultimo segnala frame pronto al decoder.
-                        if tst_burst = TST_NBURST - 1 then
+                when F_READ =>
+                    fetch_rd_n    <= '1';
+                    fetch_timeout <= fetch_timeout + 1;
+                    if fetch_timeout = 200 then
+                        fetch_timeout <= 0;
+                        if fetch_burst = FETCH_NBURST - 1 then
                             frame_ready_s <= '1';
-                            tst_st        <= TS_PAUSE;
                         else
-                            tst_burst <= tst_burst + 1;
-                            tst_st    <= TS_READ_WAIT;
+                            fetch_burst <= fetch_burst + 1;
                         end if;
                     end if;
 
-                when TS_TX_WORD =>
-                    if tst_tx_busy = '0' and tst_tx_load = '0' then
-                        tst_tx_load <= '1';
-                        
-                        if tst_nibble_idx < 8 then
-                            case tst_nibble_idx is
-                                when 0 => send_nibble(unsigned(tst_rd_arr2(tst_word_idx)(31 downto 28)));
-                                when 1 => send_nibble(unsigned(tst_rd_arr2(tst_word_idx)(27 downto 24)));
-                                when 2 => send_nibble(unsigned(tst_rd_arr2(tst_word_idx)(23 downto 20)));
-                                when 3 => send_nibble(unsigned(tst_rd_arr2(tst_word_idx)(19 downto 16)));
-                                when 4 => send_nibble(unsigned(tst_rd_arr2(tst_word_idx)(15 downto 12)));
-                                when 5 => send_nibble(unsigned(tst_rd_arr2(tst_word_idx)(11 downto 8)));
-                                when 6 => send_nibble(unsigned(tst_rd_arr2(tst_word_idx)(7 downto 4)));
-                                when 7 => send_nibble(unsigned(tst_rd_arr2(tst_word_idx)(3 downto 0)));
-                                when others => null;
-                            end case;
-                            tst_nibble_idx <= tst_nibble_idx + 1;
-                        else
-                            tst_tx_byte <= x"20"; 
-                            tst_nibble_idx <= 0;
-                            if tst_word_idx = 25 then
-                                tst_st <= TS_TX_CRLF;
-                            else
-                                tst_word_idx <= tst_word_idx + 1;
-                            end if;
-                        end if;
-                    end if;
-                    
-                when TS_TX_CRLF =>
-                    if tst_tx_busy = '0' and tst_tx_load = '0' then
-                        tst_tx_load <= '1';
-                        if tst_nibble_idx = 0 then
-                            tst_tx_byte <= x"0D";
-                            tst_nibble_idx <= 1;
-                        else
-                            tst_tx_byte <= x"0A";
-                            if tst_burst = TST_NBURST - 1 then
-                                tst_st <= TS_PAUSE;
-                            else
-                                tst_burst   <= tst_burst + 1;
-                                tst_timeout <= 0;
-                                tst_st      <= TS_READ_WAIT;
-                            end if;
-                        end if;
-                    end if;
+                when F_DONE =>
+                    fetch_rd_n <= '1';
 
-                when TS_PAUSE =>
-                    -- pronto per il prossimo IRQ del DMA
-                    tst_st <= TS_INIT;
             end case;
         end if;
     end process;

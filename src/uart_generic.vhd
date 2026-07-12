@@ -46,8 +46,7 @@ architecture UART_GENERIC_BEHAVIORAL of UART_GENERIC is
     signal rx_baud_cnt : natural range 0 to 65535 := 0;
     signal rx_parity   : std_logic := '0';
 
-    -- FIFO RX: il vecchio registro singolo veniva sovrascritto dai burst
-    -- back-to-back (es. comandi NOR multi-byte) mentre la CPU era altrove.
+    -- receive fifo: a back to back burst used to overwrite the old single register
     constant RXF_DEPTH : natural := 16;
     type rxf_t is array(0 to RXF_DEPTH - 1) of std_logic_vector(7 downto 0);
     signal rxf      : rxf_t := (others => (others => '0'));
@@ -55,8 +54,7 @@ architecture UART_GENERIC_BEHAVIORAL of UART_GENERIC is
     signal rxf_rd   : natural range 0 to RXF_DEPTH - 1 := 0;
     signal rxf_cnt  : natural range 0 to RXF_DEPTH := 0;
     signal rx_valid : std_logic;
-    -- byte catturato al ciclo di accesso (pre-pop): dat_o e' campionato dal
-    -- master al ciclo dopo, quando il puntatore e' gia' avanzato.
+    -- the popped byte is held here, the master samples it one cycle later
     signal rd_data  : std_logic_vector(8 downto 0) := (others => '0');
     signal ack_r    : std_logic := '0';
 
@@ -267,9 +265,7 @@ begin
                     when S_RX_STOP =>
                         if rx_baud_cnt = baud_div - 1 then
                             rx_baud_cnt <= 0;
-                            -- Accetta SEMPRE il byte, come fa uart_rx_char del flash (che
-                            -- funziona): NON scartare se lo stop bit campiona '0' (jitter,
-                            -- baud 0.16% off, framing back-to-back) -> ricezione affidabile.
+                            -- keep the byte even if the stop bit samples low
                             if cnt_v < RXF_DEPTH then
                                 rxf(rxf_wr) <= rx_shift(7 downto 0);
                                 rxf_wr <= (rxf_wr + 1) mod RXF_DEPTH;

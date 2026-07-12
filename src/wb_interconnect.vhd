@@ -1,25 +1,9 @@
 library ieee;
 use ieee.std_logic_1164.all;
 
--- Wishbone shared-bus crossbar: 2 masters (M0 CPU, M1 audio accelerator), 9 slaves.
--- Priority: M1 > M0 when both active simultaneously.
---
--- Decode su 5 bit addr[31:27]: 9 slave non stanno nei 7 nibble raggiungibili dalla
--- CPU (bit31=0, 0x1..0x7), quindi un bit in piu' da 14 finestre da 128 MB.
---   0x4800_0000  01001  S0  SDRAM (via FSM tst_)  [NON 0x1000_0000: range interno IP]
---   0x2000_0000  00100  S6  UART_GENERIC  (caratteri, pin 17/18)
---   0x2800_0000  00101  S7  UART_GENERIC  (comandi NOR dall'ESP32, pin 72/20)
---   0x3000_0000  00110  S5  DMA / audio accelerator control regs
---   0x3800_0000  00111  S8  spi_master_generic (SPI verso chip NOR, pin 42/41/51/48)
---   0x4000_0000  01000  S1  SPI Master (ADC)
---   0x5000_0000  01010  S2  PWM 10-bit
---   0x5800_0000  01011  S9  spi_display (TFT ST7789, pin 49/53/71/86/77)
---   0x6000_0000  01100  S3  PWM 4-bit
---   0x7000_0000  01110  S4  GPIO
--- La CPU riceve i comandi storage da S7 (UART) e li esegue su S8 (SPI), come flash_ctrl.
 entity wb_interconnect is
     port (
-        -- Master 0 (CPU)
+        clk_i    : in  std_logic;
         m0_adr_i : in  std_logic_vector(31 downto 0);
         m0_dat_i : in  std_logic_vector(31 downto 0);
         m0_dat_o : out std_logic_vector(31 downto 0);
@@ -28,7 +12,6 @@ entity wb_interconnect is
         m0_stb_i : in  std_logic;
         m0_cyc_i : in  std_logic;
         m0_ack_o : out std_logic;
-        -- Master 1 (DMA – peripheral access; SDRAM goes directly via memory_arbiter M1)
         m1_adr_i : in  std_logic_vector(31 downto 0);
         m1_dat_i : in  std_logic_vector(31 downto 0);
         m1_dat_o : out std_logic_vector(31 downto 0);
@@ -37,7 +20,6 @@ entity wb_interconnect is
         m1_stb_i : in  std_logic;
         m1_cyc_i : in  std_logic;
         m1_ack_o : out std_logic;
-        -- Slave 0 – SDRAM arbiter M0
         s0_adr_o : out std_logic_vector(31 downto 0);
         s0_dat_o : out std_logic_vector(31 downto 0);
         s0_dat_i : in  std_logic_vector(31 downto 0);
@@ -46,7 +28,6 @@ entity wb_interconnect is
         s0_stb_o : out std_logic;
         s0_cyc_o : out std_logic;
         s0_ack_i : in  std_logic;
-        -- Slave 1 – SPI Master
         s1_adr_o : out std_logic_vector(31 downto 0);
         s1_dat_o : out std_logic_vector(31 downto 0);
         s1_dat_i : in  std_logic_vector(31 downto 0);
@@ -55,7 +36,6 @@ entity wb_interconnect is
         s1_stb_o : out std_logic;
         s1_cyc_o : out std_logic;
         s1_ack_i : in  std_logic;
-        -- Slave 2 – PWM 10-bit
         s2_adr_o : out std_logic_vector(31 downto 0);
         s2_dat_o : out std_logic_vector(31 downto 0);
         s2_dat_i : in  std_logic_vector(31 downto 0);
@@ -64,7 +44,6 @@ entity wb_interconnect is
         s2_stb_o : out std_logic;
         s2_cyc_o : out std_logic;
         s2_ack_i : in  std_logic;
-        -- Slave 3 – PWM 4-bit
         s3_adr_o : out std_logic_vector(31 downto 0);
         s3_dat_o : out std_logic_vector(31 downto 0);
         s3_dat_i : in  std_logic_vector(31 downto 0);
@@ -73,7 +52,6 @@ entity wb_interconnect is
         s3_stb_o : out std_logic;
         s3_cyc_o : out std_logic;
         s3_ack_i : in  std_logic;
-        -- Slave 4 – GPIO
         s4_adr_o : out std_logic_vector(31 downto 0);
         s4_dat_o : out std_logic_vector(31 downto 0);
         s4_dat_i : in  std_logic_vector(31 downto 0);
@@ -82,7 +60,6 @@ entity wb_interconnect is
         s4_stb_o : out std_logic;
         s4_cyc_o : out std_logic;
         s4_ack_i : in  std_logic;
-        -- Slave 5 – DMA control registers
         s5_adr_o : out std_logic_vector(31 downto 0);
         s5_dat_o : out std_logic_vector(31 downto 0);
         s5_dat_i : in  std_logic_vector(31 downto 0);
@@ -91,7 +68,6 @@ entity wb_interconnect is
         s5_stb_o : out std_logic;
         s5_cyc_o : out std_logic;
         s5_ack_i : in  std_logic;
-        -- Slave 6 – UART_GENERIC caratteri (pin 17/18)
         s6_adr_o : out std_logic_vector(31 downto 0);
         s6_dat_o : out std_logic_vector(31 downto 0);
         s6_dat_i : in  std_logic_vector(31 downto 0);
@@ -100,7 +76,6 @@ entity wb_interconnect is
         s6_stb_o : out std_logic;
         s6_cyc_o : out std_logic;
         s6_ack_i : in  std_logic;
-        -- Slave 7 – UART_GENERIC comandi NOR dall'ESP32 (pin 72/20)
         s7_adr_o : out std_logic_vector(31 downto 0);
         s7_dat_o : out std_logic_vector(31 downto 0);
         s7_dat_i : in  std_logic_vector(31 downto 0);
@@ -109,7 +84,6 @@ entity wb_interconnect is
         s7_stb_o : out std_logic;
         s7_cyc_o : out std_logic;
         s7_ack_i : in  std_logic;
-        -- Slave 8 – NOR flash SPI engine (spi_master_generic)
         s8_adr_o : out std_logic_vector(31 downto 0);
         s8_dat_o : out std_logic_vector(31 downto 0);
         s8_dat_i : in  std_logic_vector(31 downto 0);
@@ -118,7 +92,6 @@ entity wb_interconnect is
         s8_stb_o : out std_logic;
         s8_cyc_o : out std_logic;
         s8_ack_i : in  std_logic;
-        -- Slave 9 – spi_display (TFT ST7789)
         s9_adr_o : out std_logic_vector(31 downto 0);
         s9_dat_o : out std_logic_vector(31 downto 0);
         s9_dat_i : in  std_logic_vector(31 downto 0);
@@ -140,9 +113,7 @@ architecture behavioral of wb_interconnect is
     signal sel_cyc : std_logic;
     signal sel_m1  : std_logic;
 
-    -- Slave index (0-9) decoded from address bits [31:27] (5 bit -> 10 slaves + sink).
-    -- Un bit in piu' dei 4 nibble spezza ogni nibble in due finestre da 128 MB.
-    -- Index 10 = sink non mappato.
+    -- slave index decoded from addr[31:27], index 10 is the unmapped sink
     signal slv_idx : integer range 0 to 10;
 
     signal slv_dat : std_logic_vector(31 downto 0);
@@ -153,9 +124,19 @@ architecture behavioral of wb_interconnect is
     signal slv_dat_arr : dat_array_t;
     signal slv_ack_arr : ack_array_t;
 
+    -- cpu bus watchdog: if a cpu (m0) access is not answered in time, force one
+    -- ack so a dead or gated slave (adc spi ack gated on data_ready, or an
+    -- unmapped address = slave 10) can never hang the soft core. TIMEOUT_MAX is
+    -- deliberately wide: every real access (sdram, spi, uart) completes in at
+    -- most a few hundred bus clocks, so this never fires on a legit transfer.
+    constant TIMEOUT_MAX : integer := 200_000;   -- ~5 ms at 40.5 MHz
+    signal wd_cnt      : integer range 0 to TIMEOUT_MAX := 0;
+    signal wd_ack      : std_logic := '0';
+    signal m0_real_ack : std_logic;
+
 begin
 
-    -- Il Mux M1 (DMA) vince su M0 (CPU)
+    -- the accelerator master always wins over the cpu
     sel_m1  <= '1' when (m1_cyc_i = '1' and m1_stb_i = '1') else '0';
     sel_adr <= m1_adr_i when sel_m1 = '1' else m0_adr_i;
     sel_dat <= m1_dat_i when sel_m1 = '1' else m0_dat_i;
@@ -167,24 +148,23 @@ begin
     process(sel_adr)
     begin
         case sel_adr(31 downto 27) is
-            when "01001" => slv_idx <= 0;  -- 0x4800_0000  SDRAM (FSM tst_). NB: NON 0x1000_0000:
-                                           -- gli indirizzi con adr[31:29]=000 (0x0..0x1FFF_FFFF)
-                                           -- sono il range INTERNO dell'IP (DTCM/ITCM/simpleuart)
-                                           -- e le letture esterne li' non completano mai (hang).
-            when "00100" => slv_idx <= 6;  -- 0x2000_0000  UART_GENERIC (caratteri)
-            when "00101" => slv_idx <= 7;  -- 0x2800_0000  UART_GENERIC (comandi NOR)
-            when "00110" => slv_idx <= 5;  -- 0x3000_0000  DMA / audio accelerator
-            when "00111" => slv_idx <= 8;  -- 0x3800_0000  spi_master_generic (SPI NOR)
-            when "01000" => slv_idx <= 1;  -- 0x4000_0000  SPI (ADC)
-            when "01010" => slv_idx <= 2;  -- 0x5000_0000  PWM10
-            when "01011" => slv_idx <= 9;  -- 0x5800_0000  spi_display (TFT)
-            when "01100" => slv_idx <= 3;  -- 0x6000_0000  PWM4
-            when "01110" => slv_idx <= 4;  -- 0x7000_0000  GPIO
-            when others  => slv_idx <= 10; -- non mappato -> sink
+            -- the 0x0 to 0x1 range is internal to the cpu ip, external
+            -- reads there never complete, so the sdram sits at 0x4800_0000
+            when "01001" => slv_idx <= 0;  -- 0x4800_0000  sdram snapshot
+            when "00100" => slv_idx <= 6;  -- 0x2000_0000  character uart
+            when "00101" => slv_idx <= 7;  -- 0x2800_0000  nor command uart
+            when "00110" => slv_idx <= 5;  -- 0x3000_0000  audio accelerator
+            when "00111" => slv_idx <= 8;  -- 0x3800_0000  nor flash spi
+            when "01000" => slv_idx <= 1;  -- 0x4000_0000  adc spi
+            when "01010" => slv_idx <= 2;  -- 0x5000_0000  speaker pwm
+            when "01011" => slv_idx <= 9;  -- 0x5800_0000  tft display spi
+            when "01100" => slv_idx <= 3;  -- 0x6000_0000  led pwm
+            when "01110" => slv_idx <= 4;  -- 0x7000_0000  gpio
+            when others  => slv_idx <= 10;
         end case;
     end process;
 
-    -- Broadcast address/data/we to all slaves; gate stb/cyc per slave
+    -- address and data go to everyone, only the selected slave gets the strobe
     s0_adr_o <= sel_adr; s0_dat_o <= sel_dat; s0_we_o <= sel_we; s0_sel_o <= sel_sel;
     s1_adr_o <= sel_adr; s1_dat_o <= sel_dat; s1_we_o <= sel_we; s1_sel_o <= sel_sel;
     s2_adr_o <= sel_adr; s2_dat_o <= sel_dat; s2_we_o <= sel_we; s2_sel_o <= sel_sel;
@@ -217,7 +197,6 @@ begin
     s9_stb_o <= sel_stb when slv_idx = 9 else '0';
     s9_cyc_o <= sel_cyc when slv_idx = 9 else '0';
 
-    -- Slave read-data/ack arrays for clean mux
     slv_dat_arr(0) <= s0_dat_i; slv_ack_arr(0) <= s0_ack_i;
     slv_dat_arr(1) <= s1_dat_i; slv_ack_arr(1) <= s1_ack_i;
     slv_dat_arr(2) <= s2_dat_i; slv_ack_arr(2) <= s2_ack_i;
@@ -228,14 +207,36 @@ begin
     slv_dat_arr(7) <= s7_dat_i; slv_ack_arr(7) <= s7_ack_i;
     slv_dat_arr(8) <= s8_dat_i; slv_ack_arr(8) <= s8_ack_i;
     slv_dat_arr(9) <= s9_dat_i; slv_ack_arr(9) <= s9_ack_i;
-    slv_dat_arr(10) <= (others => '0'); slv_ack_arr(10) <= '0';  -- sink non mappato
+    slv_dat_arr(10) <= (others => '0'); slv_ack_arr(10) <= '0';
 
     slv_dat <= slv_dat_arr(slv_idx);
     slv_ack <= slv_ack_arr(slv_idx);
 
     m0_dat_o <= slv_dat;
     m1_dat_o <= slv_dat;
-    m0_ack_o <= slv_ack and not sel_m1;
-    m1_ack_o <= slv_ack and     sel_m1;
+    m0_real_ack <= slv_ack and not sel_m1;
+    m0_ack_o    <= m0_real_ack or wd_ack;
+    m1_ack_o    <= slv_ack and sel_m1;
+
+    -- count while the cpu holds a request that is not being acked (whether it is
+    -- stalled behind m1 or waiting on a slave that never acks); at TIMEOUT_MAX
+    -- pulse one ack for a single cycle so the transaction always completes. Only
+    -- m0 is guarded: m1 (accelerator) self stalls by design and must not be forced.
+    cpu_watchdog : process(clk_i)
+    begin
+        if rising_edge(clk_i) then
+            wd_ack <= '0';
+            if m0_cyc_i = '1' and m0_stb_i = '1' and m0_real_ack = '0' then
+                if wd_cnt >= TIMEOUT_MAX then
+                    wd_ack <= '1';
+                    wd_cnt <= 0;
+                else
+                    wd_cnt <= wd_cnt + 1;
+                end if;
+            else
+                wd_cnt <= 0;
+            end if;
+        end if;
+    end process;
 
 end behavioral;

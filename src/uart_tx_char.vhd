@@ -2,9 +2,6 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- Semplice UART TX 8N1.
--- Su stb_i pulse di 1 colpo, serializza char_i sul filo tx_o.
--- Mentre trasmette busy_o = '1' (un nuovo stb_i durante busy viene ignorato).
 entity uart_tx_char is
     Generic (
         CLK_HZ : integer := 27_000_000;
@@ -12,7 +9,7 @@ entity uart_tx_char is
     );
     Port (
         clk_i  : in  std_logic;
-        rst_i  : in  std_logic;     -- reset attivo basso
+        rst_i  : in  std_logic;
         char_i : in  std_logic_vector(7 downto 0);
         stb_i  : in  std_logic;
         tx_o   : out std_logic;

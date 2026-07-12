@@ -31,6 +31,9 @@
 #ifndef WS_USE_TLS
 #define WS_USE_TLS 1             /* Cloudflare e' solo wss:// (TLS) */
 #endif
+#ifndef WIFI_RETRY_MS
+#define WIFI_RETRY_MS 8000       /* se non connesso, ri-lancia WiFi.begin ogni 8 s */
+#endif
 
 static WebSocketsClient ws;
 
@@ -271,16 +274,23 @@ static void on_ws_event(WStype_t type, uint8_t *payload, size_t length) {
     }
 }
 
+/* (ri)avvia l'associazione WiFi. Usata sia dall'init sia dal watchdog in
+ * web_link_tick, cosi' la radio aggancia da sola senza bisogno del reset. */
+static void wifi_start(void) {
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+    /* Riduce il picco di corrente della radio (~da 19.5 a 11 dBm): aiuta su
+     * alimentazioni deboli a non far scattare il brownout. Va riapplicata dopo
+     * ogni begin. La vera cura resta comunque un 5V solido. */
+    WiFi.setTxPower(WIFI_POWER_11dBm);
+}
+
 void web_link_init(void) {
     led_init(LED_WIFI_PIN);      /* GPIO 25: WiFi connesso  */
     led_init(LED_WS_PIN);        /* GPIO 26: WebSocket connesso */
 
     WiFi.mode(WIFI_STA);
-    WiFi.begin(WIFI_SSID, WIFI_PASS);
-    /* Riduce il picco di corrente della radio (~da 19.5 a 11 dBm): aiuta su
-     * alimentazioni deboli a non far scattare il brownout. La vera cura resta
-     * comunque alimentare l'ESP32 da una USB/5V solidi. */
-    WiFi.setTxPower(WIFI_POWER_11dBm);
+    WiFi.setAutoReconnect(true); /* riaggancia da solo se cade dopo essere stato su */
+    wifi_start();
     Serial.printf("[web] WiFi: connessione a \"%s\"...\n", WIFI_SSID);
 
 #if WS_USE_TLS
@@ -294,8 +304,31 @@ void web_link_init(void) {
 
 void web_link_tick(void) {
     ws.loop();
+
+    /* Watchdog WiFi: WiFi.begin() parte una volta sola nell'init. Se al boot la
+     * radio non aggancia (alimentazione ancora instabile, AP lento, glitch), senza
+     * questo si resta scollegati finche' non premo reset. Qui, se non siamo
+     * connessi, ri-lancio l'associazione ogni WIFI_RETRY_MS: aggancia da sola. */
+    static uint32_t last_try = 0;
+    static bool     was_up   = false;
+    bool up = (WiFi.status() == WL_CONNECTED);
+
+    if (up) {
+        if (!was_up) {
+            Serial.printf("[web] WiFi connesso, IP %s\n",
+                          WiFi.localIP().toString().c_str());
+        }
+        last_try = millis();               /* connesso: tieni fermo il timer */
+    } else if (millis() - last_try >= WIFI_RETRY_MS) {
+        last_try = millis();
+        Serial.println("[web] WiFi non connesso, riprovo...");
+        WiFi.disconnect();
+        wifi_start();
+    }
+    was_up = up;
+
     /* LED WiFi (GPIO 25) segue lo stato della connessione, a livello registro. */
-    led_set(LED_WIFI_PIN, WiFi.status() == WL_CONNECTED);
+    led_set(LED_WIFI_PIN, up);
 }
 
 /* ---- push verso la dashboard ---- */

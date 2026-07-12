@@ -2,8 +2,6 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- UART RX 8N1. Riceve un byte dal pin rx_i e lo presenta su data_o con un
--- impulso valid_o di 1 colpo. Campiona lo start bit a meta' periodo.
 entity uart_rx_char is
     Generic (
         CLK_HZ : integer := 27_000_000;
@@ -11,7 +9,7 @@ entity uart_rx_char is
     );
     Port (
         clk_i   : in  std_logic;
-        rst_i   : in  std_logic;     -- reset attivo basso
+        rst_i   : in  std_logic;
         rx_i    : in  std_logic;
         data_o  : out std_logic_vector(7 downto 0);
         valid_o : out std_logic
@@ -32,7 +30,6 @@ architecture behavioral of uart_rx_char is
     signal data_r   : std_logic_vector(7 downto 0) := (others => '0');
     signal valid_r  : std_logic := '0';
 
-    -- sincronizzatore a 2 FF sulla linea rx
     signal rx_meta : std_logic := '1';
     signal rx_s    : std_logic := '1';
 
@@ -57,19 +54,19 @@ begin
                 case state is
 
                     when ST_IDLE =>
-                        if rx_s = '0' then         -- start bit
+                        if rx_s = '0' then
                             baud_cnt <= 0;
                             state    <= ST_START;
                         end if;
 
-                    when ST_START =>               -- conferma a meta' bit
+                    when ST_START =>
                         if baud_cnt = HALF - 1 then
                             baud_cnt <= 0;
                             if rx_s = '0' then
                                 bit_cnt <= 0;
                                 state   <= ST_DATA;
                             else
-                                state <= ST_IDLE;  -- falso start
+                                state <= ST_IDLE;
                             end if;
                         else
                             baud_cnt <= baud_cnt + 1;
@@ -78,7 +75,7 @@ begin
                     when ST_DATA =>
                         if baud_cnt = DIV - 1 then
                             baud_cnt <= 0;
-                            sreg <= rx_s & sreg(7 downto 1);  -- LSB first
+                            sreg <= rx_s & sreg(7 downto 1);
                             if bit_cnt = 7 then
                                 state <= ST_STOP;
                             else

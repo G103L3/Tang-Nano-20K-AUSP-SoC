@@ -2,23 +2,6 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- Dual-port Wishbone→SDRAM bridge.
--- M1 (DMA write) ha priorità su M0 (AUSP read).
--- Usa SDRAM_Controller_HS_Top (SDRC_HS IP) a 108 MHz.
---
--- Protocollo SDRC_HS:
---   I_sdrc_cmd[2:0] = {RAS_n, CAS_n, WE_n}
---   cmd_en DEVE essere tenuto HIGH fino a cmd_ack='1' (non pulsato 1 solo ciclo).
---   cmd_ack scatta al ciclo ~4 sia per WRITE che per READ.
---
---   Sequenza WRITE: stati M1_CMD (tieni cmd_en='1') → M1_WR_WAIT (conta 14 cicli
---     da cmd_ack per completare WRITE+tWR+PRECHARGE+tRP) → M1_ACK
---
---   Sequenza READ: stati M0_CMD (tieni cmd_en='1') → M0_RD_WAIT (conta 5 cicli
---     da cmd_ack, CL=3+margine, dato valido su O_sdrc_data) → M0_ACK
---
--- FSM: IDLE → M1_CMD → M1_WR_WAIT → M1_ACK → IDLE
---      IDLE → M0_CMD → M0_RD_WAIT → M0_ACK → IDLE
 entity memory_arbiter is
     port (
         wb_clk_i    : in  std_logic;
@@ -103,8 +86,6 @@ architecture structural of memory_arbiter is
     signal arb_state : arb_t := IDLE;
     signal state_ack : std_logic := '0';
 
-    -- wr_timer: conta cicli in M1_CMD (timeout), M1_WR_WAIT (26 cicli), M1_FLUSH_CMD (timeout)
-    -- rd_timer: conta cicli in M0_RD_WAIT e M1_FLUSH_WAIT (CL latency)
     signal wr_timer : unsigned(4 downto 0) := (others => '0');
     signal rd_timer : unsigned(2 downto 0) := (others => '0');
 
@@ -128,13 +109,11 @@ begin
     begin
         if rising_edge(wb_clk_i) then
             sdrc_cmd_en <= '0';
-            sdrc_cmd    <= "111";  -- NOP default
+            sdrc_cmd    <= "111";
             state_ack   <= '0';
 
             case arb_state is
 
-                -- ── IDLE ─────────────────────────────────────────────────────────
-                -- Priorità M1 (DMA write) > M0 (AUSP read).
                 when IDLE =>
                     wr_timer <= (others => '0');
                     rd_timer <= (others => '0');
@@ -149,28 +128,22 @@ begin
                         end if;
                     end if;
 
-                -- ── M1_CMD: tiene cmd_en='1' finché cmd_ack o timeout ───────────
-                -- Timeout a 16 cicli: se il SDRC_HS è in refresh al momento del cmd_en
-                -- può non rispondere con cmd_ack. Un ciclo NOP (→IDLE→M1_CMD) sblocca
-                -- la state machine interna del controller.
                 when M1_CMD =>
                     sdrc_cmd_en <= '1';
-                    sdrc_cmd    <= "100";  -- WRITE
+                    sdrc_cmd    <= "100";
                     wr_timer    <= wr_timer + 1;
                     if sdrc_cmd_ack = '1' then
                         wr_ack_seen <= '1';
-                        wr_timer    <= (others => '0');  -- reset: M1_WR_WAIT parte da 0
+                        wr_timer    <= (others => '0');
                         arb_state   <= M1_WR_WAIT;
-                    elsif wr_timer = 15 then              -- timeout 16 cicli: riprova
+                    elsif wr_timer = 15 then
                         wr_timer  <= (others => '0');
-                        arb_state <= IDLE;               -- 1 ciclo NOP poi torna in M1_CMD
+                        arb_state <= IDLE;
                     elsif m1_cyc_i = '0' or m1_stb_i = '0' then
                         wr_timer  <= (others => '0');
                         arb_state <= IDLE;
                     end if;
 
-                -- ── M1_WR_WAIT: aspetta completamento WRITE ──────────────────────
-                -- 26 cicli da cmd_ack (≈241 ns @108 MHz) poi flush READ.
                 when M1_WR_WAIT =>
                     wr_timer <= wr_timer + 1;
                     if wr_timer = 25 then
@@ -178,24 +151,17 @@ begin
                         arb_state <= M1_FLUSH_CMD;
                     end if;
 
-                -- ── M1_FLUSH_CMD: READ dallo stesso addr della WRITE ─────────────
-                -- Forza ACTIVATE+READ+PRECHARGE (con precharge_ctrl='1') che chiude
-                -- la riga SDRAM. Senza questo, il SDRC_HS tiene la riga aperta e
-                -- le WRITE consecutive vanno tutte a col 0 della riga iniziale.
-                -- Timeout a 16 cicli: se in refresh, salta il flush (non critico).
                 when M1_FLUSH_CMD =>
                     sdrc_cmd_en <= '1';
-                    sdrc_cmd    <= "101";  -- READ (flush)
+                    sdrc_cmd    <= "101";
                     wr_timer    <= wr_timer + 1;
                     if sdrc_cmd_ack = '1' then
                         rd_timer  <= (others => '0');
                         arb_state <= M1_FLUSH_WAIT;
                     elsif wr_timer = 15 then
-                        arb_state <= M1_ACK;  -- timeout: skip flush
+                        arb_state <= M1_ACK;
                     end if;
 
-                -- ── M1_FLUSH_WAIT: aspetta CL cicli, scarta il dato ─────────────
-                -- 7 cicli (rd_timer=6) sufficienti per CL=3 + tRP ≈ 5 cicli.
                 when M1_FLUSH_WAIT =>
                     rd_timer <= rd_timer + 1;
                     if rd_timer = 6 then
@@ -203,7 +169,6 @@ begin
                         arb_state <= M1_ACK;
                     end if;
 
-                -- ── M1_ACK: hold ack finché DMA deasserta stb ───────────────────
                 when M1_ACK =>
                     state_ack <= '1';
                     if m1_cyc_i = '0' or m1_stb_i = '0' then
@@ -211,10 +176,9 @@ begin
                         state_ack <= '0';
                     end if;
 
-                -- ── M0_CMD: tiene cmd_en='1' finché cmd_ack ─────────────────────
                 when M0_CMD =>
                     sdrc_cmd_en <= '1';
-                    sdrc_cmd    <= "101";  -- READ
+                    sdrc_cmd    <= "101";
                     if sdrc_cmd_ack = '1' then
                         rd_ack_seen <= '1';
                         rd_timer    <= (others => '0');
@@ -223,8 +187,6 @@ begin
                         arb_state <= IDLE;
                     end if;
 
-                -- ── M0_RD_WAIT: aspetta CL=3 cicli dopo cmd_ack ─────────────────
-                -- 5 cicli da cmd_ack: al ciclo 5 O_sdrc_data è stabile (finestra t=3..7).
                 when M0_RD_WAIT =>
                     rd_timer <= rd_timer + 1;
                     if rd_timer = 4 then
@@ -236,7 +198,6 @@ begin
                         rd_timer  <= (others => '0');
                     end if;
 
-                -- ── M0_ACK: hold ack finché AUSP deasserta stb ──────────────────
                 when M0_ACK =>
                     state_ack <= '1';
                     if m0_cyc_i = '0' or m0_stb_i = '0' then
@@ -265,13 +226,13 @@ begin
         I_sdram_clk           => wb_clk_i,
         I_sdrc_cmd_en         => sdrc_cmd_en,
         I_sdrc_cmd            => sdrc_cmd,
-        I_sdrc_precharge_ctrl => '1',  -- auto-precharge: chiude la riga dopo ogni accesso (richiesto dal flush READ)
+        I_sdrc_precharge_ctrl => '1',
         I_sdram_power_down    => '0',
         I_sdram_selfrefresh   => '0',
         I_sdrc_addr           => sdrc_addr_r,
         I_sdrc_dqm            => "0000",
         I_sdrc_data           => sdrc_data_r,
-        I_sdrc_data_len       => x"00",  -- length-1: x"00" = 1 word
+        I_sdrc_data_len       => x"00",
         O_sdrc_data           => sdrc_data_out,
         O_sdrc_init_done      => sdrc_init_done,
         O_sdrc_cmd_ack        => sdrc_cmd_ack

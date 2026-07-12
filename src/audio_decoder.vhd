@@ -2,21 +2,6 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- Audio Decoder (memory-read) — protocollo COMPATTO a opcode (vedi DIARIO
--- 2026-05-24). Niente run-length: 1 tono = 1 simbolo. Solo 5 frequenze, con
--- bit0/bit1 distanti 1000 Hz (poco confondibili):
---   carrier MASTER 2000 Hz (bin 22), carrier SLAVE 2400 Hz (bin 27),
---   EOF 2900 (bin 32), bit0 3500 (bin 39), bit1 4500 (bin 50).
---
--- Ogni simbolo emesso e' una coppia carrier + tono-dato. Il decoder, per ogni
--- frame, trova il carrier (master/slave) + il tono-dato (bit0/bit1/EOF) e emette
--- UN char:
---   carrier master -> minuscole 'a'/'b'/'c' (bit0/bit1/EOF)
---   carrier slave   -> MAIUSCOLE 'A'/'B'/'C'
---
--- Algoritmo di rilevamento invariato: per ogni bin atteso, massimo locale ±3 +
--- interpolazione parabolica + soglia assoluta (generic THRESHOLD). Test senza
--- divisore: 8*D*(beta-T)+(alpha-gamma)^2 > 0 con D=2*beta-alpha-gamma.
 entity audio_decoder is
     Generic (
         DEBUG_MODE : boolean := false;
@@ -25,7 +10,7 @@ entity audio_decoder is
     );
     Port (
         clk_i      : in  std_logic;
-        rst_i      : in  std_logic;     -- reset attivo basso
+        rst_i      : in  std_logic;
         start_i    : in  std_logic;
         mem_addr_o : out std_logic_vector(8 downto 0);
         mem_data_i : in  std_logic_vector(15 downto 0);
@@ -38,17 +23,16 @@ end audio_decoder;
 
 architecture behavioral of audio_decoder is
 
-    -- Candidati: 0=carrier master, 1=carrier slave, 2=bit0, 3=bit1, 4=EOF
     constant NCAND : integer := 5;
     constant WINR  : integer := 3;
     type icand_t is array(0 to NCAND-1) of integer;
-    -- ordine: master(2000/22), slave(2400/27), bit0(3500/39), bit1(4500/50), EOF(2900/32)
+
     constant CAND_BIN : icand_t := (22, 27, 39, 50, 32);
-    constant IDX_CM   : integer := 0;  -- carrier master 2000
-    constant IDX_CS   : integer := 1;  -- carrier slave  2400
-    constant IDX_B0   : integer := 2;  -- bit0 3500
-    constant IDX_B1   : integer := 3;  -- bit1 4500
-    constant IDX_EOF  : integer := 4;  -- EOF  2900
+    constant IDX_CM   : integer := 0;
+    constant IDX_CS   : integer := 1;
+    constant IDX_B0   : integer := 2;
+    constant IDX_B1   : integer := 3;
+    constant IDX_EOF  : integer := 4;
 
     constant DBG_LEN : integer := 21;
 
@@ -63,7 +47,6 @@ architecture behavioral of audio_decoder is
     type win_t is array(0 to 2*WINR) of unsigned(14 downto 0);
     signal win : win_t := (others => (others => '0'));
 
-    -- per-candidato: rilevato + magnitudine centrale (beta)
     type det_t  is array(0 to NCAND-1) of std_logic;
     type beta_t is array(0 to NCAND-1) of unsigned(14 downto 0);
     signal det  : det_t  := (others => '0');
@@ -117,7 +100,7 @@ begin
         variable detected      : boolean;
         variable use_master    : boolean;
         variable car_base      : integer;
-        variable data_sym      : integer;   -- 0=bit0,1=bit1,2=EOF
+        variable data_sym      : integer;
         variable data_beta     : unsigned(14 downto 0);
         variable have_data     : boolean;
         variable flags         : unsigned(3 downto 0);
@@ -188,35 +171,35 @@ begin
 
                     when ST_DECIDE =>
                         if DEBUG_MODE then
-                            -- "M<cm> S<cs> 0<b0> 1<b1> E<eof> F<flags>\r\n"
+
                             flags := (others => '0');
                             flags(0) := det(IDX_CM);  flags(1) := det(IDX_CS);
                             flags(2) := det(IDX_B0) or det(IDX_B1) or det(IDX_EOF);
-                            dbg_buf(0)  <= x"4D";                       -- 'M'
+                            dbg_buf(0)  <= x"4D";
                             dbg_buf(1)  <= hexc(beta(IDX_CM)(7 downto 4));
                             dbg_buf(2)  <= hexc(beta(IDX_CM)(3 downto 0));
                             dbg_buf(3)  <= x"20";
-                            dbg_buf(4)  <= x"53";                       -- 'S'
+                            dbg_buf(4)  <= x"53";
                             dbg_buf(5)  <= hexc(beta(IDX_CS)(7 downto 4));
                             dbg_buf(6)  <= hexc(beta(IDX_CS)(3 downto 0));
                             dbg_buf(7)  <= x"20";
-                            dbg_buf(8)  <= x"30";                       -- '0'
+                            dbg_buf(8)  <= x"30";
                             dbg_buf(9)  <= hexc(beta(IDX_B0)(7 downto 4));
                             dbg_buf(10) <= hexc(beta(IDX_B0)(3 downto 0));
-                            dbg_buf(11) <= x"31";                       -- '1'
+                            dbg_buf(11) <= x"31";
                             dbg_buf(12) <= hexc(beta(IDX_B1)(7 downto 4));
                             dbg_buf(13) <= hexc(beta(IDX_B1)(3 downto 0));
-                            dbg_buf(14) <= x"45";                       -- 'E'
+                            dbg_buf(14) <= x"45";
                             dbg_buf(15) <= hexc(beta(IDX_EOF)(7 downto 4));
                             dbg_buf(16) <= hexc(beta(IDX_EOF)(3 downto 0));
-                            dbg_buf(17) <= x"46";                       -- 'F'
+                            dbg_buf(17) <= x"46";
                             dbg_buf(18) <= hexc(flags);
                             dbg_buf(19) <= x"0D";
                             dbg_buf(20) <= x"0A";
                             dbg_idx <= 0;
                             state   <= ST_DBG_WAIT;
                         else
-                            -- dato piu' forte tra bit0/bit1/EOF (solo se rilevato)
+
                             have_data := false; data_beta := (others => '0'); data_sym := 0;
                             if det(IDX_B0) = '1' and beta(IDX_B0) > data_beta then
                                 data_beta := beta(IDX_B0); data_sym := 0; have_data := true;
@@ -228,7 +211,6 @@ begin
                                 data_beta := beta(IDX_EOF); data_sym := 2; have_data := true;
                             end if;
 
-                            -- carrier: master XOR slave (se entrambi, il piu' forte)
                             use_master := false;
                             if det(IDX_CM) = '1' and det(IDX_CS) = '0' then
                                 use_master := true;

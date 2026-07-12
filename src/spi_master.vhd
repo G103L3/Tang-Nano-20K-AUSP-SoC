@@ -2,14 +2,6 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
--- MCP3201-BI/P SPI ADC driver
--- Frame: 16 bit-periods x 36 clk = 576 clk/sample (~46.875 kHz at 27 MHz)
---   periods  0     : null bit  (CS low,  SCK toggles, MISO not captured)
---   periods  1-12  : data bits B11..B0 (CS low,  SCK toggles, capture on rising edge)
---   periods 13-15  : idle      (CS high, SCK low)
--- dat_o[11:0] = 12-bit sample; dat_o[31:12] = 0
--- data_ready_o is a combinational copy of the internal flag for fast DMA polling
-
 entity SPI_Master is
     Port (
         clk_i        : in  STD_LOGIC;
@@ -32,9 +24,15 @@ end SPI_Master;
 
 architecture SPI_Master_BEHAVIORAL of SPI_Master is
 
-    constant PRESCALER  : natural := 54;  -- 40.5MHz: 36*1.5 -> fSCK = 40.5e6/54 = 750 kHz (come a 27MHz/36)
+    -- 16 sck periods of 54 clocks each: one mcp3201 frame every 864 cycles
+    constant PRESCALER  : natural := 54;
     constant HALF_PRE   : natural := PRESCALER / 2;
     constant TOTAL_BITS : natural := 16;
+
+    -- S_SHIFT covers bit periods 0 to 13 with cs low, the 12 data bits are
+    -- captured on periods 2 to 13; S_GAP is periods 14 and 15 with cs high
+    type state_t is (S_IDLE, S_SHIFT, S_GAP);
+    signal curr_state, next_state : state_t := S_IDLE;
 
     signal shift_reg    : std_logic_vector(11 downto 0) := (others => '0');
     signal data_o_s     : std_logic_vector(31 downto 0) := (others => '0');
@@ -44,23 +42,46 @@ architecture SPI_Master_BEHAVIORAL of SPI_Master is
     signal CS_s         : std_logic := '1';
     signal bit_cnt      : natural range 0 to TOTAL_BITS - 1 := 0;
     signal pre_cnt      : natural range 0 to PRESCALER - 1 := 0;
-    signal active       : std_logic := '0';
 
 begin
 
     dat_o        <= data_o_s;
     data_ready_o <= data_ready_s;
-    -- HIGH solo durante la finestra di cattura (bit_cnt 2..13, CS basso)
-    -- Media su pin 49 = stessa del raw MISO se la state machine è allineata
-    dbg_cap_o    <= MISO when (active = '1' and bit_cnt >= 2 and bit_cnt <= 13) else '0';
+    dbg_cap_o    <= MISO when (curr_state = S_SHIFT and bit_cnt >= 2) else '0';
     SCK          <= SCK_s;
     CS           <= CS_s;
     MOSI         <= '0';
 
-    process(clk_i)
+    -- next state logic
+    p_comb : process(curr_state, start, bit_cnt, pre_cnt)
+    begin
+        next_state <= curr_state;
+        case curr_state is
+            when S_IDLE =>
+                if start = '1' then
+                    next_state <= S_SHIFT;
+                end if;
+            when S_SHIFT =>
+                if bit_cnt = 13 and pre_cnt = PRESCALER - 1 then
+                    next_state <= S_GAP;
+                end if;
+            when S_GAP =>
+                if bit_cnt = TOTAL_BITS - 1 and pre_cnt = PRESCALER - 1 then
+                    if start = '1' then
+                        next_state <= S_SHIFT;
+                    else
+                        next_state <= S_IDLE;
+                    end if;
+                end if;
+        end case;
+    end process;
+
+    -- state register, bus interface and shift datapath
+    p_sync : process(clk_i)
     begin
         if rising_edge(clk_i) then
             if rst_i = '0' then
+                curr_state   <= S_IDLE;
                 ack_o        <= '0';
                 start        <= '0';
                 SCK_s        <= '0';
@@ -70,8 +91,8 @@ begin
                 shift_reg    <= (others => '0');
                 data_o_s     <= (others => '0');
                 data_ready_s <= '0';
-                active       <= '0';
             else
+                curr_state <= next_state;
                 ack_o <= '0';
 
                 if cyc_i = '1' and stb_i = '1' then
@@ -90,6 +111,7 @@ begin
                                 ack_o <= '1';
                         end case;
                     else
+                        -- the sample read acks only when a sample is ready
                         if adr_i = x"00" then
                             if data_ready_s = '1' then
                                 ack_o <= '1';
@@ -101,15 +123,14 @@ begin
                     end if;
                 end if;
 
-                if start = '1' and active = '0' then
-                    active  <= '1';
-                    bit_cnt <= 0;
-                    pre_cnt <= 0;
-                    CS_s    <= '0';
-                end if;
+                case curr_state is
+                    when S_IDLE =>
+                        CS_s    <= '1';
+                        SCK_s   <= '0';
+                        bit_cnt <= 0;
+                        pre_cnt <= 0;
 
-                if active = '1' then
-                    if bit_cnt <= 13 then
+                    when S_SHIFT =>
                         CS_s <= '0';
                         if pre_cnt = HALF_PRE - 1 then
                             SCK_s <= '1';
@@ -121,43 +142,30 @@ begin
                             SCK_s   <= '0';
                             pre_cnt <= 0;
                             if bit_cnt = 13 then
+                                -- last data bit: latch the sample and flag it
                                 data_o_s     <= x"00000" & shift_reg;
                                 data_ready_s <= '1';
                                 shift_reg    <= (others => '0');
                             end if;
-                            if bit_cnt = TOTAL_BITS - 1 then
-                                bit_cnt <= 0;
-                                if start = '0' then
-                                    active <= '0';
-                                    CS_s   <= '1';
-                                end if;
-                            else
-                                bit_cnt <= bit_cnt + 1;
-                            end if;
+                            bit_cnt <= bit_cnt + 1;
                         else
                             pre_cnt <= pre_cnt + 1;
                         end if;
-                    else
+
+                    when S_GAP =>
                         CS_s  <= '1';
                         SCK_s <= '0';
                         if pre_cnt = PRESCALER - 1 then
                             pre_cnt <= 0;
                             if bit_cnt = TOTAL_BITS - 1 then
                                 bit_cnt <= 0;
-                                if start = '0' then
-                                    active <= '0';
-                                end if;
                             else
                                 bit_cnt <= bit_cnt + 1;
                             end if;
                         else
                             pre_cnt <= pre_cnt + 1;
                         end if;
-                    end if;
-                else
-                    CS_s  <= '1';
-                    SCK_s <= '0';
-                end if;
+                end case;
 
             end if;
         end if;
